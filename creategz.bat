@@ -14,7 +14,7 @@ for /r %%a in (R\*.r) do (
 )
 
 :: delete sit.zip if present
-if exist sit.zip del sit.zip
+if exist sit.gz del sit.gz
 
 :: create zip
-c:\Library\exe\7z.exe a -tzip sit.zip -mx9 c:\temp\code.r
+c:\Library\exe\7z.exe a -tgzip sit.gz -mx9 c:\temp\code.r
