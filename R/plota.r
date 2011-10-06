@@ -320,7 +320,7 @@ plota.candle.col <- function(	y ) {
 	return( iif( Cl(y)>Op(y), plota.control$col.up, plota.control$col.dn) )
 }
 plota.volume.col <- function( y ) { 
-	return( iif( Cl(y)>lag(Cl(y)), plota.control$col.up, plota.control$col.dn) )
+	return( iif( Cl(y)>mlag(Cl(y)), plota.control$col.up, plota.control$col.dn) )
 }
 
 ###############################################################################
@@ -482,23 +482,30 @@ plota.test <- function() {
 	load.packages('quantmod')
 	
 	# download sample data from Yahoo
-	data0 = getSymbols('LULU', from = '1980-01-01', auto.assign = FALSE)
-	data1 = getSymbols('SPY', from = '1980-01-01', auto.assign = FALSE)
+	data.spy = getSymbols('SPY', from = '1980-01-01', auto.assign = FALSE)
+	data.ibm = getSymbols('IBM', from = '1980-01-01', auto.assign = FALSE)
 
 	
 	# simple example candles and volume	
-		y = data1['2011:01:01::2011:02:01']
-		highlight = which(Cl(y) < 128)
-		
+		y = data.spy['2011:01:01::2011:02:01']
+		highlight = which(Cl(y) < 127)
+
+		png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+				
 		layout(c(1,1,2))		
-		plota(y, type = 'candle', plotX = F, x.highlight = highlight)
+		plota(y, type = 'candle', main = 'SPY', plotX = F, x.highlight = highlight)
 		y = plota.scale.volume(y)
 		plota(y, type = 'volume', x.highlight = highlight)
+		
+		dev.off()
+
 						
 		
 	# simple example + rsi + legend with last value		
-		y = data1['2010:01:01::2011:02:01']		
-		
+		y = data.spy['2010:01:01::2011:02:01']		
+
+		png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+				
 		layout(c(1,1,2,3))	
 		plota(y, type = 'candle', plotX = F)
 			plota.legend('SPY', 'blue', y)
@@ -511,31 +518,43 @@ plota.test <- function() {
 			abline(h = 80, col = 'red')
 			plota.legend('RSI(2)', 'black', rsi)
 		
+		dev.off()			
 					
 	# two Y axis example
-		y = data1['2010:01:01::2011:02:01']
+		y = data.spy['2010:01:01::2011:02:01']
 		
+		png(filename = 'plot3.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+		
+		# to plot second Y axis, free some space on left side
+		# e.g. set LeftMargin=3
 		plota(y, type = 'ohlc', LeftMargin=3)
 			
 		y0 = y;			
-		y = data0['2011:01:15::2011:02:01']		
+		y = data.ibm['2010:10:15::2011:02:01']		
 		plota2Y(y, ylim = range(OHLC(y)),las=1, col='red', col.axis = 'red')
 			plota.ohlc(y, col = 'red')		
-		plota.legend('SPY(rhs),LULU(lhs)', 'blue,red', list(y0,y))
+		plota.legend('SPY(rhs),IBM(lhs)', 'blue,red', list(y0,y))
 
+		dev.off()
 				
-	# daily & weekly on the same plot
-		y = data1['2010:01:01::2011:02:01']
-		
+	# daily & monthly  on the same plot
+		y = data.spy['2010:01:01::2011:02:01']
+
+		png(filename = 'plot4.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+				
 		plota(y, type = 'candle')
 			y1 = to.monthly(y)
 				index(y1) = as.Date(index(y1))
 			plota.ohlc(y1, col = 'pink')
 			plota.candle(y)
-						
+			plota.legend('Daily,Monthly', 'red,pink')
+				
+		dev.off()		
 			
 	# daily / weekly / monthly
-		y = data1['2010:01:01::2011']
+		y = data.spy['2010:01:01::2011']
+		
+		png(filename = 'plot5.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 		
 		layout(c(1,2,3))	
 		plota(y, type = 'candle', plotX = F)
@@ -553,6 +572,7 @@ plota.test <- function() {
 			plota.candle(y1)	
 			plota.legend('Monthly', 'blue', y1)	
 			
-			
+	dev.off()					
+	
 }
 

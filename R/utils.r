@@ -160,3 +160,66 @@ test.tic.toc <- function()
 	toc(10)
 }
 
+
+###############################################################################
+# Matrix Utilities
+###############################################################################
+# Lag matrix or vector
+#  mlag(x,1) - use yesterday's values
+#  mlag(x,-1) - use tomorrow's values
+###############################################################################
+mlag <- function
+(
+	m,			# matrix or vector
+	nlag = 1	# number of lags
+)
+{ 
+	# vector
+	if( is.null(dim(m)) ) { 
+		n = len(m)
+		if(nlag > 0) {
+			m[(nlag+1):n] = m[1:(n-nlag)]
+			m[1:nlag] = NA
+		} else if(nlag < 0) {
+			m[1:(n+nlag)] = m[(1-nlag):n]
+			m[(n+nlag+1):n] = NA
+		} 	
+		
+	# matrix	
+	} else {
+		n = nrow(m)
+		if(nlag > 0) {
+			m[(nlag+1):n,] = m[1:(n-nlag),]
+			m[1:nlag,] = NA
+		} else if(nlag < 0) {
+			m[1:(n+nlag),] = m[(1-nlag):n,]
+			m[(n+nlag+1):n,] = NA
+		} 
+	}
+	return(m);
+}
+
+###############################################################################
+# Compute correlations
+###############################################################################
+compute.cor <- function
+(
+	data, 		# matrix with data
+	method = c("pearson", "kendall", "spearman")
+)
+{
+	nr = nrow(data) 
+	nc = ncol(data) 
+	
+	corm = matrix(NA,nc,nc)
+	colnames(corm) = rownames(corm) = colnames(data)
+		
+	for( i in 1:(nc-1) ) {
+		temp = data[,i]
+		for( j in (i+1):nc ) {
+			corm[i,j] = cor(temp, data[,j], use='complete.obs', method[1])	
+		}
+	}
+	return(corm)
+}
+
