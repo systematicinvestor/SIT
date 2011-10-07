@@ -154,7 +154,7 @@ plot.table <- function
 	smain = '', 				# text to draw in top,left cell
 	text.cex = 1, 				# text size
 	frame.cell = T, 			# flag to draw border
-	higlight = F, 				# either flag to higlight or matrix with 
+	highlight = F, 				# either flag to highlight or matrix with 
 								# background colors
 	colorbar = FALSE, 			# flag to draw colorbar
 	keep_all.same.cex = FALSE	# flag to auto-adjust text size
@@ -197,19 +197,19 @@ plot.table <- function
 	# add space to the right if colorbar will be drawn
 	if(colorbar) {
 		plot.matrix = cbind(plot.matrix, '')
-		if(!is.null(higlight)) if(!is.logical(higlight)) { higlight = cbind(higlight, NA) }
+		if(!is.null(highlight)) if(!is.logical(highlight)) { highlight = cbind(highlight, NA) }
 	}
 
 	nr = nrow(plot.matrix) + 1
 	nc = ncol(plot.matrix) + 1
 	
-	is_higlight = T
-	if(is.logical(higlight)) { 
-		is_higlight = higlight
-		if(higlight) higlight = plot.table.helper.color(plot.matrix)
+	is_highlight = T
+	if(is.logical(highlight)) { 
+		is_highlight = highlight
+		if(highlight) highlight = plot.table.helper.color(plot.matrix)
 	}
 	
-	if(!is_higlight) {
+	if(!is_highlight) {
 		# default coloring scheme : alternate white/yellow each other row
 		plot.matrix.cex = matrix(1, nr = nr, nc = nc )
 		plot.matrix_bg.col = matrix('white', nr = nr, nc = nc )
@@ -222,7 +222,7 @@ plot.table <- function
 		plot.matrix.cex = matrix(1, nr = nr, nc = nc )
 		plot.matrix_bg.col = matrix('white', nr = nr, nc = nc )
 			plot.matrix_bg.col[1,] = 'gray'
-			plot.matrix_bg.col[2:nr,2:nc] = higlight	
+			plot.matrix_bg.col[2:nr,2:nc] = highlight	
 			
 		plot.table.param(plot.matrix, smain, plot.matrix.cex, plot.matrix_bg.col, 
 			frame.cell, keep_all.same.cex)
@@ -233,7 +233,7 @@ plot.table <- function
 
 
 ###############################################################################
-# plot.table.helper.color - default coloring scheme for higlight
+# plot.table.helper.color - default coloring scheme for highlight
 ###############################################################################
 plot.table.helper.color <- function
 (
@@ -242,16 +242,16 @@ plot.table.helper.color <- function
 	# convert temp to numerical matrix
 	temp = matrix(as.double(gsub('[%,$]', '', temp)), nrow(temp), ncol(temp))
 
-	higlight = as.vector(temp)
-	cols = rep(NA, len(higlight))
-		ncols = len(higlight[!is.na(higlight)])
+	highlight = as.vector(temp)
+	cols = rep(NA, len(highlight))
+		ncols = len(highlight[!is.na(highlight)])
 		cols[1:ncols] = rainbow(ncols, start = 0, end = 0.3)			
 		
-	o = sort.list(higlight, na.last = TRUE, decreasing = FALSE)
+	o = sort.list(highlight, na.last = TRUE, decreasing = FALSE)
 		o1 = sort.list(o, na.last = TRUE, decreasing = FALSE)
-		higlight = matrix(cols[o1], nrow = nrow(temp))
-		higlight[is.na(temp)] = NA
-	return(higlight)
+		highlight = matrix(cols[o1], nrow = nrow(temp))
+		highlight[is.na(temp)] = NA
+	return(highlight)
 }
 
 ###############################################################################
@@ -287,31 +287,36 @@ plot.table.helper.colorbar <- function
 plot.table.test <- function()
 {
 	# basic plot.table
+		# define row and column titles
 		mrownames = spl('row one,row two,row 3')
 		mcolnames = spl('col 1,col 2,col 3,col 4')
 
+		# create temp matrix with data you want to plot
 		temp = matrix(NA, len(mrownames), len(mcolnames))
 			rownames(temp) = mrownames
-			colnames(temp) = mcolnames
-		
-		temp[,] = matrix(1:12,3,4)
+			colnames(temp) = mcolnames		
+			temp[,] = matrix(1:12,3,4)
 
 		png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	
+		# plot temp, display current date in (top, left) cell
 		plot.table(temp, format(as.Date(Sys.time()), '%d %b %Y'))
 	
 		dev.off()
 	
 	# plot.table with colorbar
+		# generate 1,000 random numbers from Normal(0,1) distribution 
 		data =  matrix(rnorm(1000), nc=10)
 			colnames(data) = paste('data', 1:10, sep='')
 		
+		# compute Pearson correlation of data and format it nicely
 		temp = compute.cor(data, 'pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 
 		png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')		
-				
-		plot.table(temp, smain='', higlight = TRUE, colorbar = TRUE)	
+			
+		# plot temp with colorbar, display Correlation in (top, left) cell	
+		plot.table(temp, smain='Correlation', highlight = TRUE, colorbar = TRUE)	
 		
 		dev.off()
 }
