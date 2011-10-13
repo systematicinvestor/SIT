@@ -101,7 +101,7 @@ load.packages <- function
 (
 	packages, 							# names of the packages separated by comma
 	repos = "http://cran.r-project.org",# default repository
-	dependencies = TRUE,				# install dependencies
+	dependencies = "Depends",				# install dependencies
 	...									# other parameters to install.packages
 )
 {
@@ -197,6 +197,20 @@ mlag <- function
 		} 
 	}
 	return(m);
+}
+
+###############################################################################
+# Replicate and tile an array
+# http://www.mathworks.com/help/techdoc/ref/repmat.html
+###############################################################################
+repmat <- function
+(
+	a,	# array
+	n,	# number of copies along rows
+	m	# number of copies along columns
+)
+{
+	kronecker( matrix(1, n, m), a )
 }
 
 ###############################################################################

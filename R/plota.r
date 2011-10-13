@@ -182,7 +182,7 @@ plota.format <- function(
 )
 {
 	return( paste(sprefix, 
-			format(round(temp, nround), big.mark = ',', scientific=FALSE),
+			format(round(as.numeric(temp), nround), big.mark = ',', scientific=FALSE),
 			eprefix ,sep='') )
 }
 
@@ -202,7 +202,7 @@ plota.legend <- function
 )
 {
 	# split fill colors & labels
-	if( !is.null(fill) ) fill = spl(fill)	
+	if( !is.null(fill) ) fill = spl( as.character(fill) )	
 	labels = spl(labels)
 	
 	# if last observations, add them to labels
@@ -576,3 +576,53 @@ plota.test <- function() {
 	
 }
 
+
+
+###############################################################################
+# plota.staccked - staccked plot
+###############################################################################
+plota.stacked <- function
+(
+	x,				# x data
+	y, 				# matrix with y data : len(x) = nrow(y)
+	xlab,			# x axis label	
+	col=1:ncol(y), 	# colors
+	...				# other parameters for plot
+)
+{
+	y = 100 * y
+	
+	y.positive = y
+		y.positive[ y.positive < 0 ] = 0
+	
+	y.negative = y
+		y.negative[ y.negative > 0 ] = 0
+		
+	ylim = c(min(rowSums(y.negative, na.rm = T)), max(1, rowSums(y.positive, na.rm = T)))
+	
+	y = y.positive
+#	par(mar = c(4, 4, 2, 1), cex = 0.8)
+	plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', ...)
+		mtext('Allocation %', side = 2,line = 2, cex = par('cex'))
+		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
+	grid()
+
+	# positive
+   	prep.x = c(x[1], x, x[len(x)])     
+	for (i in ncol(y) : 1) {
+    	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
+    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+    }
+    
+    # negative
+	y = y.negative
+	for (i in ncol(y) : 1) {
+    	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
+    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+    }
+
+    # legend
+    plota.legend(colnames(y), col)    
+}
+
+    
