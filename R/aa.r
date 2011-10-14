@@ -117,6 +117,20 @@ portfolio.maxloss <- function
 	return( -apply(portfolio.returns, 1, min) )
 }	
 
+###############################################################################
+# portfolio.mad - Mean-Absolute Deviation (MAD)
+###############################################################################
+portfolio.mad <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
+}	
+
+
 	
 ###############################################################################
 # Find Maximum Return Portfolio
@@ -141,41 +155,6 @@ max.return.portfolio <- function
 	}			
 	
 	return( x )
-}
-
-###############################################################################
-# Solve LP problem, allow negative x
-###############################################################################
-# Tradional LP problem : http://lpsolve.sourceforge.net/5.5/LPBasics.htm
-# maximize     C x
-# subject to   A x <= B
-#              x >= 0 - NOTE LP assumes all x >= 0
-###############################################################################
-# http://r.789695.n4.nabble.com/help-using-R-s-linprog-for-LP-td906987.html
-# NOTE: Linear Programming (LP) assumes x >= 0
-#
-# The constraints x >= 0 are used in most linear programming realizations.
-# Some bounds from below are needed. The trick to circumvent the restriction
-# is as follows:
-#
-# Assume you know  x >= d  where some or all of the d_i can be negative.
-# Replace x with  y = x - d >= 0  and minimize c'y with  Ay <= b - A d !
-# Your solution is then  x = y + d , that is
-#
-# solveLP(cvec, bvec - Amat %*% dvec, Amat)$solution + dvec
-#
-# For portfolio weights, it is safe to assume that x.i >= -100
-###############################################################################
-lp.anyx <- function(direction, objective.in, const.mat, const.dir,const.rhs, min.x = -100)
-{
-	dvec = rep(min.x, len(objective.in))
-	
-	sol = lp( direction, objective.in, const.mat, const.dir, 
-			const.rhs - const.mat %*% dvec )
-	
-	sol$solution = sol$solution + dvec
-		
-	return( sol )
 }
 
 ###############################################################################
@@ -215,8 +194,8 @@ min.risk.portfolio <- function
 ###############################################################################
 min.maxloss.portfolio <- function
 (
-	ia,
-	constraints
+	ia,				# input assumptions
+	constraints		# constraints
 )
 {
 	n = ia$n
@@ -259,7 +238,67 @@ min.maxloss.portfolio <- function
 	return( x )
 }	
 
+###############################################################################
+# Find portfolio that Minimizes Mean-Absolute Deviation (MAD)
+# page 33, Comparative Analysis of Linear Portfolio Rebalancing Strategies by Krokhmal, Uryasev, Zrazhevsky  
+#
+# Let x.i , i= 1,...,n  be weights of instruments in the portfolio.
+# Let us suppose that j = 1,...,T scenarios of returns are available 
+# ( r.ij denotes return of i -th asset in the scenario j ). 
+#
+# The Mean-Absolute Deviation (MAD) function has the form 
+#  1/T * [ SUM <over j> (u+.j + u-.j) ] < w
+#  [ SUM <over i> r.ij * x.i ] - 1/T * [ SUM <over j> [ SUM <over i> r.ij * x.i ] ] = u+.j - u-.j , for each j = 1,...,T 
+#  u+.j, u-.j >= 0, for each j = 1,...,T 
+###############################################################################
+min.mad.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	n = ia$n
+	nt = nrow(ia$hist.returns)
 
+	# objective : Mean-Absolute Deviation (MAD)
+	# 1/T * [ SUM <over j> (u+.j + u-.j) ]
+	f.obj = c( rep(0, n), (1/nt) * rep(1, 2 * nt) )
+	
+	# adjust prior constraints, add u+.j, u-.j
+	f.con = rbind( constraints$A, matrix(0, 2 * nt, ncol(constraints$A) ) )
+	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
+	f.rhs = constraints$b
+	
+	# [ SUM <over i> r.ij * x.i ] - 1/T * [ SUM <over j> [ SUM <over i> r.ij * x.i ] ] = u+.j - u-.j , for each j = 1,...,T 
+	a1 = rbind( matrix(0, n, nt), -diag(nt), diag(nt))
+	b1 = rep(0, nt)
+		a1[1:n,] = t(ia$hist.returns) - repmat(colMeans(ia$hist.returns), 1, nt)
+		
+	f.con = cbind( f.con, a1 )
+	f.dir = c(f.dir, rep('=', nt))
+	f.rhs = c(f.rhs, b1)
+		
+	# find optimal solution	
+	x = NA
+	min.x.bounds = c( rep(-100, n), rep(0, 2 * nt) ) 	
+	sol = try(lp.anyx('min', f.obj, t(f.con), f.dir, f.rhs, min.x.bounds), TRUE)	
+	
+	if(!inherits(sol, 'try-error')) {
+		x = sol$solution[1:n]
+		
+		# to check
+		if( F ) {
+			u1 = sol$solution[(n+1):(n+nt)]
+			u2 = sol$solution[(n+nt+1):(n+2*nt)]
+			mean(u1 + u2) - portfolio.mad(x, ia)
+		}
+	}		
+	
+	return( x )
+}	
+
+	
+	
 ###############################################################################
 # Create efficient frontier
 ###############################################################################
@@ -293,45 +332,6 @@ portopt <- function
 		colnames(out$weight) = ia$symbols
 		
 			
-	# find maximum return portfolio	
-	out$weight[1, ] = max.return.portfolio(ia, constraints)
-
-	# find minimum risk portfolio
-	out$weight[nportfolios, ] = match.fun(min.risk.fn)(ia, constraints)	
-
-	# find points on efficient frontier
-	out$return = portfolio.return(out$weight, ia)
-	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
-
-	constraints = add.constraints(ia$expected.return, target[1], type = '=', constraints)
-			
-	for(i in 2:(nportfolios - 1) ) {
-		constraints$b[1] = target[i]
-		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
-	}
-	
-	# compute risk / return
-	out$return = portfolio.return(out$weight, ia)
-	out$risk = portfolio.risk(out$weight, ia)
-	out$name = name
-	
-	return(out)			
-}
-
-
-portopt_simplified <- function
-(
-	ia,						# Input Assumptions
-	constraints = NULL,		# Constraints
-	nportfolios = 50,		# Number of portfolios
-	name = 'Risk',			# Name
-	min.risk.fn = min.risk.portfolio	# Risk Measure
-)
-{
-	# set up output 
-	out = list(weight = matrix(NA, nportfolios, ia$n))
-		colnames(out$weight) = ia$symbols		
-	
 	# find maximum return portfolio	
 	out$weight[1, ] = max.return.portfolio(ia, constraints)
 
@@ -461,18 +461,28 @@ dev.off()
 ###############################################################################
 	
 	ef.risk = portopt(ia, constraints, 50, 'Risk')
-	ef.maxloss = portopt(ia, constraints, 50, 'Max Loss', min.maxloss.portfolio)
-
-png(filename = 'plot4.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	ef.maxloss = portopt(ia, constraints, 50, 'Max Loss', min.maxloss.portfolio)	
+	ef.mad = portopt(ia, constraints, 50, 'MAD', min.mad.portfolio)
 	
-	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.risk, F)	
+	
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.maxloss, F)	
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.mad, F)	
 
 dev.off()	
-png(filename = 'plot5.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 
-	plot.ef(ia, list(ef.maxloss, ef.risk), portfolio.maxloss, F)	
+	layout( matrix(1:4, nrow = 2) )
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.maxloss)
+	plot.transitopn.map(ef.mad)
 
 dev.off()	
+
+	
 }
 	
 
@@ -536,7 +546,7 @@ plot.ef <- function
 	ylim = 100 * ylim			
 				
 	# plot
-	if(transition.map) layout(1:2) else layout(1)
+	if(transition.map) layout(1:2)
 	
 	par(mar = c(4,3,2,1), cex = 0.8)
 	plot(x, y, xlim = xlim, ylim = ylim,
@@ -544,10 +554,10 @@ plot.ef <- function
 		mtext('Return', side = 2,line = 2, cex = par('cex'))
 		mtext(risk.label, side = 1,line = 2, cex = par('cex'))		
 	grid();
-	text(x, y, symbols,	col = 'blue', adj = c(1,1), cex = 1)
+	text(x, y, ia$symbols,	col = 'blue', adj = c(1,1), cex = 0.8)
 
 	# plot fontiers
-	for(i in 1:len(efs)) {
+	for(i in len(efs):1) {
 		ef = efs[[ i ]]
 		
 		x = 100 * match.fun(portfolio.risk.fn)(ef$weight, ia)		
@@ -560,7 +570,7 @@ plot.ef <- function
 	
 	# Transition Map plot
 	if(transition.map) {
-		plot.transitopn.map(ia, efs[[1]], portfolio.risk.fn)
+		plot.transitopn.map(efs[[i]]$weight, x, risk.label, efs[[i]]$name)
 	}
 }
 
@@ -569,18 +579,23 @@ plot.ef <- function
 ###############################################################################
 plot.transitopn.map <- function
 (
-	ia,						# input assumption
-	ef,						# efficient frontier
-	portfolio.risk.fn = portfolio.risk	# risk measure
+	y,				# weights
+	x,				# x data
+	xlab = 'Risk',	# x label
+	name = ''		# name
+
 )
 {
-	# extract name of risk measure
-	risk.label = as.character(substitute(portfolio.risk.fn))
-
-	x = 100 * match.fun(portfolio.risk.fn)(ef$weight, ia)		
-	
+	if( is.list(y) ) {
+		name = y$name
+		x = 100 * y$risk
+		y = y$weight
+	}
+		
+		
 	par(mar = c(4,3,2,1), cex = 0.8)
-	plota.stacked(x, ef$weight, xlab = risk.label, main = paste('Transition Map for', ef$name))	
+	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name))	
 			
 	# plota.stacked(100*ef$risk, ef$weight, main = 'Transition Map', xlab = 'Risk')
 }
+

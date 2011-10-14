@@ -602,7 +602,7 @@ plota.stacked <- function
 	
 	y = y.positive
 #	par(mar = c(4, 4, 2, 1), cex = 0.8)
-	plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', ...)
+	plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
 		mtext('Allocation %', side = 2,line = 2, cex = par('cex'))
 		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
 	grid()
@@ -622,7 +622,7 @@ plota.stacked <- function
     }
 
     # legend
-    plota.legend(colnames(y), col)    
+    plota.legend(colnames(y), col, cex = par('cex'))    
 }
 
     
