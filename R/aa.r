@@ -86,6 +86,7 @@ portfolio.return <- function
 	ia			# input assumptions
 )	
 {
+	weight = weight[, 1:ia$n]
 	portfolio.return = weight %*% ia$expected.return
 	return( portfolio.return )
 }	
@@ -99,9 +100,12 @@ portfolio.risk <- function
 	ia			# input assumptions
 )	
 {	
-	portfolio.risk = weight %*% ia$cov %*% t(weight)
-	portfolio.risk[ is.na(portfolio.risk) | portfolio.risk < 0 ] = 0	
-	return( diag(sqrt(portfolio.risk)) )
+	weight = weight[, 1:ia$n]
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	portfolio.risk = diag(weight %*% cov %*% t(weight))
+	portfolio.risk[ !is.na(portfolio.risk) ] = sqrt( portfolio.risk[ !is.na(portfolio.risk) ] )
+	return( portfolio.risk )
 }	
 
 ###############################################################################
@@ -113,6 +117,8 @@ portfolio.maxloss <- function
 	ia			# input assumptions
 )	
 {
+	weight = weight[, 1:ia$n]
+	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	return( -apply(portfolio.returns, 1, min) )
 }	
@@ -126,6 +132,8 @@ portfolio.mad <- function
 	ia			# input assumptions
 )	
 {
+	weight = weight[, 1:ia$n]
+	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
 }	
@@ -146,10 +154,15 @@ max.return.portfolio <- function
 {
 	x = NA
 
-	sol = try(lp.anyx('max', ia$expected.return, t(constraints$A), 
-		c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq)), 
-		constraints$b, -100), TRUE)	
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
 	
+	sol = try(lp.anyx('max', c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)),
+		t(constraints$A), 
+		c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq)), 
+		constraints$b, min.x.bounds = -100, binary.vec = binary.vec), TRUE)	
+	
+		
 	if(!inherits(sol, 'try-error')) {
 		x = sol$solution
 	}			
@@ -169,14 +182,42 @@ min.risk.portfolio <- function
 	constraints		# constraints
 )
 {
-	x = NA
-	
-	sol = try(solve.QP(Dmat = ia$cov, dvec = rep(0, ia$n) , 
-		Amat=constraints$A, bvec=constraints$b, constraints$meq),TRUE) 
+	x = NA			
+
+	# check for binary variables
+	if( is.null(constraints$binary.index) ) {	
+		sol = try(solve.QP(Dmat = ia$cov.temp, dvec = rep(0, nrow(ia$cov.temp)) , 
+			Amat=constraints$A, bvec=constraints$b, constraints$meq),TRUE) 
 		
-	if(!inherits(sol, 'try-error')) {
-		x = sol$solution;
-	}		
+		if(!inherits(sol, 'try-error')) {
+			x = sol$solution;
+		}		
+
+	} else {
+		# use Binary Branch and Bound
+		qp_data = qp_new(constraints$binary.index, 
+						Dmat = ia$cov.temp, dvec = rep(0, nrow(ia$cov.temp)) , 
+						Amat=constraints$A, bvec=constraints$b, constraints$meq)
+
+#	index_binvar = constraints$binary.index
+#	bbb_data = qp_data
+#	bbb_solve = qp_solve
+#	control = bbb_control(silent=T, branchvar="max", searchdir="best" )
+#						
+#	lb = ub = c(0, 0, 1, 0, 0, 0, 0, 0)
+#	qp_solve(qp_data, lb, ub)
+	
+	
+						
+		sol = binary_branch_bound(constraints$binary.index, qp_data, qp_solve, 
+			control = bbb_control(silent=T, branchvar="max", searchdir="best" ))
+			
+		cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')
+				
+		x = sol$xmin
+
+		qp_delete(qp_data)		
+	}
 		
 	return( x )
 }
@@ -198,7 +239,8 @@ min.maxloss.portfolio <- function
 	constraints		# constraints
 )
 {
-	n = ia$n
+	n0 = ia$n
+	n = nrow(constraints$A)	
 	nt = nrow(ia$hist.returns)
 	
 	# objective : maximum loss, w
@@ -213,7 +255,7 @@ min.maxloss.portfolio <- function
 	# -SUM <over i> r.ij * x.i <= w, for each j from 1 ... T
 	a1 = rbind( matrix(0, n, nt), 0)
 	b1 = rep(0, nt)
-		a1[1:n,] = t(ia$hist.returns)
+		a1[1:n0,] = t(ia$hist.returns)
 		a1[(n + 1),] = +1		# w
 		
 	f.con = cbind( f.con, a1 )
@@ -223,20 +265,26 @@ min.maxloss.portfolio <- function
 
 	# find optimal solution	
 	x = NA
-	sol = try(lp.anyx('min', f.obj, t(f.con), f.dir, f.rhs, -100), TRUE)	
+	
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
+		
+	sol = try(lp.anyx('min', f.obj, t(f.con), f.dir, f.rhs, -100, binary.vec), TRUE)	
 	
 	if(!inherits(sol, 'try-error')) {
 		x = sol$solution[1:n]
 		
 		# to check
 		if( F ) {
-			v = sol$solution[(n+1)]
+			v = sol$solution[(n + 1)]
 			v - portfolio.maxloss(x, ia)
 		}
 	}		
 	
 	return( x )
 }	
+
+
 
 ###############################################################################
 # Find portfolio that Minimizes Mean-Absolute Deviation (MAD)
@@ -257,7 +305,8 @@ min.mad.portfolio <- function
 	constraints		# constraints
 )
 {
-	n = ia$n
+	n0 = ia$n
+	n = nrow(constraints$A)		
 	nt = nrow(ia$hist.returns)
 
 	# objective : Mean-Absolute Deviation (MAD)
@@ -272,7 +321,7 @@ min.mad.portfolio <- function
 	# [ SUM <over i> r.ij * x.i ] - 1/T * [ SUM <over j> [ SUM <over i> r.ij * x.i ] ] = u+.j - u-.j , for each j = 1,...,T 
 	a1 = rbind( matrix(0, n, nt), -diag(nt), diag(nt))
 	b1 = rep(0, nt)
-		a1[1:n,] = t(ia$hist.returns) - repmat(colMeans(ia$hist.returns), 1, nt)
+		a1[1:n0,] = t(ia$hist.returns) - repmat(colMeans(ia$hist.returns), 1, nt)
 		
 	f.con = cbind( f.con, a1 )
 	f.dir = c(f.dir, rep('=', nt))
@@ -280,8 +329,12 @@ min.mad.portfolio <- function
 		
 	# find optimal solution	
 	x = NA
+	
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index	
+	
 	min.x.bounds = c( rep(-100, n), rep(0, 2 * nt) ) 	
-	sol = try(lp.anyx('min', f.obj, t(f.con), f.dir, f.rhs, min.x.bounds), TRUE)	
+	sol = try(lp.anyx('min', f.obj, t(f.con), f.dir, f.rhs, min.x.bounds, binary.vec), TRUE)	
 	
 	if(!inherits(sol, 'try-error')) {
 		x = sol$solution[1:n]
@@ -323,31 +376,59 @@ portopt <- function
 	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
 	if( is.null(ia$cov) ) ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
 	
-	if(!is.positive.definite(ia$cov)) {
-		ia$cov <- make.positive.definite(ia$cov)
+	# setup covariance matrix used in solve.QP
+	ia$cov.temp = ia$cov
+
+	# check if there are dummy variables
+	n0 = ia$n
+	n = nrow(constraints$A)		
+	
+	if( n != nrow(ia$cov.temp) ) {
+		temp =  matrix(0, n, n)
+		temp[1:n0, 1:n0] = ia$cov.temp[1:n0, 1:n0]
+		ia$cov.temp = temp
+	}
+				
+	if(!is.positive.definite(ia$cov.temp)) {
+		ia$cov.temp <- make.positive.definite(ia$cov.temp)
 	}	
 	
+
+	
 	# set up output 
-	out = list(weight = matrix(NA, nportfolios, ia$n))
-		colnames(out$weight) = ia$symbols
+	out = list(weight = matrix(NA, nportfolios, nrow(constraints$A)))
+		colnames(out$weight) = rep('', ncol(out$weight))
+		colnames(out$weight)[1:ia$n] = ia$symbols
 		
 			
 	# find maximum return portfolio	
-	out$weight[1, ] = max.return.portfolio(ia, constraints)
+	out$weight[nportfolios, ] = max.return.portfolio(ia, constraints)
 
 	# find minimum risk portfolio
-	out$weight[nportfolios, ] = match.fun(min.risk.fn)(ia, constraints)	
+	out$weight[1, ] = match.fun(min.risk.fn)(ia, constraints)	
 
 	# find points on efficient frontier
 	out$return = portfolio.return(out$weight, ia)
 	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
 
-	constraints = add.constraints(ia$expected.return, target[1], type = '=', constraints)
-			
+if(F) {	
+	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
+						target[1], type = '=', constraints)
+									
 	for(i in 2:(nportfolios - 1) ) {
 		constraints$b[1] = target[i]
 		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
 	}
+} else {
+	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
+						target[1], type = '>=', constraints)
+									
+	for(i in 2:(nportfolios - 1) ) {
+		constraints$b[ len(constraints$b) ] = target[i]
+		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+	}
+
+}	
 	
 	# compute risk / return
 	out$return = portfolio.return(out$weight, ia)
@@ -358,133 +439,6 @@ portopt <- function
 }
 
 
-###############################################################################
-# Test AA functions
-###############################################################################
-aa.test <- function()
-{
-###############################################################################
-# Load historical prices and compute simple returns
-###############################################################################
-	load.packages('quantmod,quadprog')
-
-	# load historical prices from Yahoo Finance
-	symbols = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')	
-	symbol.names = spl('S&P 500,Nasdaq 100,Emerging Markets,Russell 2000,EAFE,20 Year Treasury,U.S. Real Estate,Gold')
-	
-	getSymbols(symbols, from = '1980-01-01', auto.assign = TRUE)
-			
-	# align dates for all symbols & convert to monthly 
-	hist.prices = merge(SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD)		
-		month.ends = endpoints(hist.prices, 'months')
-		hist.prices = Cl(hist.prices)[month.ends, ]
-		colnames(hist.prices) = symbols
-		
-	# remove any missing data	
-	hist.prices = na.omit(hist.prices['1995::2010'])
-	
-	# compute simple returns	
-	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
-	
-###############################################################################
-# Create historical input assumptions
-###############################################################################
-		
-	# setup input assumptions
-	ia = list()
-	ia$symbols = symbols
-	ia$symbol.names = symbol.names
-	ia$n = len(symbols)
-	ia$hist.returns = hist.returns
-
-	# compute historical returns, risk, and correlation
-	ia$expected.return = apply(hist.returns, 2, mean, na.rm = T)
-	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
-	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
-	
-	# convert to annual, year = 12 months
-	annual.factor = 12
-	ia$expected.return = annual.factor * ia$expected.return
-	ia$risk = sqrt(annual.factor) * ia$risk
-
-	# compute covariance matrix
-	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
-	ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
-	
-png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-	
-	# visualize input assumptions
-	plot.ia(ia)
-	
-dev.off()	
-png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-		
-
-	# display each asset in the Risk - Return plot 
-	layout(1)
-	par(mar = c(4,4,2,1), cex = 0.8)
-	x = 100 * ia$risk
-	y = 100 * ia$expected.return
-	
-	plot(x, y, xlim = range(c(0, x)), ylim = range(c(0, y)),
-		xlab='Risk', ylab='Return', main='Risk vs Return', col='black')
-	grid();
-	text(x, y, symbols,	col = 'blue', adj = c(1,1), cex = 0.8)
-	
-dev.off()
-
-###############################################################################
-# Create Efficient Frontier
-###############################################################################
-	n = ia$n		
-
-	# x.i >= 0 
-	constraints = new.constraints(diag(n), rep(0, n), type = '>=')
-
-	# x.i <= 0.8 
-	constraints = add.constraints(diag(n), rep(0.8, n), type = '<=', constraints)
-	
-	# SUM x.i = 1
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
-	
-	# create efficient frontier
-	ef = portopt(ia, constraints, 50, 'Efficient Frontier')
-	
-png(filename = 'plot3.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-		
-	plot.ef(ia, list(ef))	
-
-dev.off()
-	
-###############################################################################
-# Plot multiple Efficient Frontiers
-###############################################################################
-	
-	ef.risk = portopt(ia, constraints, 50, 'Risk')
-	ef.maxloss = portopt(ia, constraints, 50, 'Max Loss', min.maxloss.portfolio)	
-	ef.mad = portopt(ia, constraints, 50, 'MAD', min.mad.portfolio)
-	
-	
-png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-	
-	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.risk, F)	
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.maxloss, F)	
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad), portfolio.mad, F)	
-
-dev.off()	
-png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-
-	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.maxloss)
-	plot.transitopn.map(ef.mad)
-
-dev.off()	
-
-	
-}
-	
 
 ###############################################################################
 # Visualize input assumptions
@@ -532,12 +486,12 @@ plot.ef <- function
 	# prepare plot ranges
 	xlim = range(c(0, x, 
 			max( sapply(efs, function(x) max(match.fun(portfolio.risk.fn)(x$weight,ia))) )
-			))
+			), na.rm = T)
 
 	ylim = range(c(0, y, 
 			min( sapply(efs, function(x) min(portfolio.return(x$weight,ia))) ),
 			max( sapply(efs, function(x) max(portfolio.return(x$weight,ia))) )
-			))
+			), na.rm = T)
 
 	# convert x and y to percentages
 	x = 100 * x

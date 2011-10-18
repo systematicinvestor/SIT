@@ -7,6 +7,8 @@ if exist c:\temp\code.r del c:\temp\code.r
 :: create code.r
 echo. >c:\temp\code.r
 
+copy/b c:\temp\code.r+Readme.txt c:\temp\code.r
+
 :: merge all R\*.r files
 for /r %%a in (R\*.r) do (
 	echo. >>c:\temp\code.r
