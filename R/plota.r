@@ -608,17 +608,41 @@ plota.stacked <- function
 	grid()
 
 	# positive
+	if(F) {
    	prep.x = c(x[1], x, x[len(x)])     
 	for (i in ncol(y) : 1) {
     	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
     	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
     }
+    } else {
+    # http://r.789695.n4.nabble.com/how-to-fill-between-2-stair-plots-td819257.html
+   	prep.x = c(rep(x,each=2), x[len(x)], x[len(x)])     
+	for (i in ncol(y) : 1) {
+    	prep.y = c(0, rep(rowSums(y[, 1 : i, drop = FALSE]),each=2), 0)
+    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+    	
+    	#lines(prep.x, prep.y, col='black', type='s')
+    }    
+    }
+
+    
     
     # negative
 	y = y.negative
+	if(F) {
+	prep.x = c(x[1], x, x[len(x)])     
 	for (i in ncol(y) : 1) {
     	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
     	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+    }
+    } else {
+   	prep.x = c(rep(x,each=2), x[len(x)], x[len(x)])     
+	for (i in ncol(y) : 1) {
+    	prep.y = c(0, rep(rowSums(y[, 1 : i, drop = FALSE]),each=2), 0)
+    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+    	
+    	#lines(prep.x, prep.y, col='black', type='s')
+    }    
     }
 
     # legend

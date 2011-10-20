@@ -66,21 +66,26 @@ binary_branch_bound <- function
 		subprob = bbb_pop(stack)
 #cat(counter, '\t', subprob$lb, '\t', subprob$var, '\t', subprob$fval, '\t', fbest, '\n')
 #cat(counter, '\t', subprob$ub, '\n')
+#cat('stack$pointer =', stack$pointer, '\n')
 		
 	    
 		if( is.finite( subprob$fval ) & is.finite( fbest ) & fbest <= subprob$fval ) {
 			# skip this problem because fbest is alredy smaller
+#cat('Skip', '\n')			
 		} else {
 			
 		    # Solve the qp
 		    counter = counter + 1
 			sol = match.fun(bbb_solve)(bbb_data, subprob$lb, subprob$ub)
-					  
-#cat('\t', sol$ok, '\t', sol$fval, '\n');
+
+#cat('\t', sol$ok, '\t', sol$fval, '\n\n');												  
 			                   
 			if( sol$ok ) {                 
 				x = sol$x
 				fval = sol$fval
+				
+#cat('\t', round(x[index_binvar[subprob$var]],3), '\n\n');
+
 				
 		        if ( flag !=1 ) flag=5
 		

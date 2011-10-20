@@ -173,29 +173,6 @@ qp_delete <- function(qp_data)
 ###############################################################################
 # Solve QP problem
 ###############################################################################
-qp_solve1 <- function
-(
-	qp_data, 
-	lb, 
-	ub
-)
-{
-	bvec = qp_data$bvec
-	bvec[qp_data$lb_bin_index] = lb
-	# Note 0, -1 bounds 0 to 1			
-	bvec[qp_data$ub_bin_index] = -ub
-	
-	sol = tryCatch( solve.QP(Dmat=qp_data$Dmat, dvec=qp_data$dvec, Amat=qp_data$Amat, bvec=bvec, meq=qp_data$meq, factorized=qp_data$factorized),
-		error=function( err ) FALSE,
-	    warning=function( warn ) FALSE )
-	    
-	if( !is.logical( sol ) ) {   
-		return(list( ok = TRUE, x = sol$solution, fval = sol$value )) 
-	} else {
-		return(list( ok = FALSE )) 
-	}              	    
-}
-
 qp_solve <- function
 (
 	qp_data, 
@@ -217,6 +194,7 @@ qp_solve <- function
 		qp.data.temp$dvec = qp_data$dvec
 		qp.data.temp$meq = qp_data$meq	
 	
+		
 	qp.data.temp = remove.equality.constraints(qp.data.temp)
 	# if no equality constraints found go to optimization
 	if( len(qp.data.temp$var.index) == len(qp.data.temp$solution) ) {
@@ -230,6 +208,7 @@ qp_solve <- function
 	}
 	# end of NEW logic
 		
+	
 	sol = tryCatch( solve.QP(Dmat=qp.data.final$Dmat, dvec=qp.data.final$dvec, Amat=qp.data.final$Amat, 
 						bvec=qp.data.final$bvec, meq=qp.data.final$meq, factorized=qp_data$factorized),
 		error=function( err ) FALSE,
@@ -246,7 +225,26 @@ qp_solve <- function
 	}              	    
 }
 
+###############################################################################
+# Solve QP problem using Binary Branch and Bound
+###############################################################################
+solve.QP.binary.branch.bound <- function(Dmat, dvec, Amat, bvec, meq=0, factorized=FALSE, binary.vec = 0)
+{
+	# use Binary Branch and Bound
+	qp_data = qp_new(binary.vec, Dmat = Dmat, dvec = dvec, 
+					Amat=Amat, bvec=bvec, meq=meq, factorized=factorized)
+
+	sol = binary_branch_bound(binary.vec, qp_data, qp_solve, 
+			control = bbb_control(silent=T, branchvar='max', searchdir='best' ))
 			
+	qp_delete(qp_data)		
+	
+	sol$value = sol$fmin
+	sol$solution = sol$xmin
+	return(sol)
+}
+
+		
 
 ###############################################################################
 # Test QP interface to Binary Branch and Bound algorithm
@@ -258,8 +256,7 @@ mbqp.test <- function()
 	
 	# Test problem
 	# min         0.5*x'Q x + b' x
-	# subject to  Cx <= d
-	
+	# subject to  Cx <= d	
 	Q = diag(4)
 	b	= c( 2, -3, -2, -3)
 	C	= matrix(c(-1,  -1,  -1,  -1,
@@ -272,7 +269,6 @@ mbqp.test <- function()
 	vub  = c( 1e10, 1, 1, 1);
 
 	index_binvar = c(2, 3, 4);
-
 
 	# Solve.QP
 	# min(-d^T b + 1/2 b^T D b) : A^T b >= b_0
@@ -294,15 +290,12 @@ mbqp.test <- function()
 	cat('QP.solve fsol =', fsol, 'xsol =', xsol, '\n')
 
 	# Start Branch and Bound 
-	qp_data = qp_new(index_binvar, Dmat, dvec, Amat, bvec, meq=0)
+	sol = solve.QP.binary.branch.bound(Dmat=Dmat, dvec=dvec, Amat=Amat, bvec=bvec, meq=0, binary.vec = index_binvar) 
+		xsol = sol$solution
+		fsol = sol$value
 
-	solb = binary_branch_bound(index_binvar, qp_data, qp_solve, 
-			control = bbb_control(silent=T, proborder='mindiff', searchdir='breadth' ))
+	cat('QP.solve Binary Branch and Bound fsol =', fsol, 'xsol =', xsol, '\n')
 
-	qp_delete(qp_data)
-	
-	cat('QP.solve Branch and Bound  fsol =', solb$fmin, 'xsol =', solb$xmin, '\n')
-	
 }
 
 
@@ -329,6 +322,7 @@ remove.equality.constraints <- function(qp.data)
 	# 3. look for pairs among one.non.zero.index colums
 	# x >= value , -x>= -value => x = value
 	equality.constraints = rep(NA, nrow(Amat1))
+	remove.constraints = rep(NA, ncol(Amat1))
 		
 	#for( r in 1:nrow(Amat1) ) {
 	for( r in which(rowSums(Amat1[,one.non.zero.index]!=0) > 1) ) {	
@@ -343,6 +337,10 @@ remove.equality.constraints <- function(qp.data)
 			if( any(temp.index1 == 0 ) ) {
 				equality.constraints[r] = 
 					bvec1[one.non.zero.index[r1]] / Amat1[r,one.non.zero.index[r1]]
+					
+				remove.constraints[ one.non.zero.index[r1] ] = 1				
+				remove.constraints[ one.non.zero.index[ temp.index[ temp.index1 == 0]]] = 1
+				
 				break;
 			}
 		}
@@ -359,12 +357,15 @@ remove.equality.constraints <- function(qp.data)
 		Amat1 = Amat1[-remove.index,,drop=F]
 	
 		# remove constraints
-		remove.index1 = which( colSums(abs(Amat1)) == 0)		
-		bvec1 = bvec1[-remove.index1]
-		Amat1 = Amat1[,-remove.index1,drop=F]
-		
-		# handle euality constraints
-		if( meq1 > 0 ) meq1 = meq1 - len(intersect((1:meq1), remove.index1))
+		remove.index1 = which( colSums(abs(Amat1)) == 0 & bvec1 == 0)		
+		remove.index1 = which(remove.constraints==1)
+		if(len(remove.index1)>0) {
+			bvec1 = bvec1[-remove.index1]
+			Amat1 = Amat1[,-remove.index1,drop=F]
+				
+			# handle euality constraints
+			if( meq1 > 0 ) meq1 = meq1 - len(intersect((1:meq1), remove.index1))
+		}
 	}
 	
 	# prepare return object

@@ -383,9 +383,13 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 
 	layout(1:2)
 	par(mar = c(4,4,2,1), cex = 0.8)
-	plot(as.vector(sort(100*ef.risk$weight)), pch=20, 
+	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
+	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
 		xlab='', ylab='Weight', main='Portfolio Weights')
-	plot(ef.risk$risk, rowSums(ef.risk$weight > 0.000001), pch=20, type='b', 
+		abline(h=0, col = 'red')
+		abline(h=10, col = 'red')
+		
+	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
 		xlab='Risk', ylab='# Assets', main='Number of Assets')
 
 dev.off()	
@@ -402,9 +406,9 @@ dev.off()
 
 
 	#--------------------------------------------------------------------------
-	# Minimum Investment Constraint is 5%
+	# Minimum Investment Constraint is 10%
 	# Add binary[0/1] variables
-	# 0.05 * b <= x.i <= 0.8 * b
+	# 0.1 * b <= x.i <= 0.8 * b
 	#--------------------------------------------------------------------------
 	
 	# SUM x.i = 1
@@ -417,9 +421,9 @@ dev.off()
 	# index of binary variables b.i
 	constraints$binary.index = (n+1):(2*n)
 		
-	# 0.05 * b <= x.i <= 0.8 * b
-	# x.i >= 0.05 * b 
-	constraints = add.constraints(rbind(diag(n), -0.05 * diag(n)), rep(0, n), type = '>=', constraints)
+	# 0.1 * b <= x.i <= 0.8 * b
+	# x.i >= 0.1 * b 
+	constraints = add.constraints(rbind(diag(n), -0.1 * diag(n)), rep(0, n), type = '>=', constraints)
 
 	# x.i <= 0.8 * b
 	constraints = add.constraints(rbind(diag(n), -0.8 * diag(n)), rep(0, n), type = '<=', constraints)
@@ -435,11 +439,14 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 		
 	layout(1:2)
 	par(mar = c(4,4,2,1), cex = 0.8)
-	plot(as.vector(sort(100*ef.risk$weight)), pch=20, 
+	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
+	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
 		xlab='', ylab='Weight', main='Portfolio Weights')
-	plot(ef.risk$risk, rowSums(ef.risk$weight > 0.000001), pch=20, type='b', 
+		abline(h=0, col = 'red')
+		abline(h=10, col = 'red')
+		
+	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
 		xlab='Risk', ylab='# Assets', main='Number of Assets')
-
 
 dev.off()	
 png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
@@ -456,10 +463,10 @@ dev.off()
 
 	
 	#--------------------------------------------------------------------------
-	# Pre-determined number of asstes, say 3 
+	# Limit number of assets to 3
 	# Add binary[0/1] variables
 	# 0.00001 * b <= x.i <= 0.8 * b
-	# SUM b = 3
+	# SUM b.i = 3
 	#--------------------------------------------------------------------------
 	
 	# SUM x.i = 1
@@ -493,12 +500,17 @@ png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize =
 				
 	layout(1:2)
 	par(mar = c(4,4,2,1), cex = 0.8)
-	plot(as.vector(sort(100*ef.risk$weight)), pch=20, 
+	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
+	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
 		xlab='', ylab='Weight', main='Portfolio Weights')
-	plot(ef.risk$risk, rowSums(ef.risk$weight > 0.000001), pch=20, type='b', 
+		abline(h=0, col = 'red')
+		abline(h=10, col = 'red')
+		
+	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
 		xlab='Risk', ylab='# Assets', main='Number of Assets')
 
 
+		
 
 dev.off()	
 png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			

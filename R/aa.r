@@ -195,28 +195,13 @@ min.risk.portfolio <- function
 
 	} else {
 		# use Binary Branch and Bound
-		qp_data = qp_new(constraints$binary.index, 
-						Dmat = ia$cov.temp, dvec = rep(0, nrow(ia$cov.temp)) , 
-						Amat=constraints$A, bvec=constraints$b, constraints$meq)
-
-#	index_binvar = constraints$binary.index
-#	bbb_data = qp_data
-#	bbb_solve = qp_solve
-#	control = bbb_control(silent=T, branchvar="max", searchdir="best" )
-#						
-#	lb = ub = c(0, 0, 1, 0, 0, 0, 0, 0)
-#	qp_solve(qp_data, lb, ub)
-	
-	
-						
-		sol = binary_branch_bound(constraints$binary.index, qp_data, qp_solve, 
-			control = bbb_control(silent=T, branchvar="max", searchdir="best" ))
-			
-		cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')
+		sol = solve.QP.binary.branch.bound(Dmat = ia$cov.temp, dvec = rep(0, nrow(ia$cov.temp)), 
+							Amat=constraints$A, bvec=constraints$b, meq=constraints$meq,
+							binary.vec = constraints$binary.index)
 				
+		cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')
+		
 		x = sol$xmin
-
-		qp_delete(qp_data)		
 	}
 		
 	return( x )
@@ -411,24 +396,31 @@ portopt <- function
 	out$return = portfolio.return(out$weight, ia)
 	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
 
-if(F) {	
-	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
-						target[1], type = '=', constraints)
-									
-	for(i in 2:(nportfolios - 1) ) {
-		constraints$b[1] = target[i]
-		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
-	}
-} else {
+if(T) {	
 	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
 						target[1], type = '>=', constraints)
 									
 	for(i in 2:(nportfolios - 1) ) {
+	
+	
 		constraints$b[ len(constraints$b) ] = target[i]
 		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+		
+		
+		
 	}
+} else {
 
+	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
+					target[1], type = '=', constraints)
+			
+	for(i in 2:(nportfolios - 1) ) {
+		constraints$b[1] = target[i]
+		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+	}
+	
 }	
+	
 	
 	# compute risk / return
 	out$return = portfolio.return(out$weight, ia)
@@ -548,8 +540,6 @@ plot.transitopn.map <- function
 		
 		
 	par(mar = c(4,3,2,1), cex = 0.8)
-	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name))	
-			
-	# plota.stacked(100*ef$risk, ef$weight, main = 'Transition Map', xlab = 'Risk')
+	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name))				
 }
 
