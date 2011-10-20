@@ -585,65 +585,54 @@ plota.stacked <- function
 (
 	x,				# x data
 	y, 				# matrix with y data : len(x) = nrow(y)
-	xlab,			# x axis label	
+	xlab='',		# x axis label	
 	col=1:ncol(y), 	# colors
+	type=c('l','s'),# plot type  : lines, step stairs
 	...				# other parameters for plot
 )
 {
+	# transform y
 	y = 100 * y
 	
-	y.positive = y
-		y.positive[ y.positive < 0 ] = 0
+	y1 = list()
+	y1$positive = y
+		y1$positive[ y1$positive < 0 ] = 0
 	
-	y.negative = y
-		y.negative[ y.negative > 0 ] = 0
+	y1$negative = y
+		y1$negative[ y1$negative > 0 ] = 0
 		
-	ylim = c(min(rowSums(y.negative, na.rm = T)), max(1, rowSums(y.positive, na.rm = T)))
+	# find y ranges
+	ylim = c(min(rowSums(y1$negative, na.rm = T)), max(1, rowSums(y1$positive, na.rm = T)))
 	
-	y = y.positive
-#	par(mar = c(4, 4, 2, 1), cex = 0.8)
+	# create empty plot
+	# par(mar = c(4, 4, 2, 1), cex = 0.8)
 	plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
 		mtext('Allocation %', side = 2,line = 2, cex = par('cex'))
 		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
 	grid()
 
-	# positive
-	if(F) {
-   	prep.x = c(x[1], x, x[len(x)])     
-	for (i in ncol(y) : 1) {
-    	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
-    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
-    }
+	# plot stacked areas	
+	if( type[1] == 'l' ) {
+		prep.x = c(x[1], x, x[len(x)])     
+		
+		for( y in y1 ) {   	
+			for (i in ncol(y) : 1) {
+		    	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
+		    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+			}
+		}
     } else {
-    # http://r.789695.n4.nabble.com/how-to-fill-between-2-stair-plots-td819257.html
-   	prep.x = c(rep(x,each=2), x[len(x)], x[len(x)])     
-	for (i in ncol(y) : 1) {
-    	prep.y = c(0, rep(rowSums(y[, 1 : i, drop = FALSE]),each=2), 0)
-    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
-    	
-    	#lines(prep.x, prep.y, col='black', type='s')
-    }    
-    }
-
-    
-    
-    # negative
-	y = y.negative
-	if(F) {
-	prep.x = c(x[1], x, x[len(x)])     
-	for (i in ncol(y) : 1) {
-    	prep.y = c(0, rowSums(y[, 1 : i, drop = FALSE]), 0)
-    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
-    }
-    } else {
-   	prep.x = c(rep(x,each=2), x[len(x)], x[len(x)])     
-	for (i in ncol(y) : 1) {
-    	prep.y = c(0, rep(rowSums(y[, 1 : i, drop = FALSE]),each=2), 0)
-    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
-    	
-    	#lines(prep.x, prep.y, col='black', type='s')
-    }    
-    }
+    	# http://r.789695.n4.nabble.com/how-to-fill-between-2-stair-plots-td819257.html
+    	dx = mean(diff(x))/2
+   		prep.x = c(rep(x,each=2), x[len(x)] + dx, x[len(x)] + dx)     
+   		
+   		for( y in y1 ) {   	
+			for (i in ncol(y) : 1) {
+		    	prep.y = c(0, rep(rowSums(y[, 1 : i, drop = FALSE]),each=2), 0)
+		    	polygon(prep.x, prep.y, col = col[i], border = NA, angle = 90)
+		    }    
+		}
+	} 
 
     # legend
     plota.legend(colnames(y), col, cex = par('cex'))    

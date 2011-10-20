@@ -381,16 +381,22 @@ aa.cardinality.test <- function()
 
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 
-	layout(1:2)
-	par(mar = c(4,4,2,1), cex = 0.8)
-	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
-	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
-		xlab='', ylab='Weight', main='Portfolio Weights')
-		abline(h=0, col = 'red')
-		abline(h=10, col = 'red')
-		
-	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
-		xlab='Risk', ylab='# Assets', main='Number of Assets')
+	aa.plot.ef.summary.test <- function(ef)
+	{
+		layout(1:2)
+		par(mar = c(4,4,2,1), cex = 0.8)
+		y = iif(ef$weight > 0.000001, ef$weight, NA) 
+		plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
+			xlab='', ylab='Weight', main='Portfolio Weights')
+			abline(h=0, col = 'red')
+			abline(h=10, col = 'red')
+			
+		plot(100* ef$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
+			xlab='Risk', ylab='# Assets', main='Number of Assets')
+	
+	}
+	
+	aa.plot.ef.summary.test(ef.risk)
 
 dev.off()	
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
@@ -437,16 +443,7 @@ dev.off()
 		
 png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 		
-	layout(1:2)
-	par(mar = c(4,4,2,1), cex = 0.8)
-	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
-	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
-		xlab='', ylab='Weight', main='Portfolio Weights')
-		abline(h=0, col = 'red')
-		abline(h=10, col = 'red')
-		
-	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
-		xlab='Risk', ylab='# Assets', main='Number of Assets')
+	aa.plot.ef.summary.test(ef.risk)
 
 dev.off()	
 png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
@@ -498,19 +495,7 @@ dev.off()
 		
 png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 				
-	layout(1:2)
-	par(mar = c(4,4,2,1), cex = 0.8)
-	y = iif(ef.risk$weight > 0.000001, ef.risk$weight, NA) 
-	plot(as.vector(sort(100 * y)), pch=20, xaxt='n', ylim = c(0, 80),
-		xlab='', ylab='Weight', main='Portfolio Weights')
-		abline(h=0, col = 'red')
-		abline(h=10, col = 'red')
-		
-	plot(100* ef.risk$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
-		xlab='Risk', ylab='# Assets', main='Number of Assets')
-
-
-		
+	aa.plot.ef.summary.test(ef.risk)		
 
 dev.off()	
 png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
@@ -522,7 +507,6 @@ png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.transitopn.map(ef.risk)
 	plot.transitopn.map(ef.mad)
 	
-
 dev.off()	
 	
 }

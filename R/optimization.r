@@ -357,7 +357,7 @@ remove.equality.constraints <- function(qp.data)
 		Amat1 = Amat1[-remove.index,,drop=F]
 	
 		# remove constraints
-		remove.index1 = which( colSums(abs(Amat1)) == 0 & bvec1 == 0)		
+		#remove.index1 = which( colSums(abs(Amat1)) == 0 & bvec1 == 0)		
 		remove.index1 = which(remove.constraints==1)
 		if(len(remove.index1)>0) {
 			bvec1 = bvec1[-remove.index1]

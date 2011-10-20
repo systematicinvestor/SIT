@@ -396,7 +396,6 @@ portopt <- function
 	out$return = portfolio.return(out$weight, ia)
 	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
 
-if(T) {	
 	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
 						target[1], type = '>=', constraints)
 									
@@ -409,17 +408,6 @@ if(T) {
 		
 		
 	}
-} else {
-
-	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
-					target[1], type = '=', constraints)
-			
-	for(i in 2:(nportfolios - 1) ) {
-		constraints$b[1] = target[i]
-		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
-	}
-	
-}	
 	
 	
 	# compute risk / return
@@ -528,7 +516,8 @@ plot.transitopn.map <- function
 	y,				# weights
 	x,				# x data
 	xlab = 'Risk',	# x label
-	name = ''		# name
+	name = '',		# name
+	type=c('s','l')	# type
 
 )
 {
@@ -540,6 +529,6 @@ plot.transitopn.map <- function
 		
 		
 	par(mar = c(4,3,2,1), cex = 0.8)
-	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name))				
+	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name),type=type[1])				
 }
 
