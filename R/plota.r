@@ -195,7 +195,7 @@ plota.legend <- function
 	fill = NULL,			# fill colors
 	lastobs = NULL, 		# last observations
 	x = 'topleft',			# location of legend
-	merge = T, 				# merge
+	merge = F, 				# merge
 	bty = 'n',				# box
 	yformat = plota.format,	# format values
 	...						# other parameters to legend
@@ -623,7 +623,7 @@ plota.stacked <- function
 		}
     } else {
     	# http://r.789695.n4.nabble.com/how-to-fill-between-2-stair-plots-td819257.html
-    	dx = mean(diff(x))/2
+    	dx = mean(diff(x))
    		prep.x = c(rep(x,each=2), x[len(x)] + dx, x[len(x)] + dx)     
    		
    		for( y in y1 ) {   	

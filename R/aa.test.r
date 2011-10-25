@@ -55,18 +55,18 @@ dev.off()
 	#--------------------------------------------------------------------------
 	n = ia$n		
 
-	# x.i >= 0 
-	constraints = new.constraints(diag(n), rep(0, n), type = '>=')
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
 
-	# x.i <= 0.8 
-	constraints = add.constraints(diag(n), rep(0.8, n), type = '<=', constraints)
-	
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
 	# create efficient frontier
 	ef = portopt(ia, constraints, 50, 'Efficient Frontier')
+
 	
+	
+		
 png(filename = 'plot3.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 		
 	plot.ef(ia, list(ef))	
@@ -80,7 +80,6 @@ dev.off()
 	ef.risk = portopt(ia, constraints, 50, 'Risk')
 	ef.maxloss = portopt(ia, constraints, 50, 'Max Loss', min.maxloss.portfolio)	
 	ef.mad = portopt(ia, constraints, 50, 'MAD', min.mad.portfolio)
-	
 	
 png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 	
@@ -138,12 +137,9 @@ aa.long.short.test <- function()
 	ia = aa.test.create.ia()
 	n = ia$n		
 
-	# x.i >= -0.5 
-	constraints = new.constraints(diag(n), rep(-0.5, n), type = '>=')
-
-	# x.i <= 0.8 
-	constraints = add.constraints(diag(n), rep(0.8, n), type = '<=', constraints)
-	
+	# -0.5 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = -0.5, ub = 0.8)
+		
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
@@ -167,17 +163,14 @@ dev.off()
 	# -v.i <= x.i <= v.i, v.i>0, SUM(v.i) = 1.6
 	#--------------------------------------------------------------------------
 
-	# x.i >= -0.5 
-	constraints = new.constraints(diag(n), rep(-0.5, n), type = '>=')
-
-	# x.i <= 0.8 
-	constraints = add.constraints(diag(n), rep(0.8, n), type = '<=', constraints)
+	# -0.5 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = -0.5, ub = 0.8)
 	
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 
 	# adjust prior constraints, add v.i
-	constraints$A = rbind( constraints$A, matrix(0, n, ncol(constraints$A)) )
+	constraints = add.variables(n, constraints)
 
 	# -v.i <= x.i <= v.i
 	#   x.i + v.i >= 0
@@ -215,14 +208,10 @@ dev.off()
 	ia.ls = aa.test.ia.add.short(ia)
 	
 	# x.long and x.short >= 0
-	constraints = new.constraints(diag(2*n), rep(0, 2*n), type = '>=')
-
 	# x.long <= 0.8 
-	constraints = add.constraints(rbind(diag(n),0*diag(n)), rep(0.8, n), type = '<=', constraints)
-			
 	# x.short <= 0.5 
-	constraints = add.constraints(rbind(0*diag(n),diag(n)), rep(0.5, n), type = '<=', constraints)
-	
+	constraints = new.constraints(2*n, lb = 0, ub = c(rep(0.8,n),rep(0.5,n)))
+		
 	# SUM (x.long - x.short) = 1
 	constraints = add.constraints(c(rep(1,n), -rep(1,n)), 1, type = '=', constraints)		
 
@@ -259,14 +248,10 @@ dev.off()
 	#--------------------------------------------------------------------------
 	
 	# x.long and x.short >= 0
-	constraints = new.constraints(diag(2*n), rep(0, 2*n), type = '>=')
-
 	# x.long <= 0.8 
-	constraints = add.constraints(rbind(diag(n),0*diag(n)), rep(0.8, n), type = '<=', constraints)
-			
 	# x.short <= 0.5 
-	constraints = add.constraints(rbind(0*diag(n),diag(n)), rep(0.5, n), type = '<=', constraints)
-	
+	constraints = new.constraints(2*n, lb = 0, ub = c(rep(0.8,n),rep(0.5,n)))
+		
 	# SUM (x.long - x.short) = 1
 	constraints = add.constraints(c(rep(1,n), -rep(1,n)), 1, type = '=', constraints)		
 
@@ -301,13 +286,9 @@ dev.off()
 	#--------------------------------------------------------------------------
 		
 	# x.long and x.short >= 0
-	constraints = new.constraints(diag(2*n), rep(0, 2*n), type = '>=')
-
 	# x.long <= 0.8 
-	constraints = add.constraints(rbind(diag(n),0*diag(n)), rep(0.8, n), type = '<=', constraints)
-			
 	# x.short <= 0.5 
-	constraints = add.constraints(rbind(0*diag(n),diag(n)), rep(0.5, n), type = '<=', constraints)
+	constraints = new.constraints(2*n, lb = 0, ub = c(rep(0.8,n),rep(0.5,n)))
 	
 	# SUM (x.long - x.short) = 1
 	constraints = add.constraints(c(rep(1,n), -rep(1,n)), 1, type = '=', constraints)		
@@ -317,7 +298,7 @@ dev.off()
 				
 	# new add binary constraint	
 	# adjust prior constraints: add b.i
-	constraints$A = rbind( constraints$A, matrix(0, n, ncol(constraints$A)) )
+	constraints = add.variables(n, constraints)
 	
 	# index of binary variables b.i
 	constraints$binary.index = (2*n+1):(3*n)
@@ -366,12 +347,9 @@ aa.cardinality.test <- function()
 	ia = aa.test.create.ia()
 	n = ia$n		
 
-	# x.i >= 0 
-	constraints = new.constraints(diag(n), rep(0, n), type = '>=')
-
-	# x.i <= 0.8 
-	constraints = add.constraints(diag(n), rep(0.8, n), type = '<=', constraints)
-	
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+		
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
@@ -418,12 +396,12 @@ dev.off()
 	#--------------------------------------------------------------------------
 	
 	# SUM x.i = 1
-	constraints = new.constraints(rep(1, n), 1, type = '=')		
+	constraints = new.constraints(n,rep(1, n), 1, type = '=')		
 	
 	# new add binary constraint	
 	# adjust prior constraints: add b.i
-	constraints$A = rbind( constraints$A, matrix(0, n, ncol(constraints$A)) )
-	
+	constraints = add.variables(n, constraints)
+		
 	# index of binary variables b.i
 	constraints$binary.index = (n+1):(2*n)
 		
@@ -467,11 +445,11 @@ dev.off()
 	#--------------------------------------------------------------------------
 	
 	# SUM x.i = 1
-	constraints = new.constraints(rep(1, n), 1, type = '=')		
+	constraints = new.constraints(n, rep(1, n), 1, type = '=')		
 	
 	# new add binary constraint	
 	# adjust prior constraints: add b.i
-	constraints$A = rbind( constraints$A, matrix(0, n, ncol(constraints$A)) )
+	constraints = add.variables(n, constraints)
 	
 	# index of binary variables b.i
 	constraints$binary.index = (n+1):(2*n)
@@ -509,6 +487,215 @@ png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize =
 	
 dev.off()	
 	
+}
+
+###############################################################################
+# Test AA functions, CVaR Efficient Frontier
+###############################################################################
+aa.cvar.test <- function()
+{
+
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+
+# Expected shortfall (CVaR)
+# http://www.investopedia.com/articles/04/092904.asp
+ia$parameters.alpha = 0.95
+	
+		
+	
+	# create efficient frontier(s)
+	ef.risk = 		portopt(ia, constraints, 50, 'Risk')
+	ef.maxloss = 	portopt(ia, constraints, 50, 'MaxLoss',	min.maxloss.portfolio)
+	ef.mad = 		portopt(ia, constraints, 50, 'MAD', 	min.mad.portfolio)
+	ef.cvar = 		portopt(ia, constraints, 50, 'CVaR', 	min.cvar.portfolio)
+	ef.cdar = 		portopt(ia, constraints, 50, 'CDaR', 	min.cdar.portfolio)
+
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.cvar, ef.cdar), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.cvar, ef.cdar), portfolio.cvar, F)	
+	plot.ef(ia, list(ef.risk, ef.cvar, ef.cdar), portfolio.cdar, F)	
+
+dev.off()	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+
+	layout( matrix(1:4, nrow = 2) )
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.cvar)
+	plot.transitopn.map(ef.cdar)
+
+dev.off()
+
+	return()
+
+}
+	
+###############################################################################
+# Test AA functions, Multiple Risk Measures Efficient Frontier
+###############################################################################
+aa.multiple.risk.measures.test <- function()
+{
+	
+
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+
+# Expected shortfall (CVaR)
+# http://www.investopedia.com/articles/04/092904.asp
+ia$parameters.alpha = 0.95
+	
+		
+	
+	# create efficient frontier(s)
+	ef.risk = 		portopt(ia, constraints, 50, 'Risk')
+	ef.maxloss = 	portopt(ia, constraints, 50, 'MaxLoss',	min.maxloss.portfolio)
+	ef.mad = 		portopt(ia, constraints, 50, 'MAD', 	min.mad.portfolio)
+	ef.cvar = 		portopt(ia, constraints, 50, 'CVaR', 	min.cvar.portfolio)
+	ef.cdar = 		portopt(ia, constraints, 50, 'CDaR', 	min.cdar.portfolio)
+	
+	
+	
+	
+	
+	
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cvar, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cdar, F)
+	
+	
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.transitopn.map(ef.maxloss)
+	plot.transitopn.map(ef.mad)	
+	plot.transitopn.map(ef.cvar)
+	plot.transitopn.map(ef.cdar)
+	
+	
+	
+	
+	
+#--------------------------------------------------------------------------
+	# 1. let's limit max loss	
+	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.maxloss, F)
+	
+	# 2. let's limit max loss			
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	constraints = add.constraint.maxloss(ia, 12/100, '<=', constraints)	
+	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
+		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	# 3. compare new ef	
+	layout( 1:2)
+	plot.ef(ia, list(ef.risk), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk1), portfolio.maxloss, F)
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk1, ef.risk,ef.maxloss), portfolio.maxloss, F)	
+	plot.ef(ia, list(ef.risk1, ef.risk, ef.maxloss), portfolio.risk, F)
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk1)
+#--------------------------------------------------------------------------
+
+	# 1. let's limit mad
+	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)
+	
+	# 2. let's limit max loss			
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	constraints = add.constraint.mad(ia, 2.9/100, '<=', constraints)	
+	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
+		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	# 3. compare new ef	
+	layout( 1:2)
+	plot.ef(ia, list(ef.risk), portfolio.mad, F)
+	plot.ef(ia, list(ef.risk1), portfolio.mad, F)
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk1, ef.risk,ef.mad), portfolio.mad, F)	
+	plot.ef(ia, list(ef.risk1, ef.risk, ef.mad), portfolio.risk, F)
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk1)
+#--------------------------------------------------------------------------
+
+	# 1. let's limit CVaR
+	plot.ef(ia, list(ef.risk, ef.cvar), portfolio.cvar, F)
+	
+	# 2. let's limit max loss			
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	constraints = add.constraint.cvar(ia, 8/100, '<=', constraints)	
+	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
+		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	# 3. compare new ef	
+	layout( 1:2)
+	plot.ef(ia, list(ef.risk), portfolio.cvar, F)
+	plot.ef(ia, list(ef.risk1), portfolio.cvar, F)
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk1, ef.risk,ef.cvar), portfolio.cvar, F)	
+	plot.ef(ia, list(ef.risk1, ef.risk, ef.cvar), portfolio.risk, F)
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk1)
+
+#--------------------------------------------------------------------------
+
+	# 1. let's limit CDaR
+	layout(1)
+	plot.ef(ia, list(ef.risk, ef.cdar), portfolio.cdar, F)
+	
+	# 2. let's limit max loss			
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	constraints = add.constraint.cdar(ia, 18/100, '<=', constraints)	
+	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
+		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	# 3. compare new ef	
+	layout(1:2)
+	plot.ef(ia, list(ef.risk), portfolio.cdar, F)
+	plot.ef(ia, list(ef.risk1), portfolio.cdar, F)
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk1, ef.risk,ef.cdar), portfolio.cdar, F)	
+	plot.ef(ia, list(ef.risk1, ef.risk, ef.cdar), portfolio.risk, F)
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk1)
+
+
+
 }
 
 

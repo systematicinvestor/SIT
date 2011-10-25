@@ -18,7 +18,7 @@
 
 
 ###############################################################################
-# Solve LP problem with negative x
+# Solve LP problem, handling negative x
 ###############################################################################
 # Tradional LP problem : http://lpsolve.sourceforge.net/5.5/LPBasics.htm
 # maximize     C x
@@ -40,11 +40,40 @@
 #
 # For portfolio weights, it is safe to assume that x.i >= -100
 ###############################################################################
-lp.anyx <- function(direction, objective.in, const.mat, const.dir,const.rhs, min.x.bounds = -100, binary.vec = 0)
+solve.LP.bounds <- function
+(
+	direction, 		# lp parameters
+	objective.in, 	# lp parameters
+	const.mat, 		# lp parameters
+	const.dir,		# lp parameters
+	const.rhs, 		# lp parameters
+	binary.vec = 0,	# lp parameters	
+	lb = 0,			# vector with lower bounds
+	ub = +Inf,		# vector with upper bounds
+	default.lb = -100	# the smallest possible value for any variable
+)
 {
-	dvec = min.x.bounds
-	if( len(min.x.bounds) == 1 ) dvec = rep(min.x.bounds, len(objective.in))
-
+	# number variables
+	n = len(objective.in)
+	
+	if( len(lb) == 1 ) lb = rep(lb, n)
+	if( len(ub) == 1 ) ub = rep(ub, n)
+	
+	lb = ifna(lb, default.lb)
+	ub = ifna(ub, +Inf)
+	
+	lb[ lb < default.lb ] = default.lb
+	dvec = lb
+	
+	# add ub constraints
+	index = which( ub < +Inf )	
+	if( len(index) > 0 ) {
+		const.rhs = c(const.rhs, ub[index])
+		const.dir = c(const.dir, rep('<=', len(index)))		
+		const.mat = rbind(const.mat, diag(n)[index, ])		
+	}
+	
+	# main logic
 	if ( binary.vec[1] == 0 ) {	
 		sol = lp( direction, objective.in, const.mat, const.dir, 
 				const.rhs - const.mat %*% dvec )
@@ -55,10 +84,81 @@ lp.anyx <- function(direction, objective.in, const.mat, const.dir,const.rhs, min
 	
 	}
 	
-	sol$solution = sol$solution + dvec
-		
-	return( sol )
+	# update solution
+	sol$solution = sol$solution + dvec		
+	sol$value = objective.in %*% sol$solution 	
+	
+	return( sol )	
 }
+
+
+###############################################################################
+# Solve QP problem, handling binary variables using Binary Branch and Bound
+###############################################################################
+solve.QP.bounds <- function
+(
+	Dmat,				# solve.QP parameters
+	dvec, 				# solve.QP parameters
+	Amat, 				# solve.QP parameters
+	bvec, 				# solve.QP parameters
+	meq=0, 				# solve.QP parameters
+	factorized=FALSE, 	# solve.QP parameters
+	binary.vec = 0,		# vector with indices of binary variables
+	lb = -Inf,			# vector with lower bounds
+	ub = +Inf			# vector with upper bounds
+)
+{
+	# number variables
+	n = len(dvec)
+	
+	if( len(lb) == 1 ) lb = rep(lb, n)
+	if( len(ub) == 1 ) ub = rep(ub, n)
+	
+	lb = ifna(lb, -Inf)
+	ub = ifna(ub, +Inf)
+	
+	
+	# add ub constraints, A^T b >= b_0
+	index = which( ub < +Inf )	
+	if( len(index) > 0 ) {	
+		bvec = c(bvec, -ub[index])
+		Amat = cbind(Amat, -diag(n)[, index])		
+	}
+	
+	# add lb constraints, A^T b >= b_0
+	index = which( lb > -Inf )	
+	if( len(index) > 0 ) {	
+		bvec = c(bvec, lb[index])
+		Amat = cbind(Amat, diag(n)[, index])		
+	}
+	
+	# main logic
+	if ( binary.vec[1] == 0 ) {	
+		sol = solve.QP(Dmat, dvec, Amat, bvec, meq, factorized)
+	} else {
+		# use Binary Branch and Bound
+		qp_data = qp_new(binary.vec, Dmat = Dmat, dvec = dvec, 
+						Amat=Amat, bvec=bvec, meq=meq, factorized=factorized)
+	
+		sol = binary_branch_bound(binary.vec, qp_data, qp_solve, 
+				control = bbb_control(silent=T, branchvar='max', searchdir='best' ))
+				
+		qp_delete(qp_data)		
+		
+		sol$value = sol$fmin
+		sol$solution = sol$xmin
+	}
+	
+	return(sol)
+}
+
+		
+
+
+
+
+
+
 
 
 
@@ -226,27 +326,6 @@ qp_solve <- function
 }
 
 ###############################################################################
-# Solve QP problem using Binary Branch and Bound
-###############################################################################
-solve.QP.binary.branch.bound <- function(Dmat, dvec, Amat, bvec, meq=0, factorized=FALSE, binary.vec = 0)
-{
-	# use Binary Branch and Bound
-	qp_data = qp_new(binary.vec, Dmat = Dmat, dvec = dvec, 
-					Amat=Amat, bvec=bvec, meq=meq, factorized=factorized)
-
-	sol = binary_branch_bound(binary.vec, qp_data, qp_solve, 
-			control = bbb_control(silent=T, branchvar='max', searchdir='best' ))
-			
-	qp_delete(qp_data)		
-	
-	sol$value = sol$fmin
-	sol$solution = sol$xmin
-	return(sol)
-}
-
-		
-
-###############################################################################
 # Test QP interface to Binary Branch and Bound algorithm
 ###############################################################################
 mbqp.test <- function()
@@ -290,7 +369,7 @@ mbqp.test <- function()
 	cat('QP.solve fsol =', fsol, 'xsol =', xsol, '\n')
 
 	# Start Branch and Bound 
-	sol = solve.QP.binary.branch.bound(Dmat=Dmat, dvec=dvec, Amat=Amat, bvec=bvec, meq=0, binary.vec = index_binvar) 
+	sol = solve.QP.bounds(Dmat=Dmat, dvec=dvec, Amat=Amat, bvec=bvec, meq=0, binary.vec = index_binvar) 
 		xsol = sol$solution
 		fsol = sol$value
 

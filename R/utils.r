@@ -95,6 +95,17 @@ iif <- function
 } 
 
 ###############################################################################
+# Check for NA, NaN, Inf
+############################################################################### 
+ifna <- function
+(
+	x,	# check x for NA, NaN, Inf
+	y	# if found replace with y
+) { 	
+	return(iif(is.na(x) | is.nan(x) | is.infinite(x), y, x))
+}
+
+###############################################################################
 # Load Packages that are available and install ones that are not available.
 ############################################################################### 
 load.packages <- function

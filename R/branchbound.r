@@ -54,7 +54,12 @@ binary_branch_bound <- function
 		stack$data = list()
 		stack$cost = c()
 		stack$pointer = c()
-	stack$data[[1]] = list(lb = bbb_data$lb, ub = bbb_data$ub, var=1:nbinvar, level=0, fval = Inf)	
+	stack$data[[1]] = list(lb = bbb_data$lb, 
+							ub = bbb_data$ub, 
+							var = 1:nbinvar, 
+							path = rep(0,nbinvar), 
+							level = 0, 
+							fval = Inf)	
 	stack$cost = 0		# Array storing the cost of the problems, ordered in decreasing fashion (cost(1)=largest value)
 	stack$pointer = 1	# pointer stores the order of the list	
 	
@@ -64,27 +69,43 @@ binary_branch_bound <- function
 	while ( length(stack$data) >0 ) {	
 	    # Get the next subproblem from the STACK
 		subprob = bbb_pop(stack)
-#cat(counter, '\t', subprob$lb, '\t', subprob$var, '\t', subprob$fval, '\t', fbest, '\n')
-#cat(counter, '\t', subprob$ub, '\n')
-#cat('stack$pointer =', stack$pointer, '\n')
 		
+		if( !control$silent ) {
+			cat('-----------------------------------------------------', '\n')
+			if( max(subprob$path) > 0 ) {
+				temp.index = order(-subprob$path)[1 : sum(subprob$path > 0)]
+				cat('\t', 
+					paste('b', temp.index, ' = ', subprob$lb[temp.index],sep='') 
+					, '\n')				
+			} else {
+				cat(counter, '\t', 'FIRST NODE', '\n')
+			}
+			
+			cat(counter, '\t', subprob$lb, '\t', subprob$var, '\t', subprob$fval, '\t', fbest, '\n')
+			cat('\t', subprob$ub, '\n')
+			cat('stack size =', len(stack$pointer), '\n')
+		}
 	    
 		if( is.finite( subprob$fval ) & is.finite( fbest ) & fbest <= subprob$fval ) {
 			# skip this problem because fbest is alredy smaller
-#cat('Skip', '\n')			
+			if( !control$silent ) cat('SKIP this problem because a solution with lower FVAL already found\n')
 		} else {
 			
 		    # Solve the qp
 		    counter = counter + 1
 			sol = match.fun(bbb_solve)(bbb_data, subprob$lb, subprob$ub)
 
-#cat('\t', sol$ok, '\t', sol$fval, '\n\n');												  
 			                   
-			if( sol$ok ) {                 
+			if( !sol$ok ) {                 
+				if( !control$silent ) cat('NO SOLUTION EXISTS\n\n');												  			
+			} else {
 				x = sol$x
 				fval = sol$fval
 				
-#cat('\t', round(x[index_binvar[subprob$var]],3), '\n\n');
+				if( !control$silent ) {
+					cat('SOLUTION OK', '\t', sol$fval, '\n')								  								
+					cat('\t', round(x[index_binvar[subprob$var]],3), '\n\n')
+				}
 
 				
 		        if ( flag !=1 ) flag=5
@@ -96,7 +117,7 @@ binary_branch_bound <- function
 						fbest = fval               
 			            xbest = x              
 			            flag = 1  
-						if( !control$silent ) cat('fbest found =', fbest, '\n');
+						if( !control$silent ) cat('FOUND SOLUTION =', fbest, '\n');
 					} else {
 			            xi = x[index_binvar[subprob$var]]	# binary variables
 			            
@@ -105,7 +126,7 @@ binary_branch_bound <- function
 			                fbest = fval
 			                xbest = x              
 			                flag = 1
-			                if( !control$silent ) cat('fbest found =', fbest, '\n');           	                
+			                if( !control$silent ) cat('FOUND SOLUTION =', fbest, '\n');
 			            } else {
 			                # split problem in 0/1 subproblems	                
 			                branchvar = bbb_decision(xi,control)
@@ -113,6 +134,9 @@ binary_branch_bound <- function
 			                p0 = probs$p0
 			                p1 = probs$p1
 			  
+			                if( !control$silent ) cat('Branch on =', subprob$var[branchvar], '\n');
+			                
+			                
 			                
 			                if( control$searchdir == 0 ) {               
 								cost=1/(subprob$level+1) 	# Depth first
@@ -139,7 +163,7 @@ binary_branch_bound <- function
 			}
 						
 		    # verbose
-		    if( !control$silent ) {
+		    if( F ) {
 		        cat('counter =', counter, '\n')
 		        cat('fbest     =', fbest, '\n')
 		        cat('stack$pointer =', stack$pointer, '\n')
@@ -239,6 +263,7 @@ bbb_separate <- function
 			p0$fval = fval
 		    p0$level = prob$level + 1
 		    p0$var = prob$var[-branchvar]
+		    p0$path[ prob$var[branchvar] ] = 1 + max(p0$path)
 		p1 = p0
         		
 		p0$lb[ prob$var[branchvar] ] = 0
