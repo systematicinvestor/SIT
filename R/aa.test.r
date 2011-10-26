@@ -540,6 +540,22 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()
 
 	return()
+	
+
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cvar, F)
+	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cdar, F)
+	
+		
+	layout( matrix(1:4, nrow = 2) )
+	plot.transitopn.map(ef.maxloss)
+	plot.transitopn.map(ef.mad)	
+	plot.transitopn.map(ef.cvar)
+	plot.transitopn.map(ef.cdar)
+		
 
 }
 	
@@ -548,6 +564,11 @@ dev.off()
 ###############################################################################
 aa.multiple.risk.measures.test <- function()
 {
+	# Following linear risk constraints are implemented
+	# add.constraint.maxloss
+	# add.constraint.mad
+	# add.constraint.cvar
+	# add.constraint.cdar
 	
 
 	#--------------------------------------------------------------------------
@@ -562,13 +583,57 @@ aa.multiple.risk.measures.test <- function()
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
-
-# Expected shortfall (CVaR)
-# http://www.investopedia.com/articles/04/092904.asp
-ia$parameters.alpha = 0.95
-	
 		
+	# create efficient frontier(s)
+	ef.risk = 		portopt(ia, constraints, 50, 'Risk')
+	ef.maxloss = 	portopt(ia, constraints, 50, 'MaxLoss',	min.maxloss.portfolio)
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.maxloss, F)	
+
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.maxloss)
+
+dev.off()
 	
+	#--------------------------------------------------------------------------
+	# Add MaxLoss <= 12 constraint
+	#--------------------------------------------------------------------------
+	
+	constraints = add.constraint.maxloss(ia, 12/100, '<=', constraints)	
+		
+	ef.risk.maxloss = 		portopt(ia, constraints, 50, 'Risk+MaxLoss')
+		ef.risk.maxloss$weight = ef.risk.maxloss$weight[, 1:n]
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk.maxloss, ef.risk, ef.maxloss), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk.maxloss, ef.risk, ef.maxloss), portfolio.maxloss, F)	
+
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk.maxloss)
+
+dev.off()
+	
+	return()		
+	
+	
+	
+	#--------------------------------------------------------------------------
+	# Other Examples
+	#--------------------------------------------------------------------------
+	
+	# constraints
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)			
+	
+	# Alpha for CVaR and DVar
+	ia$parameters.alpha = 0.95
+				
 	# create efficient frontier(s)
 	ef.risk = 		portopt(ia, constraints, 50, 'Risk')
 	ef.maxloss = 	portopt(ia, constraints, 50, 'MaxLoss',	min.maxloss.portfolio)
@@ -577,123 +642,141 @@ ia$parameters.alpha = 0.95
 	ef.cdar = 		portopt(ia, constraints, 50, 'CDaR', 	min.cdar.portfolio)
 	
 	
-	
-	
-	
-	
-	
-	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.risk, F)
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.maxloss, F)
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cvar, F)
-	plot.ef(ia, list(ef.risk, ef.maxloss, ef.mad, ef.cvar, ef.cdar), portfolio.cdar, F)
-	
-	
-	
-	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.maxloss)
-	plot.transitopn.map(ef.mad)	
-	plot.transitopn.map(ef.cvar)
-	plot.transitopn.map(ef.cdar)
-	
-	
-	
-	
-	
-#--------------------------------------------------------------------------
-	# 1. let's limit max loss	
+	#--------------------------------------------------------------------------
+	# Limit Max Loss
+	#--------------------------------------------------------------------------
+	layout(1)
 	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.maxloss, F)
 	
-	# 2. let's limit max loss			
+	# constraints
 	constraints = new.constraints(n, lb = 0, ub = 0.8)
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)			
+	constraints = add.constraint.maxloss(ia, 15/100, '<=', constraints)	
 	
-	constraints = add.constraint.maxloss(ia, 12/100, '<=', constraints)	
-	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
-		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	ef.risk.new = portopt(ia, constraints, 50, 'Risk+')
+		ef.risk.new$weight = ef.risk.new$weight[, 1:n]
 	
 	# 3. compare new ef	
-	layout( 1:2)
+	layout(1:2)
 	plot.ef(ia, list(ef.risk), portfolio.maxloss, F)
-	plot.ef(ia, list(ef.risk1), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.maxloss, F)
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk1, ef.risk,ef.maxloss), portfolio.maxloss, F)	
-	plot.ef(ia, list(ef.risk1, ef.risk, ef.maxloss), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk.new, ef.risk,ef.maxloss), portfolio.maxloss, F)	
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss), portfolio.risk, F)
 	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk1)
-#--------------------------------------------------------------------------
-
-	# 1. let's limit mad
+	plot.transitopn.map(ef.risk.new)
+	
+	#--------------------------------------------------------------------------
+	# Limit MAD
+	#--------------------------------------------------------------------------
+	layout(1)
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)
 	
-	# 2. let's limit max loss			
+	# constraints
 	constraints = new.constraints(n, lb = 0, ub = 0.8)
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
-	
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)				
 	constraints = add.constraint.mad(ia, 2.9/100, '<=', constraints)	
-	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
-		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	ef.risk.new = portopt(ia, constraints, 50, 'Risk+')
+		ef.risk.new$weight = ef.risk.new$weight[, 1:n]
 	
 	# 3. compare new ef	
-	layout( 1:2)
+	layout(1:2)
 	plot.ef(ia, list(ef.risk), portfolio.mad, F)
-	plot.ef(ia, list(ef.risk1), portfolio.mad, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.mad, F)
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk1, ef.risk,ef.mad), portfolio.mad, F)	
-	plot.ef(ia, list(ef.risk1, ef.risk, ef.mad), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk.new, ef.risk,ef.mad), portfolio.mad, F)	
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.mad), portfolio.risk, F)
 	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk1)
-#--------------------------------------------------------------------------
-
-	# 1. let's limit CVaR
+	plot.transitopn.map(ef.risk.new)
+	
+	#--------------------------------------------------------------------------
+	# Limit CVaR
+	#--------------------------------------------------------------------------
+	layout(1)
 	plot.ef(ia, list(ef.risk, ef.cvar), portfolio.cvar, F)
 	
-	# 2. let's limit max loss			
+	# constraints
 	constraints = new.constraints(n, lb = 0, ub = 0.8)
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
-	
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)					
 	constraints = add.constraint.cvar(ia, 8/100, '<=', constraints)	
-	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
-		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	
+	ef.risk.new = portopt(ia, constraints, 50, 'Risk+')
+		ef.risk.new$weight = ef.risk.new$weight[, 1:n]
 	
 	# 3. compare new ef	
-	layout( 1:2)
+	layout(1:2)
 	plot.ef(ia, list(ef.risk), portfolio.cvar, F)
-	plot.ef(ia, list(ef.risk1), portfolio.cvar, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.cvar, F)
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk1, ef.risk,ef.cvar), portfolio.cvar, F)	
-	plot.ef(ia, list(ef.risk1, ef.risk, ef.cvar), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk.new, ef.risk,ef.cvar), portfolio.cvar, F)	
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.cvar), portfolio.risk, F)
 	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk1)
+	plot.transitopn.map(ef.risk.new)
 
-#--------------------------------------------------------------------------
-
-	# 1. let's limit CDaR
+	#--------------------------------------------------------------------------
+	# Limit CVaR
+	#--------------------------------------------------------------------------
 	layout(1)
 	plot.ef(ia, list(ef.risk, ef.cdar), portfolio.cdar, F)
 	
-	# 2. let's limit max loss			
+	# constraints
 	constraints = new.constraints(n, lb = 0, ub = 0.8)
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)						
+	constraints = add.constraint.cdar(ia, 15/100, '<=', constraints)	
 	
-	constraints = add.constraint.cdar(ia, 18/100, '<=', constraints)	
-	ef.risk1 = 		portopt(ia, constraints, 50, 'Risk1')
-		ef.risk1$weight = ef.risk1$weight[, 1:n]
+	ef.risk.new = portopt(ia, constraints, 50, 'Risk+')
+		ef.risk.new$weight = ef.risk.new$weight[, 1:n]
 	
 	# 3. compare new ef	
 	layout(1:2)
 	plot.ef(ia, list(ef.risk), portfolio.cdar, F)
-	plot.ef(ia, list(ef.risk1), portfolio.cdar, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.cdar, F)
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.ef(ia, list(ef.risk1, ef.risk,ef.cdar), portfolio.cdar, F)	
-	plot.ef(ia, list(ef.risk1, ef.risk, ef.cdar), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk.new, ef.risk,ef.cdar), portfolio.cdar, F)	
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.cdar), portfolio.risk, F)
 	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk1)
+	plot.transitopn.map(ef.risk.new)
 
+
+	#--------------------------------------------------------------------------
+	# Limit both Max Loss and CDaR
+	#--------------------------------------------------------------------------
+	layout(1:2)
+	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk, ef.cdar), portfolio.cdar, F)
+
+	# constraints
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)							
+	constraints = add.constraint.maxloss(ia, 15/100, '<=', constraints)		
+	constraints = add.constraint.cdar(ia, 15/100, '<=', constraints)	
+	
+	ef.risk.new = portopt(ia, constraints, 50, 'Risk+')
+		ef.risk.new$weight = ef.risk.new$weight[, 1:n]
+	
+	# 3. compare new ef	
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.maxloss, F)
+	plot.ef(ia, list(ef.risk), portfolio.cdar, F)
+	plot.ef(ia, list(ef.risk.new), portfolio.cdar, F)
+
+
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss, ef.cdar), portfolio.maxloss, F)		
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss, ef.cdar), portfolio.cdar, F)	
+	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss, ef.cdar), portfolio.risk, F)
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.transitopn.map(ef.risk)
+	plot.transitopn.map(ef.risk.new)
+	plot.transitopn.map(ef.maxloss)
+	plot.transitopn.map(ef.cdar)
 
 
 }
