@@ -203,7 +203,7 @@ plota.legend <- function
 {
 	# split fill colors & labels
 	if( !is.null(fill) ) fill = spl( as.character(fill) )	
-	labels = spl(labels)
+	labels = spl( as.character(labels) )
 	
 	# if last observations, add them to labels
 	if( !is.null(lastobs) ) {

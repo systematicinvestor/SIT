@@ -143,56 +143,6 @@ delete.constraints <- function
 
 
 ###############################################################################
-# General interface to Finding portfolio that Minimizes Given Risk Measure
-###############################################################################
-min.portfolio <- function
-(
-	ia,				# input assumptions
-	constraints,		# constraints
-	add.constraint.fn,
-	min.risk.fn	
-)
-{
-	n = nrow(constraints$A)	
-	nt = nrow(ia$hist.returns)
-	
-	# objective is stored as a last constraint
-	constraints = match.fun(add.constraint.fn)(ia, 0, '>=', constraints)	
-		
-	
-	
-	f.obj = constraints$A[, ncol(constraints$A)]
-		constraints = delete.constraints( ncol(constraints$A), constraints)
-
-	# setup constraints
-	f.con = constraints$A
-	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
-	f.rhs = constraints$b
-			
-	# find optimal solution	
-	x = NA
-	
-	binary.vec = 0
-	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
-		
-	sol = try(solve.LP.bounds('min', f.obj, t(f.con), f.dir, f.rhs, 
-				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
-				default.lb = -100), TRUE)	
-	
-	if(!inherits(sol, 'try-error')) {
-		x = sol$solution[1:n]
-		
-		# to check
-		if( F ) {
-			f.obj %*% sol$solution  - match.fun(min.risk.fn)(t(x), ia)
-		}
-	}		
-
-	return( x )
-}	
-
-
-###############################################################################
 # Maximum Loss
 # page 34, Comparative Analysis of Linear Portfolio Rebalancing Strategies by Krokhmal, Uryasev, Zrazhevsky  
 #
@@ -442,6 +392,183 @@ min.cdar.portfolio <- function
 
 
 
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# General interface to Finding portfolio that Minimizes Given Risk Measure
+###############################################################################
+min.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints,		# constraints
+	add.constraint.fn,
+	min.risk.fn	
+)
+{
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+	
+	# objective is stored as a last constraint
+	constraints = match.fun(add.constraint.fn)(ia, 0, '>=', constraints)	
+		
+	
+	
+	f.obj = constraints$A[, ncol(constraints$A)]
+		constraints = delete.constraints( ncol(constraints$A), constraints)
+
+	# setup constraints
+	f.con = constraints$A
+	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
+	f.rhs = constraints$b
+			
+	# find optimal solution	
+	x = NA
+	
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
+		
+	sol = try(solve.LP.bounds('min', f.obj, t(f.con), f.dir, f.rhs, 
+				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
+				default.lb = -100), TRUE)	
+	
+	if(!inherits(sol, 'try-error')) {
+		x = sol$solution[1:n]
+		
+		# to check
+		if( F ) {
+			f.obj %*% sol$solution  - match.fun(min.risk.fn)(t(x), ia)
+		}
+	}		
+
+	return( x )
+}	
+
+
+###############################################################################
+# portfolio.omega - omega
+###############################################################################
+portfolio.omega <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
+		
+	portfolio.returns = weight %*% t(ia$hist.returns)	
+	return( apply(portfolio.returns, 1, function(x) mean(pmax(x - omega,0)) / mean(pmax(omega - x,0)) ) )
+}	
+
+###############################################################################
+# Omega
+# page 6,9, Optimizing Omega by H. Mausser, D. Saunders, L. Seco
+#
+# Let x.i , i= 1,...,n  be weights of instruments in the portfolio.
+# Let us suppose that j = 1,...,T scenarios of returns are available 
+# ( r.ij denotes return of i -th asset in the scenario j ). 
+#
+# The Omega function has the form 
+# MAX [ SUM <over j> 1/T * u.j ]
+# [ SUM <over i> r.ij * x.i ] - u.j + d.j - L * t = 0, for each j = 1,...,T 
+# [ SUM <over j> 1/T * d.j ] = 1
+#  u.j, d.j >= 0, for each j = 1,...,T 
+#
+# Binary b.j enforces that only one of u.j or d.j is greter than 0
+# u.j <= b.j
+# d.j <= 1 - b.j
+###############################################################################
+add.constraint.omega <- function
+(
+	ia,			# input assumptions
+	value,		# b value
+	type = c('=', '>=', '<='),	# type of constraints
+	constraints	# constraints structure
+)
+{
+	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
+
+	n0 = ncol(ia$hist.returns)
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+
+	# adjust constraints, add u.j, d.j, t
+	constraints = add.variables(3*nt + 1, constraints, lb = c(rep(0,2*nt),-Inf,rep(0,nt)))
+		constraints$A[n + 2*nt + 1, ] = -constraints$b
+		constraints$b[] = 0
+	constraints$binary.index = (n + 2*nt + 1 + 1):(n + 3*nt + 1)
+	
+			
+	# [ SUM <over i> r.ij * x.i ] - u.j + d.j - L * t = 0, for each j = 1,...,T 	
+	a = rbind( matrix(0, n, nt), -diag(nt), diag(nt), -omega, 0*diag(nt))
+		a[1 : n0, ] = t(ia$hist.returns)
+	constraints = add.constraints(a, rep(0, nt), '=', constraints)			
+		
+	# [ SUM <over j> 1/T * u.j ] = 1	
+	constraints = add.constraints(c( rep(0,n), (1/nt) * rep(1,nt), rep(0,nt), 0, rep(0,nt)), 1, '=', constraints)				
+			
+	# objective : Omega
+	# [ SUM <over j> 1/T * d.j ]
+	constraints = add.constraints(c(rep(0, n), rep(0, nt), (1/nt) * rep(1, nt), 0, rep(0,nt)), value, type[1], constraints)	
+
+	# u.j <= b.j : b.j - u.j >= 0
+	# d.j <= 1 - b.j : -b.j - d.j >= -1
+	a = rbind( matrix(0, n, nt), -diag(nt), 0*diag(nt), 0, 1000 * diag(nt))
+	constraints = add.constraints(a, rep(0, nt), '>=', constraints)			
+
+	a = rbind( matrix(0, n, nt), 0*diag(nt), -diag(nt), 0, -1000 * diag(nt))
+	constraints = add.constraints(a, rep(-1000, nt), '>=', constraints)					
+			
+	return( constraints )	
+}
+
+###############################################################################
+# Find portfolio that Minimizes Omega
+###############################################################################
+min.omega.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	min.portfolio(ia, constraints, add.constraint.omega, portfolio.omega)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ###############################################################################
 # Functions to determine portfolio returns and risks
 ###############################################################################
@@ -635,6 +762,130 @@ portfolio.cdar <- function
 			
 }	
 
+###############################################################################
+# portfolio.avgcor - average correlation
+###############################################################################
+portfolio.avgcor.real <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)	
+	
+	return( apply(portfolio.returns, 1, function(x) mean(cor(ia$hist.returns, x)) ) )
+}	
+
+portfolio.avgcor <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	s = sqrt(diag(cov))
+		
+	
+	return( apply(weight, 1, function(x) {
+								sd_x = sqrt( t(x) %*% cov %*% x )
+								mean( ( x %*% cov ) / ( s * sd_x ) )
+							})	)
+}	
+
+###############################################################################
+# Find portfolio that Minimizes Average Correlation
+# Rdonlp2 only works with R version before 2.9
+# Rdonlp2 is not avilable for latest version of R
+# for more help please visit http://arumat.net/Rdonlp2/
+#
+# Conditions of use:                                                        
+# 1. donlp2 is under the exclusive copyright of P. Spellucci                
+#    (e-mail:spellucci@mathematik.tu-darmstadt.de)                          
+#    "donlp2" is a reserved name                                            
+# 2. donlp2 and its constituent parts come with no warranty, whether ex-    
+#    pressed or implied, that it is free of errors or suitable for any      
+#    specific purpose.                                                      
+#    It must not be used to solve any problem, whose incorrect solution     
+#    could result in injury to a person , institution or property.          
+#    It is at the users own risk to use donlp2 or parts of it and the       
+#    author disclaims all liability for such use.                           
+# 3. donlp2 is distributed "as is". In particular, no maintenance, support  
+#    or trouble-shooting or subsequent upgrade is implied.                  
+# 4. The use of donlp2 must be acknowledged, in any publication which contains                                                               
+#    results obtained with it or parts of it. Citation of the authors name  
+#    and netlib-source is suitable.                                         
+# 5. The free use of donlp2 and parts of it is restricted for research purposes                                                               
+#    commercial uses require permission and licensing from P. Spellucci.    
+###############################################################################
+min.avgcor.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	# Rdonlp2 only works with R version before 2.9
+	load.packages('Rdonlp2', repos ='http://R-Forge.R-project.org')
+
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	s = sqrt(diag(cov))
+	
+	# avgcor
+	fn <- function(x){
+		sd_x = sqrt( t(x) %*% cov %*% x )
+		mean( ( x %*% cov ) / ( s * sd_x ) )
+	}
+	
+	# control structure
+	cntl <- donlp2.control(silent = T, iterma =10000, nstep = 100, epsx = 1e-10)	
+	
+	# lower/upper bounds
+	par.l = constraints$lb
+	par.u = constraints$ub
+	
+	# intial guess
+	p = rep(1,n)
+	if(!is.null(constraints$x0)) p = constraints$x0
+		
+	# linear constraints
+	A = t(constraints$A)
+	lin.l = constraints$b
+	lin.u = constraints$b
+	lin.u[ -c(1:constraints$meq) ] = +Inf
+
+	# find solution
+	sol = donlp2(p, fn, 
+				par.lower=par.l, par.upper=par.u, 
+				A=A, lin.u=lin.u, lin.l=lin.l, 
+				control=cntl)
+	x = sol$par
+
+	return( x )
+}
+
+###############################################################################
+# Use Correlation instead of Variance in Find Minimum Risk Portfolio
+# (i.e. assume all assets have same risk = 1)
+###############################################################################
+min.cor.insteadof.cov.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	sol = solve.QP.bounds(Dmat = ia$cor, dvec = rep(0, nrow(ia$cov.temp)) , 
+		Amat=constraints$A, bvec=constraints$b, constraints$meq,
+		lb = constraints$lb, ub = constraints$ub)
+	return( sol$solution )
+}
+
+
+
+
+
+
 
 
 
@@ -766,7 +1017,8 @@ portopt <- function
 
 	# find minimum risk portfolio
 	out$weight[1, ] = match.fun(min.risk.fn)(ia, constraints)	
-
+		constraints$x0 = out$weight[1, ]
+	
 	# find points on efficient frontier
 	out$return = portfolio.return(out$weight, ia)
 	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
@@ -878,14 +1130,18 @@ plot.ef <- function
 	
 	# Transition Map plot
 	if(transition.map) {
-		plot.transitopn.map(efs[[i]]$weight, x, risk.label, efs[[i]]$name)
+		plot.transition.map(efs[[i]]$weight, x, risk.label, efs[[i]]$name)
 	}
 }
 
 ###############################################################################
-# Plot transitopn map
+# Plot Transition Map
 ###############################################################################
-plot.transitopn.map <- function
+plot.transitopn.map <- function(x,y,xlab = 'Risk',name = '',type=c('s','l')) {
+	plot.transition.map(x,y,xlab,name,type)
+}
+
+plot.transition.map <- function
 (
 	y,				# weights
 	x,				# x data

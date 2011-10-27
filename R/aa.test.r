@@ -92,9 +92,9 @@ dev.off()
 png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 
 	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.maxloss)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.maxloss)
+	plot.transition.map(ef.mad)
 
 dev.off()	
 
@@ -153,8 +153,8 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()
 
@@ -195,8 +195,8 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 		
 dev.off()
 
@@ -232,8 +232,8 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()
 	
@@ -272,8 +272,8 @@ png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()
 
@@ -325,8 +325,8 @@ png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()
 	
@@ -383,8 +383,8 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 		
 dev.off()	
 
@@ -431,8 +431,8 @@ png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()	
 
@@ -482,12 +482,67 @@ png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.mad), portfolio.mad, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.mad)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.mad)
 	
 dev.off()	
 	
 }
+
+
+###############################################################################
+# Test AA functions, Average Correlation
+# Forecast-Free Algorithms: A New Benchmark For Tactical Strategies
+# http://cssanalytics.wordpress.com/2011/08/09/forecast-free-algorithms-a-new-benchmark-for-tactical-strategies/
+#
+# Follow up FAQ: “Forecast-Free” Algorithms and Minimum Correlation Algorithm
+# http://cssanalytics.wordpress.com/2011/08/15/follow-up-faq-forecast-free-algorithms-and-minimum-correlation-algorithm/
+###############################################################################
+aa.avg.cor.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Risk')
+	ef.cor.inteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
+	ef.avgcor = portopt(ia, constraints, 50, 'AvgCor', min.avgcor.portfolio)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	layout(1:2)
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.avgcor, F)	
+	
+dev.off()	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.avgcor)
+	plot.transition.map(ef.cor.inteadof.cov)
+
+dev.off()	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# visualize input assumptions
+	plot.ia(ia)
+	
+dev.off()		
+		
+
+}
+
 
 ###############################################################################
 # Test AA functions, CVaR Efficient Frontier
@@ -533,9 +588,9 @@ dev.off()
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 
 	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.cvar)
-	plot.transitopn.map(ef.cdar)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.cvar)
+	plot.transition.map(ef.cdar)
 
 dev.off()
 
@@ -551,13 +606,124 @@ dev.off()
 	
 		
 	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.maxloss)
-	plot.transitopn.map(ef.mad)	
-	plot.transitopn.map(ef.cvar)
-	plot.transitopn.map(ef.cdar)
+	plot.transition.map(ef.maxloss)
+	plot.transition.map(ef.mad)	
+	plot.transition.map(ef.cvar)
+	plot.transition.map(ef.cdar)
 		
 
 }
+
+###############################################################################
+# Test AA functions, Omega Efficient Frontier
+###############################################################################
+plot.omega <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	omegafn = function(x,L) { mean(pmax(x-L,0)) / mean(pmax(L-x,0)) }
+
+	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega	
+	
+	weight = weight[, 1:ia$n, drop=F]
+		
+	portfolio.returns = weight %*% t(ia$hist.returns)	
+	
+	threshhold = quantile(portfolio.returns, probs = c(0.05, 0.95))
+	threshhold = seq(threshhold[1], threshhold[2], length.out = 100)
+
+	par(mar = c(4,4,2,1), cex = 0.8)
+	for(i in 1:nrow(weight)) {	
+		data = sapply(threshhold, function(L) omegafn(portfolio.returns[i, ], L))
+		
+		if(i==1) plot(threshhold,log(data), type='l', col=i, ylab='Log(Omega)', main='Portdolio Omega')
+		lines(threshhold, log(data), col=i)
+	}
+	abline(v = omega, col='black')
+	grid()
+	plota.legend(rownames(weight) ,1:nrow(weight))
+}
+
+aa.omega.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 0.8 
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+# Omega
+# http://en.wikipedia.org/wiki/Omega_ratio
+ia$parameters.omega = 13/100 
+	# convert annual to monthly
+	ia$parameters.omega = ia$parameters.omega / 12
+
+
+
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Risk')
+	
+	plot.ef(ia, list(ef.risk), portfolio.risk, F)			
+
+	rownames(ef.risk$weight) = paste('weight',1:50,sep='_')
+	plot.omega(ef.risk$weight[c(1,10,40,50), ], ia)
+	
+	temp = diag(n)
+	rownames(temp) = ia$symbols
+	plot.omega(temp, ia)
+	
+	
+plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return )
+	
+
+
+max.return.portfolio(ia, constraints)
+min.risk.portfolio(ia, constraints)
+
+
+min.omega.portfolio(ia, constraints)
+	
+	
+	
+	
+	
+	ef.cor.inteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
+	ef.avgcor = portopt(ia, constraints, 50, 'AvgCor', min.avgcor.portfolio)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	layout(1:2)
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.avgcor, F)	
+	
+dev.off()	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	layout( matrix(1:4, nrow = 2) )
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.avgcor)
+	plot.transition.map(ef.cor.inteadof.cov)
+
+dev.off()	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# visualize input assumptions
+	plot.ia(ia)
+	
+dev.off()		
+		
+
+}
+
+
 	
 ###############################################################################
 # Test AA functions, Multiple Risk Measures Efficient Frontier
@@ -594,8 +760,8 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk, ef.maxloss), portfolio.maxloss, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.maxloss)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.maxloss)
 
 dev.off()
 	
@@ -614,8 +780,8 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 	plot.ef(ia, list(ef.risk.maxloss, ef.risk, ef.maxloss), portfolio.risk, F)	
 	plot.ef(ia, list(ef.risk.maxloss, ef.risk, ef.maxloss), portfolio.maxloss, F)	
 
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.maxloss)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.maxloss)
 
 dev.off()
 	
@@ -664,8 +830,8 @@ dev.off()
 	layout( matrix(1:4, nrow = 2) )
 	plot.ef(ia, list(ef.risk.new, ef.risk,ef.maxloss), portfolio.maxloss, F)	
 	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss), portfolio.risk, F)
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.new)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.new)
 	
 	#--------------------------------------------------------------------------
 	# Limit MAD
@@ -689,8 +855,8 @@ dev.off()
 	layout( matrix(1:4, nrow = 2) )
 	plot.ef(ia, list(ef.risk.new, ef.risk,ef.mad), portfolio.mad, F)	
 	plot.ef(ia, list(ef.risk.new, ef.risk, ef.mad), portfolio.risk, F)
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.new)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.new)
 	
 	#--------------------------------------------------------------------------
 	# Limit CVaR
@@ -714,8 +880,8 @@ dev.off()
 	layout( matrix(1:4, nrow = 2) )
 	plot.ef(ia, list(ef.risk.new, ef.risk,ef.cvar), portfolio.cvar, F)	
 	plot.ef(ia, list(ef.risk.new, ef.risk, ef.cvar), portfolio.risk, F)
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.new)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.new)
 
 	#--------------------------------------------------------------------------
 	# Limit CVaR
@@ -739,8 +905,8 @@ dev.off()
 	layout( matrix(1:4, nrow = 2) )
 	plot.ef(ia, list(ef.risk.new, ef.risk,ef.cdar), portfolio.cdar, F)	
 	plot.ef(ia, list(ef.risk.new, ef.risk, ef.cdar), portfolio.risk, F)
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.new)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.new)
 
 
 	#--------------------------------------------------------------------------
@@ -773,10 +939,10 @@ dev.off()
 	plot.ef(ia, list(ef.risk.new, ef.risk, ef.maxloss, ef.cdar), portfolio.risk, F)
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.transitopn.map(ef.risk)
-	plot.transitopn.map(ef.risk.new)
-	plot.transitopn.map(ef.maxloss)
-	plot.transitopn.map(ef.cdar)
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.new)
+	plot.transition.map(ef.maxloss)
+	plot.transition.map(ef.cdar)
 
 
 }
