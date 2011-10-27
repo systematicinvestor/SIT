@@ -515,14 +515,14 @@ aa.avg.cor.test <- function()
 
 	# create efficient frontier(s)
 	ef.risk = portopt(ia, constraints, 50, 'Risk')
-	ef.cor.inteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
+	ef.cor.insteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
 	ef.avgcor = portopt(ia, constraints, 50, 'AvgCor', min.avgcor.portfolio)
 	
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 	
 	layout(1:2)
-	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.risk, F)	
-	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.avgcor, F)	
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.insteadof.cov), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.insteadof.cov), portfolio.avgcor, F)	
 	
 dev.off()	
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
@@ -530,7 +530,7 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 	layout( matrix(1:4, nrow = 2) )
 	plot.transition.map(ef.risk)
 	plot.transition.map(ef.avgcor)
-	plot.transition.map(ef.cor.inteadof.cov)
+	plot.transition.map(ef.cor.insteadof.cov)
 
 dev.off()	
 png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
