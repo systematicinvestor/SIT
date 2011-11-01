@@ -14,6 +14,9 @@
 ###############################################################################
 # Asset Allocation Functions
 # Copyright (C) 2011  Michael Kapler
+#
+# For more information please visit my blog at www.SystematicInvestor.wordpress.com
+# or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
 
@@ -143,6 +146,64 @@ delete.constraints <- function
 
 
 ###############################################################################
+# General interface to Finding portfolio that Minimizes Given Risk Measure
+###############################################################################
+min.portfolio <- function
+(
+	ia,					# input assumptions
+	constraints,		# constraints
+	add.constraint.fn,
+	min.risk.fn	
+)
+{
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+	
+	# objective is stored as a last constraint
+	constraints = match.fun(add.constraint.fn)(ia, 0, '>=', constraints)				
+	
+	f.obj = constraints$A[, ncol(constraints$A)]
+		constraints = delete.constraints( ncol(constraints$A), constraints)
+
+	# setup constraints
+	f.con = constraints$A
+	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
+	f.rhs = constraints$b
+			
+	# find optimal solution	
+	x = NA
+	
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
+		
+	sol = try(solve.LP.bounds('min', f.obj, t(f.con), f.dir, f.rhs, 
+				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
+				default.lb = -100), TRUE)	
+	
+	if(!inherits(sol, 'try-error')) {
+		x = sol$solution[1:n]
+		
+		#cat('sol.objval =', sol$objval, '\n')
+		
+		# to check
+		if( F ) {
+			f.obj %*% sol$solution  - match.fun(min.risk.fn)(t(x), ia)
+		}
+	}		
+
+	return( x )
+}	
+
+
+
+
+
+
+
+
+
+
+###############################################################################
 # Maximum Loss
 # page 34, Comparative Analysis of Linear Portfolio Rebalancing Strategies by Krokhmal, Uryasev, Zrazhevsky  
 #
@@ -181,9 +242,18 @@ add.constraint.maxloss <- function
 	return( constraints )	
 }
 
-###############################################################################
-# Find portfolio that Minimizes Maximum Loss
-###############################################################################
+portfolio.maxloss <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( -apply(portfolio.returns, 1, min) )
+}	
+
 min.maxloss.portfolio <- function
 (
 	ia,				# input assumptions
@@ -193,6 +263,14 @@ min.maxloss.portfolio <- function
 	min.portfolio(ia, constraints, add.constraint.maxloss, portfolio.maxloss)
 	
 }
+
+
+
+
+
+
+
+
 
 
 ###############################################################################
@@ -236,9 +314,18 @@ add.constraint.mad <- function
 	return( constraints )	
 }
 
-###############################################################################
-# Find portfolio that Minimizes Mean-Absolute Deviation (MAD)
-###############################################################################
+portfolio.mad <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
+}	
+
 min.mad.portfolio <- function
 (
 	ia,				# input assumptions
@@ -247,6 +334,14 @@ min.mad.portfolio <- function
 {
 	min.portfolio(ia, constraints, add.constraint.mad, portfolio.mad)	
 }
+
+
+
+
+
+
+
+
 
 
 ###############################################################################
@@ -291,9 +386,20 @@ add.constraint.cvar <- function
 	return( constraints )	
 }
 
-###############################################################################
-# Find portfolio that Minimizes Conditional Value at Risk (CVaR)
-###############################################################################
+# average of portfolio returns that are below portfolio's VaR
+portfolio.cvar <- function
+(
+	weight,		# weight
+	ia			# input assumptions	
+)	
+{
+	weight = weight[, 1:ia$n]
+	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( apply(portfolio.returns, 1, function(x) compute.cvar(x, alpha) ) )
+}	
+
 min.cvar.portfolio <- function
 (
 	ia,				# input assumptions
@@ -302,6 +408,52 @@ min.cvar.portfolio <- function
 {
 	min.portfolio(ia, constraints, add.constraint.cvar, portfolio.cvar)
 }
+
+###############################################################################
+# portfolio.var
+###############################################################################
+portfolio.var <- function
+(
+	weight,		# weight
+	ia			# input assumptions	
+)	
+{
+	weight = weight[, 1:ia$n]
+	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( apply(portfolio.returns, 1, function(x) compute.var(x, alpha) ) )
+}	
+
+###############################################################################
+# compute.var/cvar - What is the most I can with a 95% level of confidence expect to lose
+# http://www.investopedia.com/articles/04/092904.asp
+###############################################################################
+compute.var <- function
+(
+	x,		# observations
+	alpha	# confidence level
+)
+{
+	return( -quantile(x, probs = (1-alpha)) )
+}
+
+compute.cvar <- function
+(
+	x,		# observations
+	alpha	# confidence level
+)
+{
+	return( -mean(x[ x < quantile(x, probs = (1-alpha)) ]) )
+}
+
+
+
+
+
+
+
+
 
 
 ###############################################################################
@@ -336,17 +488,7 @@ add.constraint.cdar <- function
 
 	# adjust constraints, add w.j, E, u.j
 	constraints = add.variables(2*nt + 1, constraints, lb = c(rep(0,nt), rep(-Inf,nt+1)))
-
-	
-# Use this transfromation insted of returns
-#x = ia$hist.returns[,1]
-#	range(cumprod(1 + x) - exp(cumsum(log(1+x))))
-#	plot(cumprod(1 + x))
-#		lines(exp(cumsum(log(1+x))),col='blue')
-	
-		
-	
-		
+			
 	#  u.j - [ SUM <over i> [ SUM <over j> r.ij ] * x.i ] - E < w.j, for each j = 1,...,T 
 	a = rbind( matrix(0, n, nt), diag(nt), 1, -diag(nt))
 		a[1 : n0, ] = t(apply( t(ia$hist.returns), 1, cumsum))	
@@ -372,9 +514,27 @@ add.constraint.cdar <- function
 	return( constraints )	
 }
 
-###############################################################################
-# Find portfolio that Minimizes Conditional Drawdown at Risk (CDaR)
-###############################################################################
+portfolio.cdar <- function
+(
+	weight,		# weight
+	ia			# input assumptions	
+)	
+{
+	weight = weight[, 1:ia$n]
+	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	# use CVaR formula
+	return( apply(portfolio.returns, 1, 
+			function(x) {
+				x = cumsum(x)
+				x = x - cummax(x)
+				compute.cvar(x, alpha)
+			} 
+		))
+			
+}	
+
 min.cdar.portfolio <- function
 (
 	ia,				# input assumptions
@@ -383,334 +543,6 @@ min.cdar.portfolio <- function
 {
 	min.portfolio(ia, constraints, add.constraint.cdar, portfolio.cdar)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###############################################################################
-# General interface to Finding portfolio that Minimizes Given Risk Measure
-###############################################################################
-min.portfolio <- function
-(
-	ia,				# input assumptions
-	constraints,		# constraints
-	add.constraint.fn,
-	min.risk.fn	
-)
-{
-	n = nrow(constraints$A)	
-	nt = nrow(ia$hist.returns)
-	
-	# objective is stored as a last constraint
-	constraints = match.fun(add.constraint.fn)(ia, 0, '>=', constraints)	
-		
-	
-	
-	f.obj = constraints$A[, ncol(constraints$A)]
-		constraints = delete.constraints( ncol(constraints$A), constraints)
-
-	# setup constraints
-	f.con = constraints$A
-	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
-	f.rhs = constraints$b
-			
-	# find optimal solution	
-	x = NA
-	
-	binary.vec = 0
-	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
-		
-	sol = try(solve.LP.bounds('min', f.obj, t(f.con), f.dir, f.rhs, 
-				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
-				default.lb = -100), TRUE)	
-	
-	if(!inherits(sol, 'try-error')) {
-		x = sol$solution[1:n]
-		
-		# to check
-		if( F ) {
-			f.obj %*% sol$solution  - match.fun(min.risk.fn)(t(x), ia)
-		}
-	}		
-
-	return( x )
-}	
-
-
-###############################################################################
-# portfolio.omega - omega
-###############################################################################
-portfolio.omega <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{	
-	weight = weight[, 1:ia$n]
-	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
-		
-	portfolio.returns = weight %*% t(ia$hist.returns)	
-	return( apply(portfolio.returns, 1, function(x) mean(pmax(x - omega,0)) / mean(pmax(omega - x,0)) ) )
-}	
-
-###############################################################################
-# Omega
-# page 6,9, Optimizing Omega by H. Mausser, D. Saunders, L. Seco
-#
-# Let x.i , i= 1,...,n  be weights of instruments in the portfolio.
-# Let us suppose that j = 1,...,T scenarios of returns are available 
-# ( r.ij denotes return of i -th asset in the scenario j ). 
-#
-# The Omega function has the form 
-# MAX [ SUM <over j> 1/T * u.j ]
-# [ SUM <over i> r.ij * x.i ] - u.j + d.j - L * t = 0, for each j = 1,...,T 
-# [ SUM <over j> 1/T * d.j ] = 1
-#  u.j, d.j >= 0, for each j = 1,...,T 
-#
-# Binary b.j enforces that only one of u.j or d.j is greter than 0
-# u.j <= b.j
-# d.j <= 1 - b.j
-###############################################################################
-add.constraint.omega <- function
-(
-	ia,			# input assumptions
-	value,		# b value
-	type = c('=', '>=', '<='),	# type of constraints
-	constraints	# constraints structure
-)
-{
-	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
-
-	n0 = ncol(ia$hist.returns)
-	n = nrow(constraints$A)	
-	nt = nrow(ia$hist.returns)
-
-	# adjust constraints, add u.j, d.j, t
-	constraints = add.variables(3*nt + 1, constraints, lb = c(rep(0,2*nt),-Inf,rep(0,nt)))
-		constraints$A[n + 2*nt + 1, ] = -constraints$b
-		constraints$b[] = 0
-	constraints$binary.index = (n + 2*nt + 1 + 1):(n + 3*nt + 1)
-	
-			
-	# [ SUM <over i> r.ij * x.i ] - u.j + d.j - L * t = 0, for each j = 1,...,T 	
-	a = rbind( matrix(0, n, nt), -diag(nt), diag(nt), -omega, 0*diag(nt))
-		a[1 : n0, ] = t(ia$hist.returns)
-	constraints = add.constraints(a, rep(0, nt), '=', constraints)			
-		
-	# [ SUM <over j> 1/T * u.j ] = 1	
-	constraints = add.constraints(c( rep(0,n), (1/nt) * rep(1,nt), rep(0,nt), 0, rep(0,nt)), 1, '=', constraints)				
-			
-	# objective : Omega
-	# [ SUM <over j> 1/T * d.j ]
-	constraints = add.constraints(c(rep(0, n), rep(0, nt), (1/nt) * rep(1, nt), 0, rep(0,nt)), value, type[1], constraints)	
-
-	# u.j <= b.j : b.j - u.j >= 0
-	# d.j <= 1 - b.j : -b.j - d.j >= -1
-	a = rbind( matrix(0, n, nt), -diag(nt), 0*diag(nt), 0, 1000 * diag(nt))
-	constraints = add.constraints(a, rep(0, nt), '>=', constraints)			
-
-	a = rbind( matrix(0, n, nt), 0*diag(nt), -diag(nt), 0, -1000 * diag(nt))
-	constraints = add.constraints(a, rep(-1000, nt), '>=', constraints)					
-			
-	return( constraints )	
-}
-
-###############################################################################
-# Find portfolio that Minimizes Omega
-###############################################################################
-min.omega.portfolio <- function
-(
-	ia,				# input assumptions
-	constraints		# constraints
-)
-{
-	min.portfolio(ia, constraints, add.constraint.omega, portfolio.omega)
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###############################################################################
-# Functions to determine portfolio returns and risks
-###############################################################################
-# portfolio.return - weight * expected.return
-###############################################################################
-portfolio.return <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{
-	weight = weight[, 1:ia$n]
-	portfolio.return = weight %*% ia$expected.return
-	return( portfolio.return )
-}	
-
-###############################################################################
-# portfolio.risk - square root of portfolio volatility
-###############################################################################
-portfolio.risk <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{	
-	weight = weight[, 1:ia$n]
-	cov = ia$cov[1:ia$n, 1:ia$n]
-	
-	portfolio.risk = diag(weight %*% cov %*% t(weight))
-	portfolio.risk[ !is.na(portfolio.risk) ] = sqrt( portfolio.risk[ !is.na(portfolio.risk) ] )
-	return( portfolio.risk )
-}	
-
-###############################################################################
-# portfolio.maxloss - maximum historical loss at any period
-###############################################################################
-portfolio.maxloss <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{
-	weight = weight[, 1:ia$n]
-	
-	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( -apply(portfolio.returns, 1, min) )
-}	
-
-###############################################################################
-# portfolio.mad - Mean-Absolute Deviation (MAD)
-###############################################################################
-portfolio.mad <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{
-	weight = weight[, 1:ia$n]
-	
-	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
-}	
-
-
-###############################################################################
-# compute.var/cvar - What is the most I can with a 95% level of confidence expect to lose
-# http://www.investopedia.com/articles/04/092904.asp
-###############################################################################
-compute.var <- function
-(
-	x,		# observations
-	alpha	# confidence level
-)
-{
-	return( -quantile(x, probs = (1-alpha)) )
-}
-
-compute.cvar <- function
-(
-	x,		# observations
-	alpha	# confidence level
-)
-{
-	return( -mean(x[ x < quantile(x, probs = (1-alpha)) ]) )
-}
-
-###############################################################################
-# portfolio.var
-###############################################################################
-portfolio.var <- function
-(
-	weight,		# weight
-	ia			# input assumptions	
-)	
-{
-	weight = weight[, 1:ia$n]
-	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
-	
-	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( apply(portfolio.returns, 1, function(x) compute.var(x, alpha) ) )
-}	
-
-
-###############################################################################
-# portfolio.cvar - Conditional Value at Risk 
-#  = Average of portfolio returns that are below portfolio's VaR
-###############################################################################
-portfolio.cvar <- function
-(
-	weight,		# weight
-	ia			# input assumptions	
-)	
-{
-	weight = weight[, 1:ia$n]
-	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
-	
-	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( apply(portfolio.returns, 1, function(x) compute.cvar(x, alpha) ) )
-}	
-
-###############################################################################
-# portfolio.cdar - Conditional Drawdown at Risk 
-#  = Average of portfolio drawdown that are below portfolio's DaR
-###############################################################################
-compute.drawdowns <- function( portfolio.equity, make.plot = FALSE )	
-{
-	temp = portfolio.equity / cummax(portfolio.equity) - 1
-	temp = c(temp, 0)
-	
-	drawdown.start = which( temp == 0 & mlag(temp, -1) != 0 )
-	drawdown.end = which( temp == 0 & mlag(temp, 1) != 0 )
-	
-	if(make.plot) {
-		plot((1:len(temp)), temp, type='l')
-			points((1:len(temp))[drawdown.start] , temp[drawdown.start], col='red')
-			points((1:len(temp))[drawdown.end] , temp[drawdown.end], col='blue')
-	}
-						
-	return( apply(cbind(drawdown.start, drawdown.end), 1, 
-					function(x){ min(temp[ x[1]:x[2] ], na.rm=T)} )
-		)
-}	
 
 ###############################################################################
 # Compute CDaR based on data
@@ -739,61 +571,35 @@ portfolio.cdar.real <- function
 }	
 
 ###############################################################################
-# Compute CDaR based on approximation used for Optimization
+# Compute Portfolio Drawdowns
 ###############################################################################
-portfolio.cdar <- function
-(
-	weight,		# weight
-	ia			# input assumptions	
-)	
+compute.drawdowns <- function( portfolio.equity, make.plot = FALSE )	
 {
-	weight = weight[, 1:ia$n]
-	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
+	temp = portfolio.equity / cummax(portfolio.equity) - 1
+	temp = c(temp, 0)
 	
-	portfolio.returns = weight %*% t(ia$hist.returns)
-	# use CVaR formula
-	return( apply(portfolio.returns, 1, 
-			function(x) {
-				x = cumsum(x)
-				x = x - cummax(x)
-				compute.cvar(x, alpha)
-			} 
-		))
-			
+	drawdown.start = which( temp == 0 & mlag(temp, -1) != 0 )
+	drawdown.end = which( temp == 0 & mlag(temp, 1) != 0 )
+	
+	if(make.plot) {
+		plot((1:len(temp)), temp, type='l')
+			points((1:len(temp))[drawdown.start] , temp[drawdown.start], col='red')
+			points((1:len(temp))[drawdown.end] , temp[drawdown.end], col='blue')
+	}
+						
+	return( apply(cbind(drawdown.start, drawdown.end), 1, 
+					function(x){ min(temp[ x[1]:x[2] ], na.rm=T)} )
+		)
 }	
 
-###############################################################################
-# portfolio.avgcor - average correlation
-###############################################################################
-portfolio.avgcor.real <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{	
-	weight = weight[, 1:ia$n]
-	
-	portfolio.returns = weight %*% t(ia$hist.returns)	
-	
-	return( apply(portfolio.returns, 1, function(x) mean(cor(ia$hist.returns, x)) ) )
-}	
 
-portfolio.avgcor <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{	
-	weight = weight[, 1:ia$n]
-	cov = ia$cov[1:ia$n, 1:ia$n]
-	s = sqrt(diag(cov))
-		
-	
-	return( apply(weight, 1, function(x) {
-								sd_x = sqrt( t(x) %*% cov %*% x )
-								mean( ( x %*% cov ) / ( s * sd_x ) )
-							})	)
-}	
+
+
+
+
+
+
+
 
 ###############################################################################
 # Find portfolio that Minimizes Average Correlation
@@ -839,7 +645,16 @@ min.avgcor.portfolio <- function
 	}
 	
 	# control structure
-	cntl <- donlp2.control(silent = T, iterma =10000, nstep = 100, epsx = 1e-10)	
+	if( as.numeric( sessionInfo()$R.version$minor ) < 9 ) {
+		cntl <- donlp2.control(silent = T, iterma =10000, nstep = 100, epsx = 1e-10)	
+	} else {
+		cntl <- donlp2Control()
+			cntl$silent = T
+			cntl$iterma =10000
+			cntl$nstep = 100
+			cntl$epsx = 1e-10
+	}		
+	
 	
 	# lower/upper bounds
 	par.l = constraints$lb
@@ -865,6 +680,23 @@ min.avgcor.portfolio <- function
 	return( x )
 }
 
+portfolio.avgcor <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	s = sqrt(diag(cov))
+		
+	
+	return( apply(weight, 1, function(x) {
+								sd_x = sqrt( t(x) %*% cov %*% x )
+								mean( ( x %*% cov ) / ( s * sd_x ) )
+							})	)
+}	
+
 ###############################################################################
 # Use Correlation instead of Variance in Find Minimum Risk Portfolio
 # (i.e. assume all assets have same risk = 1)
@@ -882,7 +714,186 @@ min.cor.insteadof.cov.portfolio <- function
 }
 
 
+###############################################################################
+# portfolio.avgcor - average correlation
+###############################################################################
+portfolio.avgcor.real <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)	
+	
+	return( apply(portfolio.returns, 1, function(x) mean(cor(ia$hist.returns, x)) ) )
+}	
 
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Mean-Lower-Semi-Absolute Deviation (M-LSAD)
+# page 6, Portfolio Optimization under Lower Partial Risk Measure by H. Konno, H. Waki and A. Yuuki
+# http://www.kier.kyoto-u.ac.jp/fe-tokyo/workingpapers/AFE-KyotoU_WP01-e.html
+#
+# Let x.i , i= 1,...,n  be weights of instruments in the portfolio.
+# Let us suppose that j = 1,...,T scenarios of returns are available 
+# ( r.ij denotes return of i -th asset in the scenario j ). 
+#
+# Mean-Lower-Semi-Absolute Deviation (M-LSAD) function has the form 
+#  1/T * [ SUM <over j> z.j ]
+#  such that
+#  - [ SUM <over i> (r.ij - r.i) * x.i ] <= z.j , for each j = 1,...,T 
+#  z.j >= 0, for each j = 1,...,T 
+###############################################################################
+add.constraint.mad.downside <- function
+(
+	ia,			# input assumptions
+	value,		# b value
+	type = c('=', '>=', '<='),	# type of constraints
+	constraints	# constraints structure
+)
+{
+	n0 = ncol(ia$hist.returns)
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+
+	# adjust constraints, add z.j
+	constraints = add.variables(nt, constraints, lb = 0)
+				
+	#  - [ SUM <over i> (r.ij - r.i) * x.i ] <= z.j , for each j = 1,...,T 
+	a = rbind( matrix(0, n, nt), diag(nt))
+	if(is.null(ia$parameters.mar) || is.na(ia$parameters.mar)) {
+		a[1 : n0, ] = t(ia$hist.returns) - repmat(colMeans(ia$hist.returns), 1, nt)
+		constraints = add.constraints(a, rep(0, nt), '>=', constraints)			
+	} else {
+		#  MAR - [ SUM <over i> r.ij * x.i ] <= z.j , for each j = 1,...,T 
+		a[1 : n0, ] = t(ia$hist.returns)
+		constraints = add.constraints(a, rep(ia$parameters.mar, nt), '>=', constraints)					
+	}
+
+
+	# objective : Mean-Lower-Semi-Absolute Deviation (M-LSAD)
+	#  1/T * [ SUM <over j> z.j ]
+	constraints = add.constraints(c(rep(0, n), (1/nt) * rep(1, nt)), value, type[1], constraints)	
+		
+	return( constraints )	
+}
+
+portfolio.mad.downside <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	
+	if(is.null(ia$parameters.mar) || is.na(ia$parameters.mar)) {
+		return( apply(portfolio.returns, 1, function(x) mean(pmax(mean(x) - x, 0)) ) )
+	} else {
+		return( apply(portfolio.returns, 1, function(x) mean(pmax(ia$parameters.mar - x, 0)) ) )	
+	}
+}	
+
+min.mad.downside.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	min.portfolio(ia, constraints, add.constraint.mad.downside, portfolio.mad.downside)	
+}
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Mean-Lower Semi-Variance (MV)
+# page 6, Portfolio Optimization under Lower Partial Risk Measure by H. Konno, H. Waki and A. Yuuki
+# http://www.kier.kyoto-u.ac.jp/fe-tokyo/workingpapers/AFE-KyotoU_WP01-e.html
+#
+# Same logic as add.constraint.mad.downside, but minimize (z.j)^2
+# use quadratic solver
+###############################################################################
+portfolio.risk.downside <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	
+	if(is.null(ia$parameters.mar) || is.na(ia$parameters.mar)) {
+		return( apply(portfolio.returns, 1, function(x) sqrt(mean(pmax(mean(x) - x, 0)^2)) ) )
+	} else {
+		return( apply(portfolio.returns, 1, function(x) sqrt(mean(pmax(ia$parameters.mar - x, 0)^2)) ) )	
+	}
+}	
+
+min.risk.downside.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+	
+	# objective is stored as a last constraint
+	constraints = add.constraint.mad.downside(ia, 0, '>=', constraints)				
+	
+	f.obj = constraints$A[, ncol(constraints$A)]
+		constraints = delete.constraints( ncol(constraints$A), constraints)
+		
+	# setup Dmat
+	Dmat = diag( len(f.obj) )
+	diag(Dmat) = f.obj
+	if(!is.positive.definite(Dmat)) {
+		Dmat <- make.positive.definite(Dmat)
+	}	
+	
+		
+	# find optimal solution	
+	x = NA
+
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
+	
+	sol = try(solve.QP.bounds(Dmat = Dmat, dvec = rep(0, nrow(Dmat)) , 
+		Amat=constraints$A, bvec=constraints$b, constraints$meq,
+		lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec),TRUE) 
+	
+		
+	if(!inherits(sol, 'try-error')) {
+		x = sol$solution[1:n]
+		
+		
+		# to check
+		if( F ) {
+			sol$solution %*% Dmat %*% (sol$solution) - portfolio.risk.downside(t(x), ia)^2
+		}
+	}		
+	
+	return( x )	
+}
 
 
 
@@ -924,6 +935,29 @@ max.return.portfolio <- function
 }
 
 ###############################################################################
+# portfolio.return - weight * expected.return
+###############################################################################
+portfolio.return <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n]
+	portfolio.return = weight %*% ia$expected.return
+	return( portfolio.return )
+}	
+
+
+
+
+
+
+
+
+
+
+###############################################################################
 # Find Minimum Risk Portfolio
 ###############################################################################
 # solve.QP function from quadprog library
@@ -953,6 +987,23 @@ min.risk.portfolio <- function
 		
 	return( x )
 }
+
+###############################################################################
+# portfolio.risk - square root of portfolio volatility
+###############################################################################
+portfolio.risk <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	weight = weight[, 1:ia$n]
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	portfolio.risk = diag(weight %*% cov %*% t(weight))
+	portfolio.risk[ !is.na(portfolio.risk) ] = sqrt( portfolio.risk[ !is.na(portfolio.risk) ] )
+	return( portfolio.risk )
+}	
 
 
 
@@ -1032,6 +1083,7 @@ portopt <- function
 		constraints$b[ len(constraints$b) ] = target[i]
 		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
 		
+		constraints$x0 = out$weight[i, ]
 		
 		
 	}
@@ -1044,6 +1096,14 @@ portopt <- function
 	
 	return(out)			
 }
+
+
+
+
+
+
+
+
 
 
 ###############################################################################

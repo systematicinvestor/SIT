@@ -15,6 +15,9 @@
 # Collection of Random Generators
 # Copyright (C) 2005-2006  Roger Stafford - the author of the original Matlab version
 # Copyright (C) 2011  Michael Kapler - ported Roger Stafford's code to R
+#
+# For more information please visit my blog at www.SystematicInvestor.wordpress.com
+# or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
 

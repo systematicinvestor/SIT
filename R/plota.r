@@ -15,6 +15,9 @@
 # Create Technical Analysis Plots
 # plota = plot + ta
 # Copyright (C) 2011  Michael Kapler
+#
+# For more information please visit my blog at www.SystematicInvestor.wordpress.com
+# or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
 

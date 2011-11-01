@@ -15,6 +15,9 @@
 # Binary Branch and Bound and it's adaption for QP problem
 # Copyright (C) 1998-2000  Alberto Bemporad, Domenico Mignone - author's of the original Matlab version					
 # Copyright (C) 2011  Michael Kapler - adapted code to R
+#
+# For more information please visit my blog at www.SystematicInvestor.wordpress.com
+# or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
 

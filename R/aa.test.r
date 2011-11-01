@@ -14,6 +14,9 @@
 ###############################################################################
 # Test cases for Asset Allocation Functions
 # Copyright (C) 2011  Michael Kapler
+#
+# For more information please visit my blog at www.SystematicInvestor.wordpress.com
+# or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
 
@@ -517,6 +520,8 @@ aa.avg.cor.test <- function()
 	ef.risk = portopt(ia, constraints, 50, 'Risk')
 	ef.cor.insteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
 	ef.avgcor = portopt(ia, constraints, 50, 'AvgCor', min.avgcor.portfolio)
+
+	
 	
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 	
@@ -617,35 +622,6 @@ dev.off()
 ###############################################################################
 # Test AA functions, Omega Efficient Frontier
 ###############################################################################
-plot.omega <- function
-(
-	weight,		# weight
-	ia			# input assumptions
-)	
-{	
-	omegafn = function(x,L) { mean(pmax(x-L,0)) / mean(pmax(L-x,0)) }
-
-	if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega	
-	
-	weight = weight[, 1:ia$n, drop=F]
-		
-	portfolio.returns = weight %*% t(ia$hist.returns)	
-	
-	threshhold = quantile(portfolio.returns, probs = c(0.05, 0.95))
-	threshhold = seq(threshhold[1], threshhold[2], length.out = 100)
-
-	par(mar = c(4,4,2,1), cex = 0.8)
-	for(i in 1:nrow(weight)) {	
-		data = sapply(threshhold, function(L) omegafn(portfolio.returns[i, ], L))
-		
-		if(i==1) plot(threshhold,log(data), type='l', col=i, ylab='Log(Omega)', main='Portdolio Omega')
-		lines(threshhold, log(data), col=i)
-	}
-	abline(v = omega, col='black')
-	grid()
-	plota.legend(rownames(weight) ,1:nrow(weight))
-}
-
 aa.omega.test <- function()
 {
 	#--------------------------------------------------------------------------
@@ -660,12 +636,11 @@ aa.omega.test <- function()
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
-# Omega
-# http://en.wikipedia.org/wiki/Omega_ratio
-ia$parameters.omega = 13/100 
-	# convert annual to monthly
-	ia$parameters.omega = ia$parameters.omega / 12
-
+	# Omega - http://en.wikipedia.org/wiki/Omega_ratio
+	ia$parameters.omega = 13/100 
+		ia$parameters.omega = 12/100 
+		# convert annual to monthly
+		ia$parameters.omega = ia$parameters.omega / 12
 
 
 	# create efficient frontier(s)
@@ -673,56 +648,91 @@ ia$parameters.omega = 13/100
 	
 	plot.ef(ia, list(ef.risk), portfolio.risk, F)			
 
+	# plot Omega
 	rownames(ef.risk$weight) = paste('weight',1:50,sep='_')
 	plot.omega(ef.risk$weight[c(1,10,40,50), ], ia)
 	
 	temp = diag(n)
 	rownames(temp) = ia$symbols
 	plot.omega(temp, ia)
+		
+	plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return, xlab='Log(Omega)', ylab='Return', main='Portdolio Omega' )
 	
 	
-plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return )
+	# optimize Omega
+	ef.omega = portopt.omega(ia, constraints, 50, 'Omega')
 	
-
-
-max.return.portfolio(ia, constraints)
-min.risk.portfolio(ia, constraints)
-
-
-min.omega.portfolio(ia, constraints)
-	
-	
-	
-	
-	
-	ef.cor.inteadof.cov = portopt(ia, constraints, 50, 'Cor instead of Cov', min.cor.insteadof.cov.portfolio)
-	ef.avgcor = portopt(ia, constraints, 50, 'AvgCor', min.avgcor.portfolio)
-	
-png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
-	
-	layout(1:2)
-	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.risk, F)	
-	plot.ef(ia, list(ef.risk, ef.avgcor, ef.cor.inteadof.cov), portfolio.avgcor, F)	
-	
-dev.off()	
-png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 	
 	layout( matrix(1:4, nrow = 2) )
-	plot.transition.map(ef.risk)
-	plot.transition.map(ef.avgcor)
-	plot.transition.map(ef.cor.inteadof.cov)
+	plot.ef(ia, list(ef.risk,ef.omega), portfolio.risk, F)			
+	plot.ef(ia, list(ef.risk,ef.omega), portfolio.omega, F)			
 
-dev.off()	
-png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.omega)
 	
-	# visualize input assumptions
-	plot.ia(ia)
-	
-dev.off()		
 		
 
+	plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return, type='b', xlab='Log(Omega)', ylab='Return', main='Portdolio Omega' )
+		lines(log(portfolio.omega(ef.omega$weight, ia)), ef.omega$return, col='blue')
+		lines(log(portfolio.omega(ef.omega1$weight, ia)), ef.omega1$return, col='red')
+				
 }
 
+
+###############################################################################
+# Test AA functions, Downside Risk
+###############################################################################
+aa.downside.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 0.8
+	constraints = new.constraints(n, lb = 0, ub = 0.8)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+
+	# Set target return (or Minimum Acceptable Returns (MAR))
+	# and consider only returns that are less than the target 
+	ia$parameters.mar = 0/100 
+		# convert annual to monthly
+		ia$parameters.mar = ia$parameters.mar / 12
+
+		
+	# create efficient frontier(s)
+	ef.mad = portopt(ia, constraints, 50, 'MAD', min.mad.portfolio)
+	ef.mad.downside = portopt(ia, constraints, 50, 'S-MAD', min.mad.downside.portfolio)
+	
+	ef.risk = portopt(ia, constraints, 50, 'Risk')
+	ef.risk.downside = portopt(ia, constraints, 50, 'S-Risk', min.risk.downside.portfolio)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.mad.downside, ef.mad), portfolio.mad, F)			
+	plot.ef(ia, list(ef.mad.downside, ef.mad), portfolio.mad.downside, F)			
+		
+	plot.transition.map(ef.mad)
+	plot.transition.map(ef.mad.downside)
+
+dev.off()
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk.downside, ef.risk), portfolio.risk, F)			
+	plot.ef(ia, list(ef.risk.downside, ef.risk), portfolio.risk.downside, F)			
+
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.downside)
+
+dev.off()		
+}
 
 	
 ###############################################################################
