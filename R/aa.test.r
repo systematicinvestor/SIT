@@ -645,24 +645,53 @@ aa.omega.test <- function()
 
 	# create efficient frontier(s)
 	ef.risk = portopt(ia, constraints, 50, 'Risk')
-	
-	plot.ef(ia, list(ef.risk), portfolio.risk, F)			
 
-	# plot Omega
-	rownames(ef.risk$weight) = paste('weight',1:50,sep='_')
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# Plot Omega Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2, byrow=T) )
+	
+	# weights
+	rownames(ef.risk$weight) = paste('Risk','weight',1:50,sep='_')
 	plot.omega(ef.risk$weight[c(1,10,40,50), ], ia)
 	
+	# assets
 	temp = diag(n)
 	rownames(temp) = ia$symbols
 	plot.omega(temp, ia)
 		
-	plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return, xlab='Log(Omega)', ylab='Return', main='Portdolio Omega' )
-	
-	
-	# optimize Omega
+	# portfolio
+	plot.ef(ia, list(ef.risk), portfolio.omega, T, T)			
+
+dev.off()	
+		
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier in Omega Ratio framework
+	#--------------------------------------------------------------------------
+		
+	# Create maximum Omega Efficient Frontier
 	ef.omega = portopt.omega(ia, constraints, 50, 'Omega')
 	
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	
+	# Plot Omega Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2, byrow=T) )
+
+	# weights
+	plot.omega(ef.risk$weight[c(1,10,40,50), ], ia)
+
+	# weights
+	rownames(ef.omega$weight) = paste('Omega','weight',1:50,sep='_')	
+	plot.omega(ef.omega$weight[c(1,10,40,50), ], ia)
+		
+	# portfolio
+	plot.ef(ia, list(ef.omega, ef.risk), portfolio.omega, T, T)			
+		
+dev.off()	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# Plot multiple Efficient Frontiers and Transition Maps
 	layout( matrix(1:4, nrow = 2) )
 	plot.ef(ia, list(ef.risk,ef.omega), portfolio.risk, F)			
 	plot.ef(ia, list(ef.risk,ef.omega), portfolio.omega, F)			
@@ -670,11 +699,7 @@ aa.omega.test <- function()
 	plot.transition.map(ef.risk)
 	plot.transition.map(ef.omega)
 	
-		
-
-	plot( log(portfolio.omega(ef.risk$weight, ia)), ef.risk$return, type='b', xlab='Log(Omega)', ylab='Return', main='Portdolio Omega' )
-		lines(log(portfolio.omega(ef.omega$weight, ia)), ef.omega$return, col='blue')
-		lines(log(portfolio.omega(ef.omega1$weight, ia)), ef.omega1$return, col='red')
+dev.off()	
 				
 }
 

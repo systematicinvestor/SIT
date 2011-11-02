@@ -1058,6 +1058,7 @@ portopt <- function
 
 	
 	# set up output 
+	if(nportfolios<2) nportfolios = 2
 	out = list(weight = matrix(NA, nportfolios, nrow(constraints$A)))
 		colnames(out$weight) = rep('', ncol(out$weight))
 		colnames(out$weight)[1:ia$n] = ia$symbols
@@ -1070,22 +1071,22 @@ portopt <- function
 	out$weight[1, ] = match.fun(min.risk.fn)(ia, constraints)	
 		constraints$x0 = out$weight[1, ]
 	
-	# find points on efficient frontier
-	out$return = portfolio.return(out$weight, ia)
-	target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
-
-	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
-						target[1], type = '>=', constraints)
-									
-	for(i in 2:(nportfolios - 1) ) {
+	if(nportfolios>2) {
+		# find points on efficient frontier
+		out$return = portfolio.return(out$weight, ia)
+		target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
 	
-	
-		constraints$b[ len(constraints$b) ] = target[i]
-		out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+		constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
+							target[1], type = '>=', constraints)
+										
+		for(i in 2:(nportfolios - 1) ) {
 		
-		constraints$x0 = out$weight[i, ]
 		
-		
+			constraints$b[ len(constraints$b) ] = target[i]
+			out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+			
+			constraints$x0 = out$weight[i, ]
+		}
 	}
 	
 	
@@ -1138,7 +1139,8 @@ plot.ef <- function
 	ia,						# input assumption
 	efs,					# efficient fontier(s)
 	portfolio.risk.fn = portfolio.risk,	# risk measure
-	transition.map = TRUE	# flag to plot transitopn map
+	transition.map = TRUE,	# flag to plot transitopn map
+	layout = NULL			# flag to idicate if layout is already set
 )
 {
 	# extract name of risk measure
@@ -1166,7 +1168,8 @@ plot.ef <- function
 	ylim = 100 * ylim			
 				
 	# plot
-	if(transition.map) layout(1:2)
+	if( !transition.map ) layout = T
+	if( is.null(layout) ) layout(1:2)
 	
 	par(mar = c(4,3,2,1), cex = 0.8)
 	plot(x, y, xlim = xlim, ylim = ylim,

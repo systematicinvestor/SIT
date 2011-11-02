@@ -222,48 +222,19 @@ portopt.omega <- function
 	name = 'Omega'			# Name
 )
 {
-	# load / check required packages
-	load.packages('quadprog,corpcor,lpSolve')
-	
-	# set up constraints
-	if( is.null(constraints) ) {
-		constraints = new.constraints(rep(0, ia$n), 0, type = '>=')
-	} 	
-		
-	# set up solve.QP
-	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
-	if( is.null(ia$cov) ) ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
-	
-	# setup covariance matrix used in solve.QP
-	ia$cov.temp = ia$cov
-
-	# check if there are dummy variables
-	n0 = ia$n
-	n = nrow(constraints$A)		
-	
-	if( n != nrow(ia$cov.temp) ) {
-		temp =  matrix(0, n, n)
-		temp[1:n0, 1:n0] = ia$cov.temp[1:n0, 1:n0]
-		ia$cov.temp = temp
-	}
-				
-	if(!is.positive.definite(ia$cov.temp)) {
-		ia$cov.temp <- make.positive.definite(ia$cov.temp)
-	}	
-	
-
-	
 	# set up output 
 	out = list(weight = matrix(NA, nportfolios, nrow(constraints$A)))
 		colnames(out$weight) = rep('', ncol(out$weight))
 		colnames(out$weight)[1:ia$n] = ia$symbols
-		
-			
-	# find maximum return portfolio	
-	out$weight[nportfolios, ] = max.return.portfolio(ia, constraints)
 
-	# find minimum risk portfolio
-	out$weight[1, ] = min.risk.portfolio(ia, constraints)	
+				
+	ef.risk = portopt(ia, constraints, 2)	
+					
+	# maximum return portfolio	
+	out$weight[nportfolios, ] = ef.risk$weight[2,]
+
+	# minimum risk portfolio
+	out$weight[1, ] = ef.risk$weight[1,]
 		constraints$x0 = out$weight[1, ]
 	
 	# find points on efficient frontier
@@ -273,7 +244,7 @@ portopt.omega <- function
 	constraints = add.constraints(c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)), 
 						target[1], type = '<=', constraints)
 									
-	for(i in 1:(nportfolios) ) {
+	for(i in 1:nportfolios ) {
 		cat('i =', i, '\n')
 	
 		constraints$b[ len(constraints$b) ] = -target[i]
@@ -316,10 +287,12 @@ plot.omega <- function
 	for(i in 1:nrow(weight)) {	
 		data = sapply(threshhold, function(L) omegafn(portfolio.returns[i, ], L))
 		
-		if(i==1) plot(threshhold,log(data), type='l', col=i, ylab='Log(Omega)', main='Portdolio Omega')
+		if(i==1) plot(threshhold,log(data), type='l', col=i, 
+			xlab='Threshhold', ylab='Log(Omega)', main='Portfolio Omega')
 		lines(threshhold, log(data), col=i)
 	}
-	abline(v = omega, col='black')
+	abline(v = omega, col='orange')
 	grid()
-	plota.legend(rownames(weight) ,1:nrow(weight))
+	plota.legend(rownames(weight) ,1:nrow(weight), x = 'bottomleft')
 }
+
