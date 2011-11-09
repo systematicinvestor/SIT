@@ -114,29 +114,11 @@ max.omega.portfolio <- function
 	constraints		# constraints
 )
 {
-	constraints0 = constraints
-
 	n = nrow(constraints$A)	
 	nt = nrow(ia$hist.returns)
 	
-	# objective is stored as a last constraint
-	constraints = add.constraint.omega(ia, 0, '>=', constraints)	
-	f.obj = constraints$A[, ncol(constraints$A)]
-		constraints = delete.constraints( ncol(constraints$A), constraints)
-
-	# setup constraints
-	f.con = constraints$A
-	f.dir = c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
-	f.rhs = constraints$b
-			
-	# find optimal solution	
-	binary.vec = 0
-	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
-		
-	sol = try(solve.LP.bounds('max', f.obj, t(f.con), f.dir, f.rhs, 
-				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
-				default.lb = -100), TRUE)	
-	
+	sol = optimize.portfolio(ia, constraints, add.constraint.omega, portfolio.omega, 'max', T)
+				
 	if(!inherits(sol, 'try-error')) {
 		x0 = sol$solution[1:n]
 		u = sol$solution[(1+n):(n+nt)]
@@ -154,11 +136,6 @@ max.omega.portfolio <- function
 	# Try solving problem using Rdonlp2
 	if( any( u*d != 0 ) || sol$status !=0 ) {
 	
-		# Rdonlp2 only works with R version before 2.9
-		load.packages('Rdonlp2', repos ='http://R-Forge.R-project.org')
-	
-		constraints = constraints0
-	
 		if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
 	
 		# omega
@@ -166,46 +143,10 @@ max.omega.portfolio <- function
 			portfolio.returns = x %*% t(ia$hist.returns)	
 			mean(pmax(portfolio.returns - omega,0)) / mean(pmax(omega - portfolio.returns,0))
 		}
-	
-		# control structure
-		# fnscale(1) - set -1 for maximization instead of minimization.
-		if( as.numeric( sessionInfo()$R.version$minor ) < 9 ) {
-			cntl <- donlp2.control(silent = T, fnscale = -1, iterma =10000, nstep = 100, epsx = 1e-10)	
-		} else {
-			cntl <- donlp2Control()
-				cntl$silent = T
-				cntl$fnscale = -1
-				cntl$iterma =10000
-				cntl$nstep = 100
-				cntl$epsx = 1e-10
-		}		
 		
-		# lower/upper bounds
-		par.l = constraints$lb
-		par.u = constraints$ub
-		
-		# intial guess
-		p = rep(1,n)
-		if(!is.null(constraints$x0)) p = constraints$x0
-		
-		
-		# linear constraints
-		A = t(constraints$A)
-		lin.l = constraints$b
-		lin.u = constraints$b
-		lin.u[ -c(1:constraints$meq) ] = +Inf
-	
-		# find solution
-		sol = donlp2(p, fn, 
-					par.lower=par.l, par.upper=par.u, 
-					A=A, lin.u=lin.u, lin.l=lin.l, 
-					control=cntl)
-		x = sol$par
-	
+		x = optimize.portfolio.nlp(ia, constraints, fn, direction = 'max')
 		#portfolio.omega(t(x),ia)
-		
 	}
-
 
 	return( x )
 }

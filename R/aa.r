@@ -156,6 +156,19 @@ min.portfolio <- function
 	min.risk.fn	
 )
 {
+	optimize.portfolio(ia, constraints, add.constraint.fn, min.risk.fn)
+}
+
+optimize.portfolio <- function
+(
+	ia,					# input assumptions
+	constraints,		# constraints
+	add.constraint.fn,
+	min.risk.fn,
+	direction = 'min',
+	full.solution = F
+)
+{
 	n = nrow(constraints$A)	
 	nt = nrow(ia$hist.returns)
 	
@@ -176,7 +189,7 @@ min.portfolio <- function
 	binary.vec = 0
 	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
 		
-	sol = try(solve.LP.bounds('min', f.obj, t(f.con), f.dir, f.rhs, 
+	sol = try(solve.LP.bounds(direction, f.obj, t(f.con), f.dir, f.rhs, 
 				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
 				default.lb = -100), TRUE)	
 	
@@ -191,13 +204,102 @@ min.portfolio <- function
 		}
 	}		
 
+	if( full.solution ) x = sol 
 	return( x )
 }	
 
+###############################################################################
+# Rdonlp2 only works with R version before 2.9
+# Rdonlp2 is not avilable for latest version of R
+# for more help please visit http://arumat.net/Rdonlp2/
+#
+# Conditions of use:                                                        
+# 1. donlp2 is under the exclusive copyright of P. Spellucci                
+#    (e-mail:spellucci@mathematik.tu-darmstadt.de)                          
+#    "donlp2" is a reserved name                                            
+# 2. donlp2 and its constituent parts come with no warranty, whether ex-    
+#    pressed or implied, that it is free of errors or suitable for any      
+#    specific purpose.                                                      
+#    It must not be used to solve any problem, whose incorrect solution     
+#    could result in injury to a person , institution or property.          
+#    It is at the users own risk to use donlp2 or parts of it and the       
+#    author disclaims all liability for such use.                           
+# 3. donlp2 is distributed "as is". In particular, no maintenance, support  
+#    or trouble-shooting or subsequent upgrade is implied.                  
+# 4. The use of donlp2 must be acknowledged, in any publication which contains                                                               
+#    results obtained with it or parts of it. Citation of the authors name  
+#    and netlib-source is suitable.                                         
+# 5. The free use of donlp2 and parts of it is restricted for research purposes                                                               
+#    commercial uses require permission and licensing from P. Spellucci.    
+###############################################################################
+optimize.portfolio.nlp <- function
+(
+	ia,					# input assumptions
+	constraints,		# constraints
+	fn,
+	nl.constraints = NULL,	# Non-Linear constraints
+	direction = 'min',
+	full.solution = F
+)
+{
+	# Rdonlp2 only works with R version before 2.9
+	load.packages('Rdonlp2', repos ='http://R-Forge.R-project.org')
 
+	# fnscale(1) - set -1 for maximization instead of minimization.
+	if( direction == 'min' ) fnscale = 1 else fnscale = -1
+	
+	# control structure	
+	if( as.numeric( sessionInfo()$R.version$minor ) < 9 ) {
+		cntl <- donlp2.control(silent = T, fnscale = fnscale, iterma =10000, nstep = 100, epsx = 1e-10)	
+	} else {
+		cntl <- donlp2Control()
+			cntl$silent = T
+			cntl$fnscale = fnscale
+			cntl$iterma =10000
+			cntl$nstep = 100
+			cntl$epsx = 1e-10
+	}		
+	
+	
+	# lower/upper bounds
+	par.l = constraints$lb
+	par.u = constraints$ub
+	
+	# intial guess
+	p = rep(1, nrow(constraints$A))
+	if(!is.null(constraints$x0)) p = constraints$x0
+		
+	# linear constraints
+	A = t(constraints$A)
+	lin.l = constraints$b
+	lin.u = constraints$b
+	lin.u[ -c(1:constraints$meq) ] = +Inf
 
+	# find optimal solution	
+	x = NA
+	
+	if( !is.null(nl.constraints) ) {
+		sol = donlp2(p, fn, 
+					par.lower=par.l, par.upper=par.u, 
+					A=A, lin.u=lin.u, lin.l=lin.l, 
+					control=cntl,					
+					nlin=nl.constraints$constraints,
+					nlin.upper=nl.constraints$upper, nlin.lower=nl.constraints$lower					
+					)
+	} else {
+		sol = donlp2(p, fn, 
+					par.lower=par.l, par.upper=par.u, 
+					A=A, lin.u=lin.u, lin.l=lin.l, 
+					control=cntl)
+	}
+				
+	if(!inherits(sol, 'try-error')) {
+		x = sol$par
+	}		
 
-
+	if( full.solution ) x = sol 
+	return( x )
+}	
 
 
 
@@ -248,7 +350,7 @@ portfolio.maxloss <- function
 	ia			# input assumptions
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	return( -apply(portfolio.returns, 1, min) )
@@ -320,7 +422,7 @@ portfolio.mad <- function
 	ia			# input assumptions
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
@@ -393,7 +495,7 @@ portfolio.cvar <- function
 	ia			# input assumptions	
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
@@ -418,7 +520,7 @@ portfolio.var <- function
 	ia			# input assumptions	
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
@@ -520,7 +622,7 @@ portfolio.cdar <- function
 	ia			# input assumptions	
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
@@ -632,9 +734,6 @@ min.avgcor.portfolio <- function
 	constraints		# constraints
 )
 {
-	# Rdonlp2 only works with R version before 2.9
-	load.packages('Rdonlp2', repos ='http://R-Forge.R-project.org')
-
 	cov = ia$cov[1:ia$n, 1:ia$n]
 	s = sqrt(diag(cov))
 	
@@ -644,39 +743,9 @@ min.avgcor.portfolio <- function
 		mean( ( x %*% cov ) / ( s * sd_x ) )
 	}
 	
-	# control structure
-	if( as.numeric( sessionInfo()$R.version$minor ) < 9 ) {
-		cntl <- donlp2.control(silent = T, iterma =10000, nstep = 100, epsx = 1e-10)	
-	} else {
-		cntl <- donlp2Control()
-			cntl$silent = T
-			cntl$iterma =10000
-			cntl$nstep = 100
-			cntl$epsx = 1e-10
-	}		
 	
+	x = optimize.portfolio.nlp(ia, constraints, fn)
 	
-	# lower/upper bounds
-	par.l = constraints$lb
-	par.u = constraints$ub
-	
-	# intial guess
-	p = rep(1,n)
-	if(!is.null(constraints$x0)) p = constraints$x0
-		
-	# linear constraints
-	A = t(constraints$A)
-	lin.l = constraints$b
-	lin.u = constraints$b
-	lin.u[ -c(1:constraints$meq) ] = +Inf
-
-	# find solution
-	sol = donlp2(p, fn, 
-				par.lower=par.l, par.upper=par.u, 
-				A=A, lin.u=lin.u, lin.l=lin.l, 
-				control=cntl)
-	x = sol$par
-
 	return( x )
 }
 
@@ -686,7 +755,7 @@ portfolio.avgcor <- function
 	ia			# input assumptions
 )	
 {	
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	cov = ia$cov[1:ia$n, 1:ia$n]
 	s = sqrt(diag(cov))
 		
@@ -723,7 +792,7 @@ portfolio.avgcor.real <- function
 	ia			# input assumptions
 )	
 {	
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)	
 	
@@ -794,7 +863,7 @@ portfolio.mad.downside <- function
 	ia			# input assumptions
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	
@@ -837,7 +906,7 @@ portfolio.risk.downside <- function
 	ia			# input assumptions
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
 	
@@ -943,11 +1012,113 @@ portfolio.return <- function
 	ia			# input assumptions
 )	
 {
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	portfolio.return = weight %*% ia$expected.return
 	return( portfolio.return )
 }	
 
+###############################################################################
+# portfolio.geometric.return
+###############################################################################
+portfolio.geometric.return <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n, drop=F]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	return( apply(portfolio.returns, 1, function(x) (prod(1+x)^(1/len(x)))^ia$annual.factor - 1 ) )
+}	
+
+
+###############################################################################
+# Find Maximum Geometric Return Portfolio
+###############################################################################
+max.geometric.return.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints,	# constraints
+	min.risk,
+	max.risk
+)
+{
+	# Geometric return
+	fn <- function(x){
+		portfolio.returns = x %*% t(ia$hist.returns)	
+		prod(1 + portfolio.returns)
+	}
+
+	# Nonlinear constraints
+	nlcon1 <- function(x){
+		sqrt(t(x) %*% ia$cov %*% x)
+	}
+	
+	nl.constraints = list()
+		nl.constraints$constraints = list(nlcon1)
+		nl.constraints$upper = c(max.risk)
+		nl.constraints$lower = c(min.risk)
+	
+	x = optimize.portfolio.nlp(ia, constraints, fn, nl.constraints, direction = 'max')
+	
+	return( x )
+}
+
+###############################################################################
+# portfolio.unrebalanced.return
+# http://www.effisols.com/mvoplus/sample1.htm
+###############################################################################
+portfolio.unrebalanced.return <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	weight = weight[, 1:ia$n, drop=F]
+	
+	total.return = apply(1+ia$hist.returns,2,prod)
+	total.portfolio.return = weight %*% total.return / rowSums(weight)
+	total.portfolio.return = (total.portfolio.return^(1/nrow(ia$hist.returns)))^ia$annual.factor - 1 
+	return( total.portfolio.return )
+}	
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Functions to convert between Arithmetic and Geometric means
+###############################################################################
+# page 8, DIVERSIFICATION, REBALANCING, AND THE GEOMETRIC MEAN FRONTIER by W. Bernstein and D. Wilkinson (1997)
+###############################################################################
+geom2aritm <- function(G, V, a, b) 
+{ 
+	(2*G + a*V^2) / (1 - b*G + sqrt((1+b*G)^2 + 2*a*b*V^2)) 
+}
+
+aritm2geom <- function(R, V, a, b) 
+{ 
+	R - a*V^2 / (2*(1 + b*R)) 
+}
+
+###############################################################################
+# page 14, A4, On the Relationship between Arithmetic and Geometric Returns by D. Mindlin
+###############################################################################
+geom2aritm4 <- function(G, V) 
+{ 
+	(1+G)*sqrt(1/2 + 1/2*sqrt(1 + 4*V^2/(1+G)^2)) - 1 
+}
+
+aritm2geom4 <- function(R, V) 
+{ 
+	(1+R)/(sqrt(1 + V^2/(1+R)^2)) - 1 
+}
 
 
 
@@ -997,14 +1168,11 @@ portfolio.risk <- function
 	ia			# input assumptions
 )	
 {	
-	weight = weight[, 1:ia$n]
+	weight = weight[, 1:ia$n, drop=F]
 	cov = ia$cov[1:ia$n, 1:ia$n]
 	
-	portfolio.risk = diag(weight %*% cov %*% t(weight))
-	portfolio.risk[ !is.na(portfolio.risk) ] = sqrt( portfolio.risk[ !is.na(portfolio.risk) ] )
-	return( portfolio.risk )
+	return( apply(weight, 1, function(x) sqrt(t(x) %*% cov %*% x)) )	
 }	
-
 
 
 
@@ -1023,7 +1191,9 @@ portopt <- function
 	constraints = NULL,		# Constraints
 	nportfolios = 50,		# Number of portfolios
 	name = 'Risk',			# Name
-	min.risk.fn = min.risk.portfolio	# Risk Measure
+	min.risk.fn = min.risk.portfolio,	# Risk Measure
+	equally.spaced.risk = F	# Add extra portfolios so that portfolios on efficient frontier 
+							# are equally spaced on risk axis
 )
 {
 	# load / check required packages
@@ -1052,7 +1222,7 @@ portopt <- function
 	}
 				
 	if(!is.positive.definite(ia$cov.temp)) {
-		ia$cov.temp <- make.positive.definite(ia$cov.temp)
+		ia$cov.temp <- make.positive.definite(ia$cov.temp, 0.000000001)
 	}	
 	
 
@@ -1071,7 +1241,7 @@ portopt <- function
 	out$weight[1, ] = match.fun(min.risk.fn)(ia, constraints)	
 		constraints$x0 = out$weight[1, ]
 	
-	if(nportfolios>2) {
+	if(nportfolios > 2) {
 		# find points on efficient frontier
 		out$return = portfolio.return(out$weight, ia)
 		target = seq(out$return[1], out$return[nportfolios], length.out = nportfolios)
@@ -1080,12 +1250,50 @@ portopt <- function
 							target[1], type = '>=', constraints)
 										
 		for(i in 2:(nportfolios - 1) ) {
-		
-		
 			constraints$b[ len(constraints$b) ] = target[i]
 			out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
+				constraints$x0 = out$weight[i, ]
+		}
+		
+		if( equally.spaced.risk ) {
+			out$risk = portfolio.risk(out$weight, ia)
+		
+			temp = diff(out$risk)
+			index = which(temp >= median(temp) + mad(temp))
 			
-			constraints$x0 = out$weight[i, ]
+			if( len(index) > 0 ) {
+				index = min(index)
+
+				proper.spacing = ceiling((out$risk[nportfolios] - out$risk[index])/temp[(index-1)])-1
+				nportfolios1 = proper.spacing + 2
+								
+				if(nportfolios1 > 2) {
+					out$return = portfolio.return(out$weight, ia)
+					out$risk = portfolio.risk(out$weight, ia)
+					temp = spline(out$risk, out$return, n = nportfolios, method = 'natural')
+										
+					target = temp$y[ which(temp$y > out$return[index] & temp$y < out$return[nportfolios] & 
+						temp$x > out$risk[index] & temp$x < out$risk[nportfolios])]
+					target = c(out$return[index], target, out$return[nportfolios])
+					nportfolios1 = len(target)
+									
+					out1 = list(weight = matrix(NA, nportfolios1, nrow(constraints$A)))
+						out1$weight[1, ] = out$weight[index, ]
+						out1$weight[nportfolios1, ] = out$weight[nportfolios, ]
+					
+					constraints$x0 = out1$weight[1, ]					
+					for(i in 2:(nportfolios1 - 1) ) {						
+						constraints$b[ len(constraints$b) ] = target[i]
+						out1$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)				
+							constraints$x0 = out1$weight[i, ]
+					}
+					
+					out$weight = rbind(out$weight[-c(index:nportfolios),], out1$weight)
+				}
+				
+				
+			}
+			
 		}
 	}
 	
@@ -1097,9 +1305,6 @@ portopt <- function
 	
 	return(out)			
 }
-
-
-
 
 
 

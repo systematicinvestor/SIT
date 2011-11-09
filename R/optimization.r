@@ -465,5 +465,3 @@ remove.equality.constraints <- function(qp.data)
 
 
 	
-	
-	

@@ -983,6 +983,252 @@ dev.off()
 }
 
 
+###############################################################################
+# Test AA functions, Arithmetic vs Geometric Efficient Frontier
+###############################################################################
+aa.arithmetic.geometric.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia.rebal()
+	n = ia$n		
+
+	# -1 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Arithmetic', equally.spaced.risk = T)	
+	
+	# compute historical geometrical returns
+	ef.risk.geometric = ef.risk
+		ef.risk.geometric$name = 'Geometric'
+		ef.risk.geometric$return = portfolio.geometric.return(ef.risk$weight, ia)		
+		
+		
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+				
+	# Plot multiple Efficient Frontiers and Transition Maps
+	plot.ef(ia, list(ef.risk, ef.risk.geometric), portfolio.risk, T)			
+
+dev.off()	
+	
+
+	#--------------------------------------------------------------------------
+	# Following DIVERSIFICATION, REBALANCING, AND THE GEOMETRIC MEAN FRONTIER by W. Bernstein and D. Wilkinson (1997)
+	# paper's notation : A(1,0) and A(1,1) page 8, 14
+	#--------------------------------------------------------------------------
+	# A(1,0)
+	ef.risk.A10 = ef.risk
+		ef.risk.A10$name = 'A(1;0)'
+		ef.risk.A10$return = apply( cbind(ef.risk$return, ef.risk$risk), 1, 
+								function(x) aritm2geom(x[1], x[2], 1, 0) )
+	# A(1,1)
+	ef.risk.A11 = ef.risk
+		ef.risk.A11$name = 'A(1;1)'
+		ef.risk.A11$return = apply( cbind(ef.risk$return, ef.risk$risk), 1, 
+								function(x) aritm2geom(x[1], x[2], 1, 1) )
+							
+	# G(1,0)
+	ia.G = ia
+	ia.G$expected.return = apply( cbind(ia$geometric.return, ia$risk), 1, 
+								function(x) geom2aritm(x[1], x[2], 1, 0) )
+	ef.risk.G10 = portopt(ia.G, constraints, 50, 'G(1;0)',equally.spaced.risk = T)	
+		ef.risk.G10$return = apply( cbind(ef.risk.G10$return, ef.risk.G10$risk), 1, 
+								function(x) aritm2geom(x[1], x[2], 1, 0) )
+	# G(1,1)
+	ia.G$expected.return = apply( cbind(ia$geometric.return, ia$risk), 1, 
+								function(x) geom2aritm(x[1], x[2], 1, 1) )
+	ef.risk.G11 = portopt(ia.G, constraints, 50, 'G(1;1)',equally.spaced.risk = T)	
+		ef.risk.G11$return = apply( cbind(ef.risk.G11$return, ef.risk.G11$risk), 1, 
+								function(x) aritm2geom(x[1], x[2], 1, 1) )
+									
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+
+	# Plot multiple Efficient Frontiers
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.A10), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.A11), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.G10), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.G11), portfolio.risk, F)
+	
+dev.off()		
+
+	#--------------------------------------------------------------------------
+	# Use A4 method to convert between Arithmetic and Geometric means
+	#--------------------------------------------------------------------------
+	# A	
+	ef.risk.A4 = ef.risk
+		ef.risk.A4$name = 'Risk A4'
+		ef.risk.A4$return = apply( cbind(ef.risk$return, ef.risk$risk), 1, 
+								function(x) aritm2geom4(x[1], x[2]) )
+
+	# G
+	ia.G = ia
+	ia.G$expected.return = apply( cbind(ia$geometric.return, ia$risk), 1, 
+								function(x) geom2aritm4(x[1], x[2]) )
+	ef.risk.G4 = portopt(ia.G, constraints, 50, 'Risk G4',equally.spaced.risk = T)	
+		ef.risk.G4$return = apply( cbind(ef.risk.G4$return, ef.risk.G4$risk), 1, 
+								function(x) aritm2geom4(x[1], x[2]) )
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+								
+	# Plot multiple Efficient Frontiers						
+	layout( matrix(1:2, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.A4), portfolio.risk, F)
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.G4), portfolio.risk, F)
+
+dev.off()		
+	
+	#--------------------------------------------------------------------------
+	# Create True Geometric Efficient Frontier
+	#--------------------------------------------------------------------------
+	ef.true.geometric = ef.risk
+		ef.true.geometric$name = 'True Geometric'
+		constraints$x0 = ef.risk$weight[1,]
+
+	for(i in 1:len(ef.risk$risk)) {
+		cat('i =', i, '\n')
+		ef.true.geometric$weight[i,] = max.geometric.return.portfolio(ia, constraints, ef.risk$risk[i], ef.risk$risk[i])
+			constraints$x0 = ef.true.geometric$weight[i,]
+	}
+	
+	ef.true.geometric$return = portfolio.geometric.return(ef.true.geometric$weight, ia)		
+
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+		
+	# Plot multiple Efficient Frontiers						
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk.geometric, ef.risk, ef.true.geometric), portfolio.risk, T, T)			
+	plot.ef(ia, list(ef.true.geometric, ef.risk, ef.risk.geometric), portfolio.risk, T, T)			
+	
+dev.off()			
+	
+	#--------------------------------------------------------------------------
+	# Double check that NonLinear Optimization finds global maximums by
+	# creating random portfolios that satisfy constraints. 
+	# Plot True Geometric Efficient Frontier and random portfolios, check
+	# that all portfolios lie below the efficient frontier.
+	#--------------------------------------------------------------------------	
+	# Generate random portfolios
+	ef.random = list()
+		ef.random$name = 'Random'
+		ef.random$weight = randfixedsum(1000000, n, 1, 0, 1)
+		
+		ef.random$risk = portfolio.risk(ef.random$weight, ia)		
+		ef.random$return = portfolio.geometric.return(ef.random$weight, ia)		
+		
+		
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+		
+	# Plot True Geometric Efficient Frontier and random portfolios
+	layout(1)
+	plot(100*ef.random$risk, 100*ef.random$return, type='p', pch=20,
+			xlim = 100*range(ef.random$risk, ef.true.geometric$risk),
+			ylim = 100*range(ef.random$return, ef.true.geometric$return),
+			main = 'True Geometric Efficient Frontier vs Random Portfolios',
+			xlab = 'portfolio.risk',
+			ylab = 'Return'			
+		)
+	lines(100*ef.true.geometric$risk, 100*ef.true.geometric$return, type='l', lwd=2,col = 'red')
+		
+dev.off()		
+
+		
+	# find max Geom Mean portfolio	
+	#x=max.geometric.return.portfolio(ia, constraints, 0, 1)
+	#constraints$x0 = x
+	#x=max.geometric.return.portfolio(ia, constraints, 0.4, 1)	
+	#lines( portfolio.risk(t(x), ia), portfolio.geometric.return(t(x), ia), type='p', pch=20, col = 'blue')
+}
+
+
+
+
+
+###############################################################################
+# Create Input Assumptions used in 
+# DIVERSIFICATION, REBALANCING, AND THE GEOMETRIC MEAN FRONTIER by W. Bernstein and D. Wilkinson (1997)
+# www.effisols.com/basics/rebal.pdf
+###############################################################################
+aa.test.create.ia.rebal <- function()
+{
+	symbols = spl('SP500	SmallUS   	Europe	Pacific	Japan  	Gold   	20Y_Treas	5Y_Treas	TBills', '\t')
+	
+	data = 
+'1970	0.0403	-0.1743	-0.0935	-0.13	-0.156	0.0871	0.121	0.1685	0.0652
+1971	0.1432	0.165	0.2803	0.1082	0.6107	-0.0373	0.1324	0.0874	0.0439
+1972	0.1898	0.0443	0.1582	0.6678	1.1447	0.602	0.0567	0.0517	0.0384
+1973	-0.1466	-0.309	-0.0773	-0.2392	-0.1595	0.9184	-0.011	0.0461	0.0693
+1974	-0.2647	-0.1995	-0.2277	-0.4059	-0.1392	0.1094	0.0435	0.0568	0.0801
+1975	0.372	0.5282	0.439	0.6342	0.1723	-0.2407	0.0919	0.0782	0.058
+1976	0.2384	0.5738	-0.0637	0.0572	0.2637	-0.3258	0.1676	0.1288	0.0508
+1977	-0.0718	0.2538	0.2392	0.0334	0.1722	0.3549	-0.0065	0.014	0.0513
+1978	0.0656	0.2346	0.243	0.2397	0.5182	0.0934	-0.0118	0.0349	0.072
+1979	0.1844	0.4346	0.1467	0.5216	-0.1461	1.6133	-0.0121	0.041	0.1038
+1980	0.3242	0.3988	0.1452	0.6149	0.2939	0.6427	-0.0396	0.039	0.1126
+1981	-0.0491	0.1388	-0.1045	-0.1547	0.1041	-0.2514	0.0186	0.0944	0.1472
+1982	0.2141	0.2801	0.0569	-0.2818	-0.0023	0.4786	0.4037	0.291	0.1053
+1983	0.2251	0.3967	0.2238	0.3421	0.2779	0.0259	0.0069	0.0741	0.088
+1984	0.0623	-0.0667	0.0126	-0.0724	0.1701	0.2922	0.1554	0.1403	0.0978
+1985	0.3216	0.2466	0.7979	0.1729	0.4413	-0.0887	0.3096	0.2034	0.0773
+1986	0.1847	0.0685	0.4446	0.4839	0.9185	0.3593	0.2445	0.1513	0.0615
+1987	0.0523	-0.093	0.041	0.042	0.4187	0.3753	-0.027	0.029	0.0546
+1988	0.1681	0.2287	0.1635	0.3056	0.3534	-0.1846	0.0968	0.0609	0.0636
+1989	0.3149	0.1018	0.2906	0.1585	0.0217	0.2538	0.181	0.1327	0.0838
+1990	-0.0317	-0.2156	-0.0337	-0.1015	-0.3618	-0.2373	0.062	0.0974	0.0782
+1991	0.3055	0.4463	0.1366	0.3661	0.0882	-0.042	0.1926	0.1531	0.056
+1992	0.0766	0.2335	-0.0425	0.0701	-0.2111	-0.1598	0.0941	0.072	0.0351
+1993	0.099	0.21	0.2979	0.8035	0.2505	0.8287	0.1824	0.1124	0.029
+1994	0.012	0.031	0.0266	-0.141	0.2217	-0.1193	-0.0778	-0.0513	0.0391
+1995	0.3753	0.3448	0.2213	0.1295	0.0069	0.0191	0.3069	0.1905	0.0551
+1996	0.2295	0.1765	0.2895	0.2054	-0.155	0.0706	-0.0127	0.0661	0.0502'
+
+	hist.returns = matrix( as.double(spl( gsub('\n', '\t', data), '\t')), 
+				nrow = len(spl(data, '\n')), byrow=TRUE)
+				
+				
+	load.packages('quantmod')
+	symbol.names = symbols
+	
+	hist.returns = as.xts( hist.returns[,-1] , 
+							as.Date(paste('1/1/', hist.returns[,1], sep=''), '%d/%m/%Y')
+						) 
+	colnames(hist.returns) = symbols
+	
+	#--------------------------------------------------------------------------
+	# Create historical input assumptions
+	#--------------------------------------------------------------------------
+		
+	# setup input assumptions
+	ia = list()
+	ia$symbols = symbols
+	ia$symbol.names = symbol.names
+	ia$n = len(symbols)
+	ia$hist.returns = hist.returns
+	ia$annual.factor = 1
+	
+	# compute historical returns, risk, and correlation
+	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)
+	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
+		
+	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
+	# use N instead of N-1 in computation of variance
+	# ia$risk = apply(hist.returns, 2, function(x) sqrt(sum((x-mean(x))^2)/len(x)) )
+	
+	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
+	
+	ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
+	
+	ia$expected.return = ia$arithmetic.return
+	
+	return(ia)
+}
+
+
 
 ###############################################################################
 # Create Input Assumptions used in aa.test functions
@@ -1003,7 +1249,7 @@ aa.test.create.ia <- function()
 	# align dates for all symbols & convert to monthly 
 	hist.prices = merge(SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD)		
 		month.ends = endpoints(hist.prices, 'months')
-		hist.prices = Cl(hist.prices)[month.ends, ]
+		hist.prices = Ad(hist.prices)[month.ends, ]
 		colnames(hist.prices) = symbols
 		
 	# remove any missing data	
@@ -1022,20 +1268,28 @@ aa.test.create.ia <- function()
 	ia$symbol.names = symbol.names
 	ia$n = len(symbols)
 	ia$hist.returns = hist.returns
-
+	
 	# compute historical returns, risk, and correlation
-	ia$expected.return = apply(hist.returns, 2, mean, na.rm = T)
+	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)
+	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
+	
 	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
 	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
 	
 		# convert to annual, year = 12 months
-		annual.factor = 12
-		ia$expected.return = annual.factor * ia$expected.return
-		ia$risk = sqrt(annual.factor) * ia$risk
+		ia$annual.factor = 12
+		
+		#ia$arithmetic.return = ia$annual.factor * ia$arithmetic.return
+		ia$arithmetic.return = (1 + ia$arithmetic.return)^ia$annual.factor - 1
+		
+		ia$geometric.return = (1 + ia$geometric.return)^ia$annual.factor - 1
+		ia$risk = sqrt(ia$annual.factor) * ia$risk
 
 		# compute covariance matrix
 		ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
 	ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
+	
+	ia$expected.return = ia$arithmetic.return
 	
 	return(ia)
 }
@@ -1060,5 +1314,6 @@ aa.test.ia.add.short <- function(ia)
 	
 	return(ia)
 }
+
 
 	

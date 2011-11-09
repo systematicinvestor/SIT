@@ -227,12 +227,13 @@ plota.legend <- function
 # plota.layout - create layout
 ###############################################################################
 plota.layout <- function(
-	ilayout		# matrix stored as a string 
+	ilayout,	# matrix stored as a string 
+	delim = ','	# delimiter
 )
 {	
-	ilayout = matrix( as.double(spl( gsub('\n', ',', ilayout), ',')), 
+	ilayout = matrix( as.double(spl( gsub('\n', delim, ilayout), delim)), 
 				nrow = len(spl(ilayout, '\n')), byrow=TRUE)
-	layout(mat = ilayout); 	
+	layout(mat = ilayout)
 }	
 
 ###############################################################################
@@ -584,6 +585,15 @@ plota.test <- function() {
 ###############################################################################
 # plota.staccked - staccked plot
 ###############################################################################
+plota.colors.remove.black <- function(col) {
+	# remove black color
+	if( any(col == 1) ) col[ which(col == 1) : len(col) ] = col[ which(col == 1) : len(col) ]+1
+	if( any(col == 9) ) col[ which(col == 9) : len(col) ] = col[ which(col == 9) : len(col) ]+1
+	if( any(col == 17) ) col[ which(col == 17) : len(col) ] = col[ which(col == 17) : len(col) ]+1
+	if( any(col == 25) ) col[ which(col == 25) : len(col) ] = col[ which(col == 25) : len(col) ]+1
+	return( col )
+}
+
 plota.stacked <- function
 (
 	x,				# x data
@@ -594,6 +604,9 @@ plota.stacked <- function
 	...				# other parameters for plot
 )
 {
+	# remove black color
+	col = plota.colors.remove.black(col)
+
 	# transform y
 	y = 100 * y
 	
