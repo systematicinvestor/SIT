@@ -233,6 +233,12 @@ randfixedsum <- function
 	return(t(x))
 }
 
+# Alternative Idea
+# http://programming-r-pro-bro.blogspot.com/2011/11/modern-portfolio-optimization-theory.html
+# diff(c(0,sort(runif(n-1)), 1))
+# diff(c(0,sort(runif(n-1)), 1)) * 0.5
+# diff(c(0,sort(runif(n-1,0,0.8)), 0.8))
+
 ###############################################################################
 # Test for randfixedsum function
 ###############################################################################

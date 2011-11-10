@@ -1116,7 +1116,7 @@ dev.off()
 	# Generate random portfolios
 	ef.random = list()
 		ef.random$name = 'Random'
-		ef.random$weight = randfixedsum(1000000, n, 1, 0, 1)
+		ef.random$weight = randfixedsum(100000, n, 1, 0, 1)
 		
 		ef.random$risk = portfolio.risk(ef.random$weight, ia)		
 		ef.random$return = portfolio.geometric.return(ef.random$weight, ia)		
