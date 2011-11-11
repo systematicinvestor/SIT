@@ -983,6 +983,92 @@ dev.off()
 }
 
 
+
+###############################################################################
+# Test AA functions: Solutions to Instability of mean-variance efficient portfolios
+# Resampling and Shrinkage
+###############################################################################
+aa.solutions2instability.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# All methods provide:
+	# 1. Better Diversification
+	# 2. Efficient Portfolios are immune to small changes in input assumptions
+	#--------------------------------------------------------------------------
+
+	#--------------------------------------------------------------------------
+	# Create Resampled Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia.rebal()
+	n = ia$n		
+
+	# -1 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Risk', equally.spaced.risk = T)
+	ef.risk.resampled = portopt.resampled(ia, constraints, 50, 'Risk Resampled', 
+						nsamples = 200, sample.len= 10)	
+						
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+									
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(c(1,1,2,3), nrow = 2, byrow=T) )
+	plot.ef(ia, list(ef.risk, ef.risk.resampled), portfolio.risk, F)	
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.resampled)
+			
+dev.off()	
+
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier using Ledoit-Wolf Covariance Shrinkage Estimator from tawny package
+	#--------------------------------------------------------------------------
+	
+	# load / check required packages
+	load.packages('tawny')
+
+	ia.original = ia
+	
+	ia$cov = tawny::cov.shrink(ia$hist.returns)	
+	ef.risk.cov.shrink = portopt(ia, constraints, 50, 'Risk Ledoit-Wolf', equally.spaced.risk = T)
+		
+	ia = ia.original
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+		
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(c(1,1,2,3), nrow = 2, byrow=T) )
+	plot.ef(ia, list(ef.risk, ef.risk.cov.shrink), portfolio.risk, F)	
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.cov.shrink)
+	
+dev.off()
+	
+	#--------------------------------------------------------------------------
+	# Create Resampled Efficient Frontier(using Ledoit-Wolf Covariance Shrinkage Estimator)
+	# As described on page 8 of
+	# Resampling vs. Shrinkage for Benchmarked Managers by M. Wolf (2006)
+	#--------------------------------------------------------------------------
+
+	ef.risk.resampled.shrink = portopt.resampled(ia, constraints, 50, 'Risk Ledoit-Wolf+Resampled', 
+						nsamples = 200, sample.len= 10, shrinkage.fn=tawny::cov.shrink)	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+												
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(c(1:4), nrow = 2, byrow=T) )
+	plot.ef(ia, list(ef.risk, ef.risk.resampled, ef.risk.resampled.shrink), portfolio.risk, F)	
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.risk.resampled)
+	plot.transition.map(ef.risk.resampled.shrink)
+
+dev.off()	
+
+}
+
 ###############################################################################
 # Test AA functions, Arithmetic vs Geometric Efficient Frontier
 ###############################################################################
@@ -1016,6 +1102,7 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 
 dev.off()	
 	
+
 
 	#--------------------------------------------------------------------------
 	# Following DIVERSIFICATION, REBALANCING, AND THE GEOMETRIC MEAN FRONTIER by W. Bernstein and D. Wilkinson (1997)
@@ -1137,12 +1224,27 @@ png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize =
 		
 dev.off()		
 
-		
-	# find max Geom Mean portfolio	
-	#x=max.geometric.return.portfolio(ia, constraints, 0, 1)
-	#constraints$x0 = x
-	#x=max.geometric.return.portfolio(ia, constraints, 0.4, 1)	
-	#lines( portfolio.risk(t(x), ia), portfolio.geometric.return(t(x), ia), type='p', pch=20, col = 'blue')
+	return()	
+
+
+	# compute Unrebalanced returns
+	ef.risk.unrebalanced = ef.risk
+		ef.risk.unrebalanced$name = 'Unrebalanced'
+		ef.risk.unrebalanced$return = portfolio.unrebalanced.return(ef.risk$weight, ia)			
+	plot.ef(ia, list(ef.risk, ef.risk.geometric, ef.risk.unrebalanced), portfolio.risk, T)			
+	
+	
+	# To check that Geometric returns are not additive, feed geometric.returns to optimizer
+	# and observe resulting frontier below the True Geometric frontier
+	ia.G = ia
+	ia.G$expected.return = ia$geometric.return
+	ef.risk.geometric1 = portopt(ia.G, constraints, 50, 'Geometric1',equally.spaced.risk = T)	
+	plot.ef(ia, list(ef.risk, ef.risk.geometric,ef.risk.geometric1), portfolio.risk, T)			
+
+	
+	# Find maximum Geometric Mean portfolio	
+	x=max.geometric.return.portfolio(ia, constraints, 0, 1)
+	lines( portfolio.risk(t(x), ia), portfolio.geometric.return(t(x), ia), type='p', pch=20, col = 'blue')
 }
 
 
@@ -1221,7 +1323,7 @@ aa.test.create.ia.rebal <- function()
 	
 	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
 	
-	ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
 	
 	ia$expected.return = ia$arithmetic.return
 	
@@ -1287,7 +1389,7 @@ aa.test.create.ia <- function()
 
 		# compute covariance matrix
 		ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
-	ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
 	
 	ia$expected.return = ia$arithmetic.return
 	

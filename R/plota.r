@@ -585,13 +585,45 @@ plota.test <- function() {
 ###############################################################################
 # plota.staccked - staccked plot
 ###############################################################################
-plota.colors.remove.black <- function(col) {
-	# remove black color
-	if( any(col == 1) ) col[ which(col == 1) : len(col) ] = col[ which(col == 1) : len(col) ]+1
-	if( any(col == 9) ) col[ which(col == 9) : len(col) ] = col[ which(col == 9) : len(col) ]+1
-	if( any(col == 17) ) col[ which(col == 17) : len(col) ] = col[ which(col == 17) : len(col) ]+1
-	if( any(col == 25) ) col[ which(col == 25) : len(col) ] = col[ which(col == 25) : len(col) ]+1
-	return( col )
+plota.colors <- function(N) {
+	# default palette excluding black
+	col = c('red','cyan','magenta','yellow','gray','green','blue')
+
+	# find all available colors
+	temp = list()
+	for(j in 1:length(col)) {
+		# find colors
+		temp[[j]] = colors()[grep(col[j],colors())]
+		
+		# remove numbered colors
+		temp[[j]] = temp[[j]][grep('^[^0-9]*$',temp[[j]])]
+
+		# sort color names
+		temp[[j]] = temp[[j]][order(nchar(temp[[j]]))]
+
+		# remove 'white(255,255,255)' and 'black(0,0,0)'
+		index = which( colSums(col2rgb(temp[[j]])) < 100 )
+		if( length(index) > 0 ) temp[[j]] = temp[[j]][-index]
+
+		index = which( colSums(255 - col2rgb(temp[[j]])) < 100 )
+		if( length(index) > 0 ) temp[[j]] = temp[[j]][-index]
+	}
+
+	index = 1
+	col = rep('', N)
+
+	for(i in 1:10) {
+		for(j in 1:length(temp)) {
+			if(length(temp[[j]]) >= i) {
+				col[index] = temp[[j]][i]
+				if(index == N) break else index = index + 1
+			}
+		}
+	
+	}
+
+	#pie(rep(1,length(1:14)), col=plota.colors(14))
+	return(col)
 }
 
 plota.stacked <- function
@@ -599,13 +631,11 @@ plota.stacked <- function
 	x,				# x data
 	y, 				# matrix with y data : len(x) = nrow(y)
 	xlab='',		# x axis label	
-	col=1:ncol(y), 	# colors
+	col = plota.colors(ncol(y)), 	# colors
 	type=c('l','s'),# plot type  : lines, step stairs
 	...				# other parameters for plot
 )
 {
-	# remove black color
-	col = plota.colors.remove.black(col)
 
 	# transform y
 	y = 100 * y

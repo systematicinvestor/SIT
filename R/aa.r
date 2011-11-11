@@ -776,7 +776,7 @@ min.cor.insteadof.cov.portfolio <- function
 	constraints		# constraints
 )
 {
-	sol = solve.QP.bounds(Dmat = ia$cor, dvec = rep(0, nrow(ia$cov.temp)) , 
+	sol = solve.QP.bounds(Dmat = ia$correlation, dvec = rep(0, nrow(ia$cov.temp)) , 
 		Amat=constraints$A, bvec=constraints$b, constraints$meq,
 		lb = constraints$lb, ub = constraints$ub)
 	return( sol$solution )
@@ -1206,7 +1206,7 @@ portopt <- function
 		
 	# set up solve.QP
 	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
-	if( is.null(ia$cov) ) ia$cov = ia$cor * (ia$risk %*% t(ia$risk))		
+	if( is.null(ia$cov) ) ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
 	
 	# setup covariance matrix used in solve.QP
 	ia$cov.temp = ia$cov
@@ -1306,7 +1306,56 @@ portopt <- function
 	return(out)			
 }
 
-
+###############################################################################
+# Create Resampled efficient frontier
+###############################################################################
+portopt.resampled <- function
+(
+	ia,						# Input Assumptions
+	constraints = NULL,		# Constraints
+	nportfolios = 50,		# Number of portfolios
+	name = 'Risk',			# Name
+	min.risk.fn = min.risk.portfolio,	# Risk Measure
+	nsamples = 100,			# Number of Samples to draw
+	sample.len = 60,		# Length of each sample
+	shrinkage.fn = NULL		# function to compute Covariance Shrinkage Estimator 
+)
+{
+	# create basic efficient frontier
+	out = portopt(ia, constraints, nportfolios, name, min.risk.fn)
+	
+	# load / check required packages
+	load.packages('MASS')
+	
+	#Start Monte Carlo simulation of asset returns
+	ia.original = ia
+		
+	for(i in 1:nsamples) {
+		ia$hist.returns = mvrnorm(sample.len, ia.original$expected.return, Sigma = ia.original$cov)
+		ia$expected.return = apply(ia$hist.returns, 2, mean)
+	   
+		if( is.null(shrinkage.fn) ) {
+			ia$risk = apply(ia$hist.returns, 2, sd)
+			ia$correlation = cor(ia$hist.returns, use = 'complete.obs', method = 'pearson')			
+			ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+		} else {
+			ia$cov = match.fun(shrinkage.fn)(ia$hist.returns)
+		}
+	
+		temp = portopt(ia, constraints, nportfolios, name, min.risk.fn)
+		out$weight = out$weight + temp$weight	
+	}
+	
+    out$weight = out$weight / (nsamples + 1)
+    
+        
+	# compute risk / return
+	ia = ia.original
+	out$return = portfolio.return(out$weight, ia)
+	out$risk = portfolio.risk(out$weight, ia)
+	
+	return(out)			
+}
 
 
 
@@ -1329,7 +1378,7 @@ plot.ia <- function
 	plot.table(temp, 'Symbol')
 	
 	# visualize correlation  matrix
-	temp = ia$cor
+	temp = ia$correlation
 		temp[lower.tri(temp, TRUE)] = NA
 		temp = temp[-ia$n, -1]
 		temp[] = plota.format(100 * temp[], 1, '', '%')			
