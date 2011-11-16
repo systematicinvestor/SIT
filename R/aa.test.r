@@ -546,6 +546,38 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()		
 		
 
+	#--------------------------------------------------------------------------
+	# Double check that NonLinear Optimization finds global maximums by
+	# creating random portfolios that satisfy constraints. 
+	# Plot Average Correlation Efficient Frontier and random portfolios, check
+	# that all portfolios lie below the efficient frontier.
+	#--------------------------------------------------------------------------	
+	# Generate random portfolios
+	ef.random = list()
+		ef.random$name = 'Random'
+		ef.random$weight = randfixedsum(1000000, n, 1, 0, 0.8)
+		
+		ef.random$risk = portfolio.avgcor(ef.random$weight, ia)		
+		ef.random$return = portfolio.return(ef.random$weight, ia)		
+		
+		
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+		
+	# Plot Average Correlation and random portfolios
+	layout(1)
+	plot(100*ef.random$risk, 100*ef.random$return, type='p', pch=20,
+			xlim = 100*range(0, ef.random$risk, ef.avgcor$risk),
+			ylim = 100*range(0, ef.random$return, ef.avgcor$return),
+			main = 'Average Correlation Efficient Frontier vs Random Portfolios',
+			xlab = 'portfolio.avgcor',
+			ylab = 'Return'			
+		)
+	lines(100*portfolio.avgcor(ef.avgcor$weight, ia), 100*ef.avgcor$return, type='l', lwd=2,col = 'red')
+	
+dev.off()			
+	
+
+	
 }
 
 
@@ -1249,6 +1281,246 @@ dev.off()
 
 
 
+###############################################################################
+# Test AA functions, Black-Litterman model
+###############################################################################
+aa.black.litterman.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Visualize Market Capitalization History
+	#--------------------------------------------------------------------------
+
+	hist.caps = aa.test.hist.capitalization()	
+	hist.caps.weight = hist.caps/rowSums(hist.caps)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	
+	plot.transition.map(hist.caps.weight, index(hist.caps.weight), xlab='', name='Market Capitalization Weight History')
+
+dev.off()	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		
+	layout( matrix(1:9, nrow = 3, byrow=T) )
+	col = plota.colors(ncol(hist.caps))
+	for(i in 1:ncol(hist.caps)) {
+		plota(hist.caps[,i], type='l', lwd=5, col=col[i], main=colnames(hist.caps)[i])
+	}
+
+dev.off()	
+
+			
+
+	#--------------------------------------------------------------------------
+	# Compute Risk Aversion, prepare Black-Litterman input assumptions
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia.country()
+	
+	ir = get.fedfunds.rate()	
+		period = join( format(range(index(ia$hist.returns)), '%Y:%m'), '::')
+	
+	# The implied risk aversion coefficient can be estimated by dividing
+	# the expected excess return by the variance of the portfolio
+	risk.aversion = bl.compute.risk.aversion( ia$hist.returns$USA, ir[period]/ia$annual.factor )
+	risk.aversion = bl.compute.risk.aversion( ia$hist.returns$USA )
+
+	# the latest weights
+	cap.weight = last(hist.caps.weight)	
+			
+	ia.bl = ia
+	ia.bl$expected.return = bl.compute.eqret( risk.aversion, ia$cov, cap.weight, last(ir[period]) )
+	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+
+	layout( matrix(c(1,1,2,3), nrow=2, byrow=T) )
+	pie(coredata(cap.weight), paste(colnames(cap.weight), round(100*cap.weight), '%'), 
+		main = paste('Country Market Capitalization Weights for', format(last(index(ia$hist.returns)),'%b %Y'))
+		, col=plota.colors(ia$n))
+	
+	plot.ia(ia.bl, T)
+		
+dev.off()	
+	
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier(s)
+	#--------------------------------------------------------------------------
+	n = ia$n
+	
+	# -1 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Historical', equally.spaced.risk = T)		
+	ef.risk.bl = portopt(ia.bl, constraints, 50, 'Black-Litterman', equally.spaced.risk = T)	
+
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk), portfolio.risk, T, T)			
+	plot.ef(ia.bl, list(ef.risk.bl), portfolio.risk, T, T)			
+	
+dev.off()
+	
+	#--------------------------------------------------------------------------
+	# Create Views
+	#--------------------------------------------------------------------------
+	temp = matrix(rep(0, n), nrow = 1)
+		colnames(temp) = ia$symbols
+		
+	# Relative View
+	# Japan will outperform UK by 2%
+	temp[,'Japan'] = 1
+	temp[,'UK'] = -1
+
+	pmat = temp
+	qmat = c(0.02)
+	
+	# Absolute View
+	# Australia's expected return is 12%
+	temp[] = 0
+	temp[,'Australia'] = 1
+	
+	pmat = rbind(pmat, temp)	
+	qmat = c(qmat, 0.12)
+
+	# compute posterior distribution parameters
+	post = bl.compute.posterior(ia.bl$expected.return, ia$cov, pmat, qmat, tau = 0.025 )
+	#bl.compute.optimal(risk.aversion, post$expected.return, post$cov)
+
+	# create Black-Litterman input assumptions with Views	
+	ia.bl.view = ia.bl
+		ia.bl.view$expected.return = post$expected.return
+		ia.bl.view$cov = post$cov
+		ia.bl.view$risk = sqrt(diag(ia.bl.view$cov))
+		
+	# create efficient frontier(s)
+	ef.risk.bl.view = portopt(ia.bl.view, constraints, 50, 'Black-Litterman + View(s)', equally.spaced.risk = T)	
+
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	
+	# Plot multiple Efficient Frontiers and Transition Maps
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia.bl, list(ef.risk.bl), portfolio.risk, T, T)			
+	plot.ef(ia.bl.view, list(ef.risk.bl.view), portfolio.risk, T, T)			
+	
+dev.off()	
+				
+}
+
+
+
+# Historical Country Capitalizations from worldbank.org
+# Select Countries, Series. Type in "capitalization" and select Years
+# http://databank.worldbank.org/ddp/home.do?Step=12&id=4&CNO=2
+#
+# Alternative Source : "World Federation of Exchanges"
+# http://www.world-exchanges.org/statistics/time-series
+aa.test.hist.capitalization <- function()
+{
+	symbols = spl('Australia	Canada	France	Germany	Japan	United Kingdom	United States', '\t')
+	
+	# Market capitalization of listed companies (current US$) in 1,000,000,000	
+	data = 
+'1988	138.0	242.0	245.0	252.0	3910.0	771.0	2790.0
+1989	141.0	291.0	365.0	365.0	4390.0	827.0	3510.0
+1990	109.0	242.0	314.0	355.0	2920.0	849.0	3060.0
+1991	149.0	267.0	348.0	393.0	3130.0	988.0	4090.0
+1992	145.0	243.0	351.0	348.0	2400.0	927.0	4490.0
+1993	204.9	326.5	456.1	463.5	2999.8	1151.6	5136.2
+1994	218.9	315.0	451.3	470.5	3719.9	1210.2	5067.0
+1995	245.2	366.3	522.1	577.4	3667.3	1407.7	6857.6
+1996	312.0	486.3	591.1	671.0	3088.9	1740.2	8484.4
+1997	295.8	567.6	674.4	825.2	2216.7	1996.2	11308.8
+1998	328.9	543.4	991.5	1094.0	2495.8	2374.3	13451.4
+1999	427.7	800.9	1475.5	1432.2	4546.9	2933.3	16635.1
+2000	372.8	841.4	1446.6	1270.2	3157.2	2577.0	15104.0
+2001	375.1	700.8	1174.4	1071.7	2251.8	2164.7	13854.6
+2002	378.8	575.3	967.0	691.1	2126.1	1864.3	11098.1
+2003	585.5	894.0	1355.9	1079.0	3040.7	2460.1	14266.3
+2004	776.4	1177.5	1559.1	1194.5	3678.3	2815.9	16323.7
+2005	804.1	1480.9	1758.7	1221.3	4736.5	3058.2	16970.9
+2006	1095.9	1700.7	2428.6	1637.8	4726.3	3794.3	19425.9
+2007	1298.4	2186.6	2771.2	2105.5	4453.5	3858.5	19947.3
+2008	675.6	1002.2	1492.3	1108.0	3220.5	1852.0	11737.6
+2009	1258.5	1681.0	1972.0	1297.6	3377.9	2796.4	15077.3
+2010	1454.5	2160.2	1926.5	1429.7	4099.6	3107.0	17139.0'
+	
+	hist.caps = matrix( as.double(spl( gsub('\n', '\t', data), '\t')), 
+				nrow = len(spl(data, '\n')), byrow=TRUE)
+				
+				
+	load.packages('quantmod')
+	symbol.names = symbols
+	
+	hist.caps = as.xts( hist.caps[,-1] , 
+							as.Date(paste('1/1/', hist.caps[,1], sep=''), '%d/%m/%Y')
+						) 
+	colnames(hist.caps) = symbols
+	
+	return(hist.caps)
+
+}
+
+
+# Get Monthly Federal funds rate from http://www.federalreserve.gov/releases/h15/data.htm
+get.fedfunds.rate <- function()
+{
+	# download Monthly History of Fed Funds rates
+	url = 'http://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=40afb80a445c5903ca2c4888e40f3f1f&lastObs=&from=&to=&filetype=csv&label=include&layout=seriescolumn'
+	txt = readLines(url)
+
+	txt = txt[-c(1 : grep('Time Period', txt))]
+	hist.returns = matrix( spl(txt), nrow = len(txt), byrow=TRUE)
+	
+	load.packages('quantmod')
+	
+	hist.returns = as.xts( as.double(hist.returns[,-1]) / 100, 
+							as.Date(paste(hist.returns[,1], '-1', sep=''), '%Y-%m-%d')
+						) 
+						
+	return(hist.returns)
+}
+
+
+
+aa.test.create.ia.country <- function()
+{
+	#--------------------------------------------------------------------------
+	# Load historical prices and compute simple returns
+	#--------------------------------------------------------------------------
+	load.packages('quantmod,quadprog')
+
+	# load historical prices from Yahoo Finance
+	symbols = spl('EWA,EWC,EWQ,EWG,EWJ,EWU,SPY')	
+	symbol.names = spl('Australia,Canada,France,Germany,Japan,UK,USA')
+	
+	getSymbols(symbols, from = '1980-01-01', auto.assign = TRUE)
+			
+	# align dates for all symbols & convert to frequency 
+	hist.prices = merge(EWA,EWC,EWQ,EWG,EWJ,EWU,SPY)		
+		period.ends = endpoints(hist.prices, 'months')
+		hist.prices = Ad(hist.prices)[period.ends, ]
+		colnames(hist.prices) = symbol.names
+	annual.factor = 12
+	
+	# remove any missing data	
+	hist.prices = na.omit(hist.prices['1990::2010'])
+	
+	# compute simple returns	
+	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
+	
+	#--------------------------------------------------------------------------
+	# Create historical input assumptions
+	#--------------------------------------------------------------------------
+	ia = create.historical.ia(hist.returns, annual.factor, symbol.names, symbol.names)
+	
+	return(ia)	
+}
+
+
 
 
 ###############################################################################
@@ -1294,7 +1566,6 @@ aa.test.create.ia.rebal <- function()
 				
 				
 	load.packages('quantmod')
-	symbol.names = symbols
 	
 	hist.returns = as.xts( hist.returns[,-1] , 
 							as.Date(paste('1/1/', hist.returns[,1], sep=''), '%d/%m/%Y')
@@ -1304,28 +1575,7 @@ aa.test.create.ia.rebal <- function()
 	#--------------------------------------------------------------------------
 	# Create historical input assumptions
 	#--------------------------------------------------------------------------
-		
-	# setup input assumptions
-	ia = list()
-	ia$symbols = symbols
-	ia$symbol.names = symbol.names
-	ia$n = len(symbols)
-	ia$hist.returns = hist.returns
-	ia$annual.factor = 1
-	
-	# compute historical returns, risk, and correlation
-	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)
-	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
-		
-	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
-	# use N instead of N-1 in computation of variance
-	# ia$risk = apply(hist.returns, 2, function(x) sqrt(sum((x-mean(x))^2)/len(x)) )
-	
-	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
-	
-	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
-	
-	ia$expected.return = ia$arithmetic.return
+	ia = create.historical.ia(hist.returns, 1, symbols)
 	
 	return(ia)
 }
@@ -1363,38 +1613,58 @@ aa.test.create.ia <- function()
 	#--------------------------------------------------------------------------
 	# Create historical input assumptions
 	#--------------------------------------------------------------------------
-		
+	ia = create.historical.ia(hist.returns, 12, symbols, symbol.names)
+	
+	return(ia)	
+}
+
+###############################################################################
+# Create historical input assumptions
+###############################################################################
+create.historical.ia <- function
+(
+	hist.returns, 
+	annual.factor,
+	symbols = colnames(hist.returns), 
+	symbol.names = symbols)
+{	
 	# setup input assumptions
 	ia = list()
+	
+	ia$n = len(symbols)
+	ia$annual.factor = annual.factor
+	
 	ia$symbols = symbols
 	ia$symbol.names = symbol.names
-	ia$n = len(symbols)
+	
 	ia$hist.returns = hist.returns
 	
 	# compute historical returns, risk, and correlation
 	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)
 	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
 	
+	# use N instead of N-1 in computation of variance
+	# ia$risk = apply(hist.returns, 2, function(x) sqrt(sum((x-mean(x))^2)/len(x)) )	
 	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
+	
 	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
 	
-		# convert to annual, year = 12 months
-		ia$annual.factor = 12
-		
+	# convert ia to annual		
 		#ia$arithmetic.return = ia$annual.factor * ia$arithmetic.return
 		ia$arithmetic.return = (1 + ia$arithmetic.return)^ia$annual.factor - 1
 		
 		ia$geometric.return = (1 + ia$geometric.return)^ia$annual.factor - 1
 		ia$risk = sqrt(ia$annual.factor) * ia$risk
 
-		# compute covariance matrix
-		ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
+	# compute covariance matrix
+	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
 	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
 	
 	ia$expected.return = ia$arithmetic.return
 	
 	return(ia)
 }
+
 
 ###############################################################################
 # Add short (negative copy) input assumptions to given ia

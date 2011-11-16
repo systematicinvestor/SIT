@@ -616,15 +616,19 @@ plota.colors <- function(N) {
 		for(j in 1:length(temp)) {
 			if(length(temp[[j]]) >= i) {
 				col[index] = temp[[j]][i]
-				if(index == N) break else index = index + 1
+				index = index + 1
+				if(index > N) break  
 			}
 		}
-	
+		if(index > N) break  
 	}
 
 	#pie(rep(1,length(1:14)), col=plota.colors(14))
 	return(col)
 }
+
+
+
 
 plota.stacked <- function
 (

@@ -1306,56 +1306,6 @@ portopt <- function
 	return(out)			
 }
 
-###############################################################################
-# Create Resampled efficient frontier
-###############################################################################
-portopt.resampled <- function
-(
-	ia,						# Input Assumptions
-	constraints = NULL,		# Constraints
-	nportfolios = 50,		# Number of portfolios
-	name = 'Risk',			# Name
-	min.risk.fn = min.risk.portfolio,	# Risk Measure
-	nsamples = 100,			# Number of Samples to draw
-	sample.len = 60,		# Length of each sample
-	shrinkage.fn = NULL		# function to compute Covariance Shrinkage Estimator 
-)
-{
-	# create basic efficient frontier
-	out = portopt(ia, constraints, nportfolios, name, min.risk.fn)
-	
-	# load / check required packages
-	load.packages('MASS')
-	
-	#Start Monte Carlo simulation of asset returns
-	ia.original = ia
-		
-	for(i in 1:nsamples) {
-		ia$hist.returns = mvrnorm(sample.len, ia.original$expected.return, Sigma = ia.original$cov)
-		ia$expected.return = apply(ia$hist.returns, 2, mean)
-	   
-		if( is.null(shrinkage.fn) ) {
-			ia$risk = apply(ia$hist.returns, 2, sd)
-			ia$correlation = cor(ia$hist.returns, use = 'complete.obs', method = 'pearson')			
-			ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
-		} else {
-			ia$cov = match.fun(shrinkage.fn)(ia$hist.returns)
-		}
-	
-		temp = portopt(ia, constraints, nportfolios, name, min.risk.fn)
-		out$weight = out$weight + temp$weight	
-	}
-	
-    out$weight = out$weight / (nsamples + 1)
-    
-        
-	# compute risk / return
-	ia = ia.original
-	out$return = portfolio.return(out$weight, ia)
-	out$risk = portfolio.risk(out$weight, ia)
-	
-	return(out)			
-}
 
 
 
@@ -1366,11 +1316,12 @@ portopt.resampled <- function
 ###############################################################################
 plot.ia <- function
 (
-	ia		# input assumptions
+	ia,				# input assumptions
+	layout = NULL	# flag to idicate if layout is already set
 )
 {
 	# create a table with summary statistics
-	layout(1:2)
+	if( is.null(layout) ) layout(1:2)	
 	temp = cbind(ia$expected.return, ia$risk)
 		temp[] = plota.format(100 * temp[], 1, '', '%')
 		temp = cbind(ia$symbol.names, temp)

@@ -238,6 +238,15 @@ randfixedsum <- function
 # diff(c(0,sort(runif(n-1)), 1))
 # diff(c(0,sort(runif(n-1)), 1)) * 0.5
 # diff(c(0,sort(runif(n-1,0,0.8)), 0.8))
+#
+#PORTFOLIO OPTIMIZATION FOR VAR, CVAR, OMEGA AND UTILITY WITH GENERAL RETURN DISTRIBUTIONS:
+#A MONTE CARLO APPROACH FOR LONG-ONLY AND BOUNDED SHORT PORTFOLIOS WITH OPTIONAL ROBUSTNESS
+#AND A SIMPLIFIED APPROACH TO COVARIANCE MATCHING
+#by WILLIAM T. SHAW
+#
+#http://luc.devroye.org/rnbookindex.html
+# Non-Uniform Random Variate Generation by Luc Devroye (1986), chapter 5
+
 
 ###############################################################################
 # Test for randfixedsum function
