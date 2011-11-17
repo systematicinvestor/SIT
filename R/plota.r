@@ -587,7 +587,7 @@ plota.test <- function() {
 ###############################################################################
 plota.colors <- function(N) {
 	# default palette excluding black
-	col = c('red','cyan','magenta','yellow','gray','green','blue')
+	col = rev(c('yellow','cyan','magenta','red','gray','green','blue'))
 
 	# find all available colors
 	temp = list()

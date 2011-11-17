@@ -323,3 +323,51 @@ plot.table.test <- function()
 		
 		dev.off()
 }
+
+
+###############################################################################
+# plot.periodic.table - test for plot.table function
+# Construct Periodic table, like in Single Country Index Returns
+# http://us.ishares.com/content/stream.jsp?url=/content/en_us/repository/resource/single_country_periodic_table.pdf&mimeType=application/pdf
+###############################################################################
+plot.periodic.table1 <- function(hist.returns)
+{	
+	n = ncol(hist.returns)
+	
+	# create temp matrix with data you want to plot
+	temp = t(coredata(hist.returns))
+		colnames(temp) = format(index(hist.returns), '%Y')
+		rownames(temp) = 1:n
+			rownames(temp)[1] = ' Best '
+			rownames(temp)[n] = ' Worst '
+
+	# highlight each column
+	col = plota.colors(n)
+	highlight = apply(temp,2, function(x) col[order(x, decreasing = T)] )
+	
+	# sort each column
+	temp[] = apply(temp,2, sort, decreasing = T)
+	
+	# format data as percentages
+	temp[] = plota.format(100 * temp, 0, '', '%')	
+
+	# plot temp and legend
+	plot.table(temp, highlight = highlight)			
+	plota.legend(colnames(hist.returns), col)	# , cex=1.5
+}
+
+plot.periodic.table2 <- function(hist.returns)
+{	
+	# create temp matrix with data you want to plot
+	temp = t(coredata(hist.returns))
+		colnames(temp) = format(index(hist.returns), '%Y')
+
+	# format data as percentages
+	temp[] = plota.format(100 * temp, 0, '', '%')
+		
+	# highlight each column separately 		
+	highlight = apply(temp,2, function(x) plot.table.helper.color(t(x)) )
+	
+	# plot temp with colorbar
+	plot.table(temp, highlight = highlight, colorbar = TRUE)	
+}	

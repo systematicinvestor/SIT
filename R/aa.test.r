@@ -1279,7 +1279,53 @@ dev.off()
 	lines( portfolio.risk(t(x), ia), portfolio.geometric.return(t(x), ia), type='p', pch=20, col = 'blue')
 }
 
+###############################################################################
+# Test AA functions, Periodic table
+# Construct Periodic table, like in Single Country Index Returns
+# http://us.ishares.com/content/stream.jsp?url=/content/en_us/repository/resource/single_country_periodic_table.pdf&mimeType=application/pdf
+###############################################################################
+aa.periodic.table.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Get Historical Data
+	#--------------------------------------------------------------------------
+	# Country IA are based on monthly data
+	ia = aa.test.create.ia.country()
+		hist.returns = ia$hist.returns
+		
+	# convert returns to prices
+	hist.prices = cumprod(1 + hist.returns)
+	
+	# extract annual prices
+	period.ends = endpoints(hist.prices, 'years')
+		hist.prices = hist.prices[period.ends, ]
+		
+	# compute simple returns	
+	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
+		hist.returns = hist.returns['2000::2010']
 
+				
+	#--------------------------------------------------------------------------
+	# Create Periodic table
+	#--------------------------------------------------------------------------
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	
+	plot.periodic.table1(hist.returns)
+	
+dev.off()			
+			
+	#--------------------------------------------------------------------------
+	# Create Periodic table, another version
+	#--------------------------------------------------------------------------
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+
+	plot.periodic.table2(hist.returns)
+	
+dev.off()			
+
+}
 
 ###############################################################################
 # Test AA functions, Black-Litterman model
