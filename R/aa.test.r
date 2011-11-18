@@ -1328,6 +1328,227 @@ dev.off()
 }
 
 ###############################################################################
+# Test AA functions, Decompose Manager's Style
+###############################################################################
+#--------------------------------------------------------------------------
+# Style Summary Plot
+#--------------------------------------------------------------------------
+aa.style.summary.plot <- function(name, style.weights, style.r.squared, window.len)
+{
+	layout( matrix(c(1,2,2,3,3,3), nrow=2, byrow=T) )
+	
+	#Latest weights	
+	weight = last(style.weights)
+	plot.table(t(round(100*weight)))
+	
+	# R2
+	plota(100*style.r.squared, type='l', LeftMargin = 3, main=paste(window.len, 'months window Linear Least Squares Regression R^2'))
+		
+	# Style History
+	plot.transition.map(style.weights, index(style.weights), xlab='', name=name)
+}	
+	
+
+aa.style.test <- function()
+{
+
+	#--------------------------------------------------------------------------
+	# Get Historical Data
+	#--------------------------------------------------------------------------
+	load.packages('quantmod')
+
+	# load historical prices from Yahoo Finance
+	symbols = spl('FMILX,EWA,EWC,EWQ,EWG,EWJ,EWU,SPY')	
+	symbols = spl('FWWFX,EWA,EWC,EWQ,EWG,EWJ,EWU,SPY')	
+	
+	symbol.names = spl('Fund,Australia,Canada,France,Germany,Japan,UK,USA')
+	
+	getSymbols(symbols, from = '1980-01-01', auto.assign = TRUE)
+			
+	# align dates for all symbols & convert to frequency 
+	hist.prices = merge(FWWFX,EWA,EWC,EWQ,EWG,EWJ,EWU,SPY)		
+		period.ends = endpoints(hist.prices, 'months')
+		hist.prices = Ad(hist.prices)[period.ends, ]
+		
+		index(hist.prices) = as.Date(paste('1/', format(index(hist.prices), '%m/%Y'), sep=''), '%d/%m/%Y')
+		colnames(hist.prices) = symbol.names
+	
+	# remove any missing data	
+	hist.prices = na.omit(hist.prices['1990::2010'])
+	
+	# compute simple returns	
+	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
+		
+	#load 3-Month Treasury Bill from FRED
+	TB3M = quantmod::getSymbols('TB3MS', src='FRED', auto.assign = FALSE)	
+	TB3M = processTBill(TB3M, timetomaturity = 1/4)
+		index(TB3M) = as.Date(paste('1/', format(index(TB3M), '%m/%Y'), sep=''), '%d/%m/%Y')
+		TB3M = ROC(Ad(TB3M), type = 'discrete')
+		colnames(TB3M) = 'Cash'
+		
+	hist.returns = na.omit( merge(hist.returns, TB3M) )
+
+	#--------------------------------------------------------------------------
+	# Style Regression  over 36 Month window, unconstrainted
+	#--------------------------------------------------------------------------
+	# setup
+	ndates = nrow(hist.returns)
+	n = ncol(hist.returns)-1
+	window.len = 36
+		
+	style.weights = hist.returns[, -1]
+		style.weights[] = NA
+	style.r.squared = hist.returns[, 1]
+		style.r.squared[] = NA
+	
+	# main loop
+	for( i in window.len:ndates ) {
+		window.index = (i - window.len + 1) : i
+		
+		fit = lm.constraint( hist.returns[window.index, -1], hist.returns[window.index, 1] )	
+			style.weights[i,] = fit$coefficients
+			style.r.squared[i,] = fit$r.squared
+	}
+ 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	aa.style.summary.plot('Style UnConstrained', style.weights, style.r.squared, window.len)
+
+dev.off()	
+
+			
+	#--------------------------------------------------------------------------
+	# Style Regression  over Window, constrainted
+	#--------------------------------------------------------------------------
+	# setup
+	load.packages('quadprog')
+
+	style.weights[] = NA
+	style.r.squared[] = NA
+
+	# Setup constraints
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# main loop
+	for( i in window.len:ndates ) {
+		window.index = (i - window.len + 1) : i
+		
+		fit = lm.constraint( hist.returns[window.index, -1], hist.returns[window.index, 1], constraints )	
+			style.weights[i,] = fit$coefficients
+			style.r.squared[i,] = fit$r.squared
+	}
+ 	
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	
+	aa.style.summary.plot('Style Constrained', style.weights, style.r.squared, window.len)
+	
+dev.off()			
+
+	#--------------------------------------------------------------------------
+	# Style Regression  over Window, constrained + limits on allocation
+	#--------------------------------------------------------------------------
+	# setup
+	style.weights[] = NA
+	style.r.squared[] = NA
+
+	# Setup constraints
+	temp = rep(0, n)
+		names(temp) = colnames(hist.returns)[-1]
+	lb = temp
+	ub = temp
+	ub[] = 1
+			
+	lb['Australia'] = 0
+	ub['Australia'] = 5
+
+	lb['Canada'] = 0
+	ub['Canada'] = 5
+		
+	lb['France'] = 0
+	ub['France'] = 15
+
+	lb['Germany'] = 0
+	ub['Germany'] = 15
+
+   	lb['Japan'] = 0
+	ub['Japan'] = 15
+
+   	lb['UK'] = 0
+	ub['UK'] = 25
+	
+   	lb['USA'] = 30
+	ub['USA'] = 100
+	     
+   	lb['Cash'] = 2
+	ub['Cash'] = 15
+       
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = lb/100, ub = ub/100)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# main loop
+	for( i in window.len:ndates ) {
+		window.index = (i - window.len + 1) : i
+		
+		fit = lm.constraint( hist.returns[window.index, -1], hist.returns[window.index, 1], constraints )	
+			style.weights[i,] = fit$coefficients
+			style.r.squared[i,] = fit$r.squared
+	}
+ 	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	
+	aa.style.summary.plot('Style Constrained+Limits', style.weights, style.r.squared, window.len)
+
+dev.off()		
+
+	#--------------------------------------------------------------------------
+	# Look at Manager's Tracking Error
+	#--------------------------------------------------------------------------
+	manager.returns = hist.returns[, 1]
+		manager.returns = manager.returns[window.len:ndates,]
+	implied.returns = as.xts( rowSums(style.weights * hist.returns[, -1]), index(hist.returns))
+		implied.returns = implied.returns[window.len:ndates,]
+
+	tracking.error = manager.returns - implied.returns
+	alpha = 12*mean(tracking.error)
+	covar.alpha = 12* cov(tracking.error)
+		
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+			
+	layout(1:2)
+	plota(cumprod(1+manager.returns), type='l')
+		plota.lines(cumprod(1+implied.returns), col='red')
+		plota.legend('Fund,Style', 'black,red')
+			
+	par(mar = c(4,4,2,1))
+	hist(100*tracking.error, xlab='Monthly Tracking Error',
+		main= paste('Annualized Alpha =', round(100*alpha,1), 'Std Dev =', round(100*sqrt(covar.alpha),1))
+	)
+	
+dev.off()		
+
+	
+	# Biulding Managers IA to create Efficient Frontier
+	# For error calculations we can either use most recent window or full sample
+	# error = managers.hist.returns - style %*% t(assets.hist.returns)
+	# managers.alpha = 12 * mean(error)
+	# managers.covar.alpha = 12 * cov(error)	
+	# 
+	# Long-term component + Short-term component
+	# managers.expected.return = style %*% t(assets.expected.return) + managers.alpha
+	# managers.cov = style %*% assets.covar %*% t(style) + managers.covar.alpha
+
+}
+
+
+###############################################################################
 # Test AA functions, Black-Litterman model
 ###############################################################################
 aa.black.litterman.test <- function()

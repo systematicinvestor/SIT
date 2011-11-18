@@ -465,3 +465,129 @@ remove.equality.constraints <- function(qp.data)
 
 
 	
+###############################################################################
+# Run linear least squares regression with constraints
+###############################################################################
+lm.constraint <- function
+(
+	x,
+	y,
+	constraints = NULL
+)
+{
+	if( is.null(constraints) ) {
+		fit = lm.fit(x, y)
+		return( ols.summary(x, y, fit$coefficients) )
+	} else {
+    	temp = cov(cbind(y, x))
+		Dmat = temp[-1,-1] 
+		dvec = temp[-1,1]
+	
+		sol = solve.QP.bounds(Dmat = Dmat, dvec = dvec , 
+				Amat=constraints$A, bvec=constraints$b, constraints$meq,
+				lb = constraints$lb, ub = constraints$ub)
+		return( ols.summary(x, y, sol$solution) )
+	}
+}
+
+
+###############################################################################
+# Run linear least squares regression
+###############################################################################
+ols <- function
+(
+	x,
+	y,
+	computeSummary=F
+)
+{
+	xx = t(x) %*% x
+	
+	if(is.null(ncol(xx))) { xinv = inv1(xx) 
+	} else if(ncol(xx) == 1) { xinv = inv1(xx) 
+	} else if(ncol(xx) == 2) { xinv = inv2(xx) 
+	} else if(ncol(xx) == 3) { xinv = inv3(xx) 
+	} else { xinv = inv(xx) }
+	
+	coefficients = xinv %*% t(x) %*% y
+	if(computeSummary) {
+		return( ols.summary(x, y, coefficients, xinv) )
+	} else {
+		return(list(coefficients = coefficients))
+	}
+}
+
+
+	
+ols.summary <- function
+(
+	x,
+	y,
+	coefficients,
+	xinv = NULL
+)
+{
+	n = length(y) 
+	p = length(coefficients) 
+	rdf = n-p
+
+	# error		
+   	e = y - x %*% coefficients                        
+    ess=sum(e^2)
+	mss = sum((y - sum(y)/n)^2)
+	r.squared = 1 - ess/mss
+	#r.squared = 1 - (var(e)/var(y))
+	#adj.r.squared = 1 - (1 - r.squared)*(n - 1)/(n - p - 1)
+    
+	if( !is.null(xinv) ) {
+		s2=ess/(rdf)
+		seb=sqrt(diag(s2*xinv))	
+		tratio=coefficients/seb	
+		
+		return(list(coefficients = coefficients, seb = seb,tratio = tratio, r.squared = r.squared))
+	} else {
+		return(list(coefficients = coefficients, r.squared = r.squared))
+	}
+}
+
+ols.test <- function() {
+	x = matrix( rnorm(4*10), ncol=4)
+	y = rnorm(10)
+
+	summary(lm(y ~ x+0))
+	ols(x, y, T)
+}
+
+
+###############################################################################
+# Compute matrix inverse
+###############################################################################
+inv <- function(x) { solve(x) }
+
+inv1 <- function(x) { 1/x }
+
+#http://www.mathwords.com/i/inverse_of_a_matrix.htm
+inv2 <- function(x) 
+{ 
+	matrix(c(x[2,2],-x[1,2],-x[2,1],x[1,1]),nrow=2,byrow=T) / (x[1,1]*x[2,2] - x[1,2]*x[2,1]) 
+}
+
+#http://www.dr-lex.be/random/matrix_inv.html
+inv3 <- function(x) 
+{ 
+	matrix(c(x[3,3]*x[2,2]-x[3,2]*x[2,3],-(x[3,3]*x[1,2]-x[3,2]*x[1,3]),x[2,3]*x[1,2]-x[2,2]*x[1,3],
+	-(x[3,3]*x[2,1]-x[3,1]*x[2,3]),x[3,3]*x[1,1]-x[3,1]*x[1,3],-(x[2,3]*x[1,1]-x[2,1]*x[1,3]),
+	x[3,2]*x[2,1]-x[3,1]*x[2,2],-(x[3,2]*x[1,1]-x[3,1]*x[1,2]),x[2,2]*x[1,1]-x[2,1]*x[1,2]),nrow=3,byrow=T) / 
+	(x[1,1]*(x[3,3]*x[2,2]-x[3,2]*x[2,3])-x[2,1]*(x[3,3]*x[1,2]-x[3,2]*x[1,3])+x[3,1]*(x[2,3]*x[1,2]-x[2,2]*x[1,3])) 
+}
+ 
+inv.test <- function() {
+	m=matrix(c(4,3,3,2),nrow=2,byrow=T)
+	inv2(m) %*% m
+	inv(m) %*% m
+
+	m = matrix(c(1,2,3,4,5,6,7,8,8),ncol=3,byrow=T)
+	inv3(m) %*% m
+	m %*% inv3(m)
+	inv(m) %*% m
+}

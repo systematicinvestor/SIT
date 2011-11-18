@@ -585,6 +585,7 @@ plota.test <- function() {
 ###############################################################################
 # plota.staccked - staccked plot
 ###############################################################################
+#col = rainbow(N, start=0, end=.9)
 plota.colors <- function(N) {
 	# default palette excluding black
 	col = rev(c('yellow','cyan','magenta','red','gray','green','blue'))

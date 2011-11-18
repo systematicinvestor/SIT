@@ -1425,6 +1425,7 @@ plot.transition.map <- function
 		y = y$weight
 	}
 		
+	y[is.na(y)] = 0	
 		
 	par(mar = c(4,3,2,1), cex = 0.8)
 	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name),type=type[1])				

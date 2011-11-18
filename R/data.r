@@ -117,3 +117,56 @@ extract.table.from.webpage.test <- function()
 	
 	dev.off()		
 }
+
+
+###############################################################################
+# Pricing Zero Coupon Bond (i.e. yield to price)
+# http://thinkanddone.com/finance/valuation-of-zero-coupon-bonds.html
+###############################################################################
+PricingZeroCouponBond <- function
+( 
+	yield, 
+	timetomaturity, 
+	parvalue = 100 
+)
+{
+	parvalue / ( 1 + yield ) ^ timetomaturity  
+}
+
+###############################################################################
+# Convert Historical TBills rates to Total Returns
+# http://timelyportfolio.blogspot.com/2011/04/historical-sources-of-bond-returns_17.html
+###############################################################################
+processTBill <- function 
+( 
+	yields, 
+	timetomaturity = 1/4
+)
+{
+	yield = coredata(yields) / 100
+	
+	# price return
+	pr = sapply( yield, function(x) PricingZeroCouponBond(x, timetomaturity) )
+		pr = ROC(pr)
+		pr[1] = 0
+
+	# interest return
+	ir = mlag(yield, nlag=1) / 12
+		ir[1] = 0
+	
+	# total return
+	tr = pr + ir
+		
+	#out = as.xts( cbind(pr, ir, tr), index(yields) )
+	#	colnames(out) = spl('PR,IR,TR')
+		
+		
+	close.price = cumprod(1 + pr)
+	adjusted.price = cumprod(1 + tr)
+		
+	out = as.xts( cbind(close.price, adjusted.price), index(yields) )
+		colnames(out) = spl('Close,Adjusted')
+		
+	return(out)
+}
+
