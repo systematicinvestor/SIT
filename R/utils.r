@@ -109,6 +109,56 @@ ifna <- function
 }
 
 ###############################################################################
+# Count number of non NA elements
+############################################################################### 
+count <- function(
+	x,			# matrix with data
+	side = 2	# margin along which to count
+)
+{
+	if( is.null(dim(x)) ) { 
+		sum( !is.na(x) ) 
+	} else { 
+		apply(!is.na(x), side, sum) 
+	}
+}  
+
+###############################################################################
+# Running over window Count of non NA elements
+############################################################################### 
+run.count <- function
+(
+	x, 			# vector with data
+	window.len	# window length
+)
+{ 
+	n    = length(x) 
+	xcount = cumsum( !is.na(x) )
+	ycount = xcount[-c(1 : (k-1))] - c(0, xcount[-c((n-k+1) : n)])
+	return( c( xcount[1:(k-1)], ycount))
+}
+
+###############################################################################
+# Day of Week
+############################################################################### 
+date.dayofweek <- function(ddate) 
+{	
+	return(as.double(format(ddate, '%w')))
+}
+ 
+date.year <- function(ddate) 
+{	
+	return(as.double(format(ddate, '%Y')))
+}
+
+date.month <- function(ddate) 
+{	
+	return(as.double(format(ddate, '%m')))
+}
+
+
+
+###############################################################################
 # Load Packages that are available and install ones that are not available.
 ############################################################################### 
 load.packages <- function
@@ -249,5 +299,41 @@ compute.cor <- function
 		}
 	}
 	return(corm)
+}
+
+###############################################################################
+# XTS helper functions
+###############################################################################
+# Create XTS object
+###############################################################################
+make.xts <- function
+(
+	x,			# data
+	order.by	# date
+)
+{
+	Sys.setenv(TZ = 'GMT')
+	tzone = Sys.getenv('TZ')
+	
+    orderBy = class(order.by)
+    index = as.numeric(as.POSIXct(order.by, tz = tzone))
+    if( is.null(dim(x)) ) dim(x) = c(len(x), 1)
+
+    x = structure(.Data = x, 
+    	index = structure(index, tzone = tzone, tclass = orderBy), 
+    	class = c('xts', 'zoo'), .indexCLASS = orderBy, .indexTZ = tzone)
+	return( x )
+}
+
+###############################################################################
+# Write XTS object to file
+###############################################################################
+write_xts <- function
+(
+	x,			# XTS object
+	filename	# file name
+)
+{
+	write.csv(x, row.names = index(x), filename)	
 }
 

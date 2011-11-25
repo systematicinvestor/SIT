@@ -11,7 +11,9 @@
 ###############################################################################
 # Load Systematic Investor Toolbox (SIT)
 # setInternet2(TRUE) 
-# source(gzcon(url('https://github.com/systematicinvestor/SIT/raw/master/sit.gz', 'rb')))
+# con = gzcon(url('https://github.com/systematicinvestor/SIT/raw/master/sit.gz', 'rb'))
+#	source(con)
+# close(con)
 #
 #
 # Alternatively, if for example you saved sit.gz to c:/temp/sit.gz
