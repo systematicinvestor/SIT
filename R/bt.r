@@ -210,16 +210,19 @@ bt.run <- function
 	trade.summary = F, 	# flag to create trade summary
 	do.lag = 1, 		# lag signal
 	do.CarryLastObservationForwardIfNA = TRUE, 
-	type = c('weight', 'share')
+	type = c('weight', 'share'),
+	silent = F
 ) 
 {
 	# setup
 	type = type[1]
 
 	# print last signal / weight observation
-	cat('Latest weights :\n')
-		print( last(b$weight) )
-	cat('\n')
+	if( !silent ) {
+		cat('Latest weights :\n')
+			print( last(b$weight) )
+		cat('\n')
+	}
 		
     # create signal
     weight = b$weight
@@ -267,19 +270,19 @@ bt.run <- function
 	weight = make.xts(weight, b$dates)
 
 	# prepare output
-	out = list()
-		out = bt.summary(weight, ret, type)
+	bt = list()
+		bt = bt.summary(weight, ret, type)
 
-	if( trade.summary ) {
-		out$trade.summary = bt.trade.summary(b,	weight)
+	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
+
+	if( !silent ) {
+		cat('Performance summary :\n')
+		cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
+    	cat('', sapply(cbind(bt$cagr, bt$best, bt$worst), function(x) round(100*x,1)), '\n', sep = '\t')  
+		cat('\n')    
 	}
-
-	cat('Performance summary :\n')
-	cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
-    cat('', sapply(cbind(out$cagr, out$best, out$worst), function(x) round(100*x,1)), '\n', sep = '\t')  
-	cat('\n')    
 	    
-	return(out)
+	return(bt)
 }
 
 
@@ -298,10 +301,12 @@ bt.summary <- function
 	     	
     bt = list()
     	bt$weight = weight
+    	bt$type = type
     	
 	if( type == 'weight') {    	    	
     	bt$ret = make.xts(rowSums(ret * weight), index(ret))
     } else {
+    	bt$share = weight
     	prices = ret
     		
     	# backfill pricess
@@ -309,6 +314,7 @@ bt.summary <- function
 			
    		if( all(weight>=0) ) {
 			portfolio.ret = rowSums(weight * prices, na.rm=T) / rowSums(weight * mlag(prices), na.rm=T) - 1
+			bt$weight = weight * mlag(prices) / rowSums(weight * mlag(prices), na.rm=T)
 		} else { # short positions			
 			# cash left after transactions: for longs substract, for shorts add
 			cash = rowSums(abs(weight) * mlag(prices), na.rm=T) - rowSums(weight * mlag(prices), na.rm=T)
@@ -324,8 +330,9 @@ bt.summary <- function
 			totalcash = ifna.prev(totalcash)
 				
 			portfolio.ret = (totalcash + rowSums(weight * prices, na.rm=T) ) / (totalcash + rowSums(weight * mlag(prices), na.rm=T) ) - 1
-		}
-			
+			bt$weight = weight * mlag(prices) / (totalcash + rowSums(weight * mlag(prices), na.rm=T) )
+		}		
+		bt$weight[is.na(bt$weight)] = 0		
 		bt$ret = make.xts(ifna(portfolio.ret,0), index(ret))
     }
     	
@@ -343,9 +350,11 @@ bt.summary <- function
 bt.trade.summary <- function
 (
 	b, 		# enviroment with symbols time series
-	weight
+	bt		# backtest object
 )
 {    
+	if( bt$type == 'weight') weight = bt$weight else weight = bt$share
+	
 	# find trades
 	weight1 = mlag(weight, -1)
 	tstart = weight != weight1 & weight1 != 0
@@ -355,7 +364,7 @@ bt.trade.summary <- function
 	# prices
 	prices = b$prices
 	
-	# excercize price logic
+	# execution price logic
 	if( sum(trade) > 0 ) {
 		execution.price = coredata(b$execution.price)
 		prices1 = coredata(b$prices)
@@ -367,6 +376,9 @@ bt.trade.summary <- function
    	# backfill pricess
 	prices[is.na(prices)] = ifna(mlag(prices), NA)[is.na(prices)]
 	
+	
+	# get actual weights
+	weight = bt$weight
 	
 	# extract trades
 	symbolnames = b$symbolnames
@@ -381,7 +393,7 @@ bt.trade.summary <- function
 			if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
 			
 			trades = rbind(trades, 
-							cbind(i, weight[tendi, i], 
+							cbind(i, weight[(tstarti+1), i], 
 							tstarti, tendi, 
 							as.vector(prices[tstarti, i]), as.vector(prices[tendi,i])
 							)
@@ -404,6 +416,8 @@ bt.trade.summary <- function
 		trades$entry.date = index(weight)[trades$entry.date]
 		trades$exit.date = index(weight)[trades$exit.date]
 		trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)
+		trades$weight = round(100*(trades$weight),1)
+		
 
 	out$trades = as.matrix(trades)		
 		
@@ -513,6 +527,8 @@ bt.exrem <- function(weight)
 ###############################################################################
 bt.test <- function()
 {
+	load.packages('quantmod')
+	
 	#*****************************************************************
 	# Load historical data
 	#****************************************************************** 
@@ -562,8 +578,8 @@ dev.off()
 
 
 	# put all reports into one pdf file
-	pdf(file = 'report.pdf', width=8.5, height=11);
-		plotbt.custom.report(sma.cross, buy.hold)
+	pdf(file = 'report.pdf', width=8.5, height=11)
+		plotbt.custom.report(sma.cross, buy.hold, trade.summary=T)
 	dev.off()	
 
 }

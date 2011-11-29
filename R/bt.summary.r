@@ -48,13 +48,13 @@ plotbt.custom.report <- function
 	models = variable.number.arguments( ... )
 		
 	# Main plot
-	plotbt.list(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
-		mtext('Cumulative Perfromance', side = 2, line = 1)
+	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
 	
-	plotbt.list(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
+	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
 		mtext('12 Month Rolling', side = 2, line = 1)
 		
-	plotbt.list(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
+	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
 		mtext('Drawdown', side = 2, line = 1)
 			
 	model = models[[1]]
@@ -64,14 +64,13 @@ plotbt.custom.report <- function
 	temp = plotbt.monthly.table(model$equity)	
 	plotbt.holdings.time(model$weight)
 	
-	trade.summary = !is.null(model$trade.summary)
-	if ( trade.summary ) {
+	if ( !is.null(model$trade.summary) ) {
 		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE)		
 	} else {
 		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE)
 	}
 			
-	if( len(models) > 1 ) plotbt.strategy.sidebyside.list(models)
+	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
 		
 	if ( trade.summary ) {	
 		ntrades = min(20, nrow(model$trade.summary$trades))
@@ -98,13 +97,13 @@ plotbt.custom.report.part1 <- function
 	model = models[[1]]
 	
 	# Main plot
-	plotbt.list(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
-		mtext('Cumulative Perfromance', side = 2, line = 1)
+	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
 	
-	plotbt.list(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
+	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
 		mtext('12 Month Rolling', side = 2, line = 1)
 		
-	plotbt.list(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
+	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
 		mtext('Drawdown', side = 2, line = 1)
 }
 
@@ -132,14 +131,13 @@ plotbt.custom.report.part2 <- function
 	temp = plotbt.monthly.table(model$equity)	
 	plotbt.holdings.time(model$weight)
 	
-	trade.summary = !is.null(model$trade.summary)
-	if ( trade.summary ) {
+	if ( !is.null(model$trade.summary) ) {
 		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE)		
 	} else {
 		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE)
 	}
 			
-	if( len(models) > 1 ) plotbt.strategy.sidebyside.list(models)
+	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
 }	
 
 plotbt.custom.report.part3 <- function
@@ -154,8 +152,6 @@ plotbt.custom.report.part3 <- function
 	models = variable.number.arguments( ... )
 	model = models[[1]]
 		
-	trade.summary = !is.null(model$trade.summary)
-
 	if ( trade.summary ) {	
 		ntrades = min(20, nrow(model$trade.summary$trades))
 		print( last(model$trade.summary$trades, ntrades) )
@@ -255,22 +251,15 @@ plotbt.strategy.sidebyside <- function
 	perfromance.metric = spl('System,Trade,Period') 
 ) 
 {
-	plotbt.strategy.sidebyside.list( variable.number.arguments( ... ), perfromance.metric[1])
-}
-
-plotbt.strategy.sidebyside.list <- function
-( 
-	models , 
-	perfromance.metric = spl('System,Trade,Period') 
-) 
-{
+	models = variable.number.arguments( ... )
 	out = list()
+	
 	for( i in 1:len(models) ) {
 		out[[ names(models)[i] ]] = bt.detail.summary(models[[ i ]])[[ perfromance.metric[1] ]]
 	}
 	plot.table( list2matrix(out, keep.names=F), smain = perfromance.metric[1] )
 }
-	
+
 
 ###############################################################################
 # Plot equity curves for eact strategy(model)
@@ -286,24 +275,8 @@ plotbt <- function
 	log = '',
 	LeftMargin = 0 
 ) 
-{    							
-	plotbt.list( variable.number.arguments( ... ), 
-		dates = dates, plottype = plottype, xfun=xfun,
-		main = main, plotX = plotX, log = log, LeftMargin = LeftMargin)
-}							
-							
-plotbt.list <- function
-(
-	models,
-	dates = NULL,
-	plottype = spl('line,12M'),
-	xfun=function(x) { x$equity },
-	main = NULL,
-	plotX = T,
-	log = '',
-	LeftMargin = 0 
-) 
-{   
+{    		
+	models = variable.number.arguments( ... )					
 	plottype = plottype[1]
    	n = length(models)    	
 
@@ -328,7 +301,7 @@ plotbt.list <- function
    		}
    		
    		if( plottype == '12M' ) {
-   			itemp = itemp / mlag(itemp, nlag ) - 1
+   			itemp = 100 * (itemp / mlag(itemp, nlag ) - 1)
    		}
    		temp[[i]] = itemp
    		
@@ -352,7 +325,6 @@ plotbt.list <- function
 ###############################################################################
 plotbt.transition.map <- function(weight) 
 {
-#	par(mar=c(2, 4, 1, 1),cex.main=0.8,cex.sub=0.6,cex.axis=0.8,cex.lab=0.8)
 	par(mar=c(2, 4, 1, 1), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
 	icols=rainbow(ncol(weight), start=0, end=.9)	
 	
@@ -369,7 +341,6 @@ plotbt.holdings <- function
 	smain = format(index(last(weight)), '%d-%b-%Y') 
 ) 
 {
-#	par(mar=c(2, 2, 2, 2),cex.main=0.8,cex.sub=0.6,cex.axis=0.8,cex.lab=0.8)	
 	par(mar=c(2, 2, 2, 2), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
 	icols=rainbow(ncol(weight), start=0, end=.9)
 	
@@ -458,9 +429,13 @@ plotbt.monthly.table <- function(equity)
 variable.number.arguments <- function( ... ) 
 {
 	out = list( ... )
+	if( is.list(out[[1]][[1]]) ) return( out[[1]] )
+	
 	names( out ) = as.character(substitute(c(...))[-1])  	
 	return ( out )
-}
+}	
+
+
 
 ###############################################################################
 # Convert list of lists to matrix

@@ -657,11 +657,22 @@ plota.stacked <- function
 	
 	# create empty plot
 	# par(mar = c(4, 4, 2, 1), cex = 0.8)
-	plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
+	if( class(x) != 'Date') {
+		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
+		grid()
+	} else {
+		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
+			axis(2)
+			xaxis.ticks = axis.Date(1, x, labels = T, tick = T)		
+			
+			abline( h = axTicks(2), col = 'lightgray', lty = 'dotted')
+			abline( v = xaxis.ticks, col = 'lightgray', lty = 'dotted')		
+	}
+		
 		mtext('Allocation %', side = 2,line = 2, cex = par('cex'))
 		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
-	grid()
-
+	
+	
 	# plot stacked areas	
 	if( type[1] == 'l' ) {
 		prep.x = c(x[1], x, x[len(x)])     
