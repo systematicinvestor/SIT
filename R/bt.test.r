@@ -20,7 +20,36 @@
 # or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
+bt.empty.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
 
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='keep.all', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices    
+	
+	# Buy & Hold	
+	data$weight[] = 0
+	buy.hold = bt.run(data, trade.summary=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	
+	plotbt.custom.report.part1( buy.hold, trade.summary =T)
+	plotbt.custom.report.part2( buy.hold, trade.summary =T)
+	plotbt.custom.report.part3( buy.hold, trade.summary =T)
+
+}
 
 
 ###############################################################################

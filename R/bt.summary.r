@@ -72,13 +72,16 @@ plotbt.custom.report <- function
 			
 	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
 		
-	if ( trade.summary ) {	
+	if ( trade.summary & !is.null(model$trade.summary)) {	
 		ntrades = min(20, nrow(model$trade.summary$trades))
-		print( last(model$trade.summary$trades, ntrades) )
+		
+		temp = last(model$trade.summary$trades, ntrades)
+		if( ntrades == 1 ) temp = model$trade.summary$trades
+		print( temp )
 		print( model$trade.summary$stats )
 
 		layout(1)
-		plot.table( last(model$trade.summary$trades,ntrades) )
+		plot.table( temp )
 	}	
 }	
 
@@ -152,13 +155,16 @@ plotbt.custom.report.part3 <- function
 	models = variable.number.arguments( ... )
 	model = models[[1]]
 		
-	if ( trade.summary ) {	
+	if ( trade.summary & !is.null(model$trade.summary)) {	
 		ntrades = min(20, nrow(model$trade.summary$trades))
-		print( last(model$trade.summary$trades, ntrades) )
+		
+		temp = last(model$trade.summary$trades, ntrades)
+		if( ntrades == 1 ) temp = model$trade.summary$trades
+		print( temp )
 		print( model$trade.summary$stats )
 
 		layout(1)
-		plot.table( last(model$trade.summary$trades,ntrades) )
+		plot.table( temp )
 	}	
 }
 
@@ -361,7 +367,7 @@ plotbt.holdings <- function
 plotbt.holdings.time <- function(weight) 
 {
 	weight = as.matrix( apply(abs(weight), 2, sum, na.rm = T) )
-	plotbt.holdings( t(weight) / sum(abs(weight), na.rm = T), smain = 'in time')
+	if( sum(abs(weight)) > 0 ) plotbt.holdings( t(weight) / sum(abs(weight), na.rm = T), smain = 'in time')
 }
 
 

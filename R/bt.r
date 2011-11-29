@@ -355,6 +355,8 @@ bt.trade.summary <- function
 {    
 	if( bt$type == 'weight') weight = bt$weight else weight = bt$share
 	
+	out = NULL
+	
 	# find trades
 	weight1 = mlag(weight, -1)
 	tstart = weight != weight1 & weight1 != 0
@@ -371,56 +373,55 @@ bt.trade.summary <- function
 		
 		prices1[trade] = iif( is.na(execution.price[trade]), prices1[trade], execution.price[trade] )
 		prices[] = prices1
-	}
+	
 
-   	# backfill pricess
-	prices[is.na(prices)] = ifna(mlag(prices), NA)[is.na(prices)]
-	
-	
-	# get actual weights
-	weight = bt$weight
-	
-	# extract trades
-	symbolnames = b$symbolnames
-	nsymbols = len(symbolnames) 	
-
-	trades = c()
-	for( i in 1:nsymbols ) {	
-		tstarti = which(tstart[,i])
-		tendi = which(tend[,i])
+   		# backfill pricess
+		prices[is.na(prices)] = ifna(mlag(prices), NA)[is.na(prices)]
 		
-		if( len(tstarti) > 0 ) {
-			if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
-			
-			trades = rbind(trades, 
-							cbind(i, weight[(tstarti+1), i], 
-							tstarti, tendi, 
-							as.vector(prices[tstarti, i]), as.vector(prices[tendi,i])
-							)
-						)
-		}
-	}
-	colnames(trades) = spl('symbol,weight,entry.date,exit.date,entry.price,exit.price')
+		# get actual weights
+		weight = bt$weight
+	
+		# extract trades
+		symbolnames = b$symbolnames
+		nsymbols = len(symbolnames) 	
 
-	# prepare output	
-	out = list()
+		trades = c()
+		for( i in 1:nsymbols ) {	
+			tstarti = which(tstart[,i])
+			tendi = which(tend[,i])
+			
+			if( len(tstarti) > 0 ) {
+				if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
+				
+				trades = rbind(trades, 
+								cbind(i, weight[(tstarti+1), i], 
+								tstarti, tendi, 
+								as.vector(prices[tstarti, i]), as.vector(prices[tendi,i])
+								)
+							)
+			}
+		}
+		colnames(trades) = spl('symbol,weight,entry.date,exit.date,entry.price,exit.price')
+
+		# prepare output		
+		out = list()
 		out$stats = cbind(
 			bt.trade.summary.helper(trades),
 			bt.trade.summary.helper(trades[trades[, 'weight'] >= 0, ]),
 			bt.trade.summary.helper(trades[trades[, 'weight'] <0, ])
 		)
-	colnames(out$stats) = spl('All,Long,Short')
+		colnames(out$stats) = spl('All,Long,Short')
 		
-	trades = data.frame(coredata(trades))
-		trades$symbol = symbolnames[trades$symbol]
-		trades$entry.date = index(weight)[trades$entry.date]
-		trades$exit.date = index(weight)[trades$exit.date]
-		trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)
-		trades$weight = round(100*(trades$weight),1)
-		
+		trades = data.frame(coredata(trades))
+			trades$symbol = symbolnames[trades$symbol]
+			trades$entry.date = index(weight)[trades$entry.date]
+			trades$exit.date = index(weight)[trades$exit.date]
+			trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)
+			trades$weight = round(100*(trades$weight),1)		
 
-	out$trades = as.matrix(trades)		
-		
+		out$trades = as.matrix(trades)		
+	}
+	
 	return(out)
 }
 
