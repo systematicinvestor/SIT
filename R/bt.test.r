@@ -108,7 +108,7 @@ dev.off()
 	# evaluate strategies
 	for(ima in 1:len(ma.lens)) {
 		sma = mas[, ima]
-		cat('SMA =', ima, '\n')
+		cat('SMA =', ma.lens[ima], '\n')
 
 		for(idv in 0:len(dv.lens)) {			
 			if( idv == 0 ) {
