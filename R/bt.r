@@ -86,33 +86,6 @@ bt.merge <- function
 }
 
 
-###############################################################################
-# Concatenate history and today enviroments
-###############################################################################
-bt.concatenate <- function(hist, today, update=F) 
-{
-	symbolnames = ls(hist)
-	nsymbols = len(symbolnames) 
-	
-	for( i in 1:nsymbols ) {
-		h = hist[[ symbolnames[i] ]]
-		t = last(today[[ symbolnames[i] ]])
-		
-		if( attr(h[nrow(h), ], 'index') <= attr(t[nrow(t), ], 'index') ) {
-			temp = matrix(coredata(t)[1,][colnames(h)], nr=1)
-
-			if( attr(h[nrow(h), ], 'index') < attr(t[nrow(t), ], 'index') ) {
-				colnames(temp) = colnames(h)
-				temp = make.xts( temp, index(t) )
-				hist[[ symbolnames[i] ]] = c(h, temp)
-			} else {
-				if(update) {
-					hist[[ symbolnames[i] ]][nrow(h),] = temp
-				}
-			}		
-		}
-	}		
-}
 
 ###############################################################################
 # Prepare backtest data
