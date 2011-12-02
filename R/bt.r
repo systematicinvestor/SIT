@@ -87,6 +87,34 @@ bt.merge <- function
 
 
 ###############################################################################
+# Concatenate history and today enviroments
+###############################################################################
+bt.concatenate <- function(hist, today, update=F) 
+{
+	symbolnames = ls(hist)
+	nsymbols = len(symbolnames) 
+	
+	for( i in 1:nsymbols ) {
+		h = hist[[ symbolnames[i] ]]
+		t = last(today[[ symbolnames[i] ]])
+		
+		if( attr(h[nrow(h), ], 'index') <= attr(t[nrow(t), ], 'index') ) {
+			temp = matrix(coredata(t)[1,][colnames(h)], nr=1)
+
+			if( attr(h[nrow(h), ], 'index') < attr(t[nrow(t), ], 'index') ) {
+				colnames(temp) = colnames(h)
+				temp = make.xts( temp, index(t) )
+				hist[[ symbolnames[i] ]] = c(h, temp)
+			} else {
+				if(update) {
+					hist[[ symbolnames[i] ]][nrow(h),] = temp
+				}
+			}		
+		}
+	}		
+}
+
+###############################################################################
 # Prepare backtest data
 ###############################################################################
 bt.prep <- function
@@ -309,9 +337,11 @@ bt.summary <- function
     	bt$share = weight
     	prices = ret
     		
-    	# backfill pricess
-		prices[is.na(prices)] = ifna(mlag(prices), NA)[is.na(prices)]
-			
+    	# backfill prices
+		prices1 = coredata(prices)
+		prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
+		prices[] = prices1
+		
    		if( all(weight>=0) ) {
 			portfolio.ret = rowSums(weight * prices, na.rm=T) / rowSums(weight * mlag(prices), na.rm=T) - 1
 			bt$weight = weight * mlag(prices) / rowSums(weight * mlag(prices), na.rm=T)
@@ -372,12 +402,11 @@ bt.trade.summary <- function
 		prices1 = coredata(b$prices)
 		
 		prices1[trade] = iif( is.na(execution.price[trade]), prices1[trade], execution.price[trade] )
-		prices[] = prices1
-	
-
-   		# backfill pricess
-		prices[is.na(prices)] = ifna(mlag(prices), NA)[is.na(prices)]
 		
+		# backfill pricess
+		prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
+		prices[] = prices1
+			
 		# get actual weights
 		weight = bt$weight
 	

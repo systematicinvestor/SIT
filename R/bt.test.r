@@ -179,3 +179,93 @@ dev.off()
 }	
 	
 	
+###############################################################################
+# Simple, Long-Term Indicator Near to Giving Short Signal By Woodshedder 
+# http://ibankcoin.com/woodshedderblog/2011/08/28/simple-long-term-indicator-near-to-giving-short-signal/
+###############################################################################
+bt.roc.cross.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='keep.all', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices    
+	
+	# Buy & Hold	
+	data$weight[] = 1
+	buy.hold = bt.run(data)	
+
+	
+	# Strategy: calculate the 5 day rate of change (ROC5) and the 252 day rate of change (ROC252).
+	#  Buy (or cover short) at the close if yesterday the ROC252 crossed above the ROC5 and today the ROC252 is still above the ROC5.
+	#  Sell (or open short) at the close if yesterday the ROC5 crossed above the ROC252 and today the ROC5 is still above the ROC252.
+	roc5 = prices / mlag(prices,5)
+	roc252 = prices / mlag(prices,252)
+	
+	roc5.1 = mlag(roc5,1)
+	roc5.2 = mlag(roc5,2)
+	roc252.1 = mlag(roc252,1)
+	roc252.2 = mlag(roc252,2)
+	
+	data$weight[] = NA
+		data$weight$SPY[] = iif(roc252.2 < roc5.2 & roc252.1 > roc5.1 & roc252 > roc5, 1, data$weight$SPY)
+		data$weight$SPY[] = iif(roc252.2 > roc5.2 & roc252.1 < roc5.1 & roc252 < roc5, -1, data$weight$SPY)
+	roc.cross = bt.run(data, trade.summary=T)					
+       
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(roc.cross, buy.hold, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(roc.cross, buy.hold, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part3(roc.cross, buy.hold, trade.summary=T)
+dev.off()	
+
+
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	
+	# When shorting always use 	type = 'share' backtest to get realistic results
+	# The type = 'weight' backtest assumes that we are constantly adjusting our position
+	# to keep all cash = shorts
+	data$weight[] = NA
+		data$weight$SPY[] = iif(roc252.2 < roc5.2 & roc252.1 > roc5.1 & roc252 > roc5, 1, data$weight$SPY)
+		data$weight$SPY[] = iif(roc252.2 > roc5.2 & roc252.1 < roc5.1 & roc252 < roc5, -1, data$weight$SPY)	
+		
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	roc.cross.share = bt.run(data, type='share', trade.summary=T)					
+		
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(roc.cross.share, roc.cross, buy.hold, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot5.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(roc.cross.share, roc.cross, buy.hold, trade.summary=T)
+dev.off()	
+	
+	
+}

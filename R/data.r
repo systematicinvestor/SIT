@@ -120,6 +120,152 @@ extract.table.from.webpage.test <- function()
 
 
 ###############################################################################
+# Properly handling quote when reading text from CGIwithR
+###############################################################################
+scan.text <- function
+(
+	string, 
+	what = character(0), 
+	...
+)
+{
+    tc = textConnection(string)
+    result = scan(tc, what = what, quiet = TRUE, ...)
+    close(tc)
+    return(result)
+}		
+
+###############################################################################
+# Parsing BATS qoutes
+# http://www.batstrading.com/book/AA/data/
+###############################################################################			
+parse.bats <- function(txt) 
+{
+	tryCatch({			
+		# remove commas within qoutes
+		temp = scan.text(txt, what = '', sep = ',', quote='\"')
+			temp = paste(gsub(',', '', temp), collapse = ',')
+	
+		# find rows
+		poss = gregexpr('\\[[^\\]]+\\]', temp, perl=T)[[1]]					
+			rows = sapply(1:length(poss), function(i) substr(temp,poss[i],poss[i] + attr(poss, 'match.length')[i]-1))
+			rows = gsub(pattern = '[\\[\\]]', replacement = '', rows, perl=TRUE)	
+			temp = t( sapply(strsplit(rows, ','), function(x) x) )
+	}, error = function(ex) {
+		temp <<- txt
+	}, finally = {
+		return(temp)
+	})
+}		
+	
+parse.bats.test <- function()
+{
+	Symbol = 'IBM'	
+	
+	# download BATS qoute
+	url = paste('http://www.batstrading.com/book/', Symbol, '/data/', sep = '')
+	txt = join(readLines(url))
+	
+	# trades, bids, asks, 
+	pos = regexpr('\"trades\":((?:(?!]]).)*)]]', txt, perl = T)
+	parse.bats( substr(txt, pos, pos + attr(pos, 'match.length')-1) ) 	
+
+}
+
+###############################################################################
+# getSymbols interface to BATS qoutes
+###############################################################################			
+getSymbols.bats <- function
+(
+	Symbols, 
+	env = .GlobalEnv, 
+	auto.assign = TRUE
+)
+{
+	for (i in 1:len(Symbols)) {
+		# download BATS qoute
+		url = paste('http://www.batstrading.com/book/', trim(Symbols[i]), '/data/', sep = '')
+		txt = join(readLines(url))
+
+		# trades
+		pos = regexpr('\"trades\":((?:(?!]]).)*)]]', txt, perl = T)
+		temp = substr(txt, pos, pos + attr(pos, 'match.length')-1)
+		temp = parse.bats( temp )
+		
+		# volume
+		pos = regexpr('\"volume\":([^,]*),', txt, perl = T)
+		volume = substr(txt, attr(pos, 'capture.start'), attr(pos, 'capture.start') + attr(pos, 'capture.length')-1)
+		
+		# date
+   		date = as.Date(Sys.Date())
+   			
+   		temp = as.double( temp[,3] )
+		out = matrix(double(1),len(date), 6)
+   			colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')	
+   			out[,1] = tail(temp,1)
+   			out[,2] = range(temp)[2]
+   			out[,3] = range(temp)[1]
+   			out[,4] = temp[1]
+   			out[,5] = as.double( volume )
+   			out[,6] = out[,4]	# Adjusted = Close   			
+		out = make.xts( out,  date)
+			
+		if (auto.assign) {		
+			assign(gsub('\\^', '', Symbols[i]), out, env)	
+		}	
+	}
+	if (!auto.assign) {
+		return(out)
+	} else {		
+		return(env)				
+	}	
+}
+
+###############################################################################
+# getSymbols interface to Yahoo today's delayed qoutes
+# based on getQuote.yahoo from quantmod package
+###############################################################################			
+getQuote.yahoo.today <- function
+(
+	Symbols, 
+	env = .GlobalEnv, 
+	auto.assign = TRUE
+)
+{
+	what = yahooQF(names = spl('Symbol,Last Trade Date,Open,Days High,Days Low,Last Trade (Price Only),Volume'))
+	names = spl('Symbol,Date,Open,High,Low,Close,Volume')
+	
+	all.symbols = lapply(seq(1, len(Symbols), 100), function(x) na.omit(Symbols[x:(x + 99)])) 
+	
+	for(i in 1:len(all.symbols)) {
+		# download
+		url = paste('http://download.finance.yahoo.com/d/quotes.csv?s=', 
+			join( trim(all.symbols[[i]]), ','),
+			'&f=', what[[1]], sep = '')
+		tempi = readLines(url)
+		
+		for (j in 1:len(tempi)) {
+			tempj = scan.text(tempi[j], what = '', sep = ',', quote='\"')
+			names(tempj) = names
+	
+			out = matrix(double(1),1, 6)
+	   			colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')	
+	   			out[1,] = as.double( tempj[spl('Open,High,Low,Close,Volume,Close')] )
+			out = make.xts( out,  as.Date(tempj['Date'], '%m/%d/%Y'))
+				
+			if (auto.assign) {		
+				assign(gsub('\\^', '', tempj['Symbol']), out, env)	
+			}	
+		}
+	}
+	if (!auto.assign) {
+		return(out)
+	} else {		
+		return(env)				
+	}	
+}
+
+###############################################################################
 # Pricing Zero Coupon Bond (i.e. yield to price)
 # http://thinkanddone.com/finance/valuation-of-zero-coupon-bonds.html
 ###############################################################################
