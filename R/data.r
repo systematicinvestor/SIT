@@ -170,3 +170,56 @@ processTBill <- function
 	return(out)
 }
 
+###############################################################################
+# Load CRB Commodities Index 
+# http://www.jefferies.com/cositemgr.pl/html/ProductsServices/SalesTrading/Commodities/ReutersJefferiesCRB/IndexData/index.shtml
+###############################################################################
+get.CRB <- function()
+{
+	load.packages('gtools,gdata')
+	
+	#http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Excess&StartDate=19940103&EndDate=20111202
+	url = paste('http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Total&StartDate=19940101&EndDate=', format(Sys.Date(), '%Y%m%d'), sep='')	
+  	temp = read.xls(url)
+  	
+  	temp = as.matrix(temp[-c(1:7),])
+  	
+	out = repmat(as.double(temp[,2]), 1, 6)
+   		colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
+   		out[, 'Volume'] = 0
+	out = make.xts( out,  as.Date(temp[,1], '%m/%d/%y'))
+		
+	return(out)
+}
+
+get.CRB.test <- function()	
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 	
+	CRB = get.CRB()
+		
+	load.packages('quantmod')	
+	# http://etfdb.com/
+	tickers = spl('GSG,DBC')		
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01')
+	
+	#*****************************************************************
+	# Compare different indexes
+	#****************************************************************** 	
+	out = na.omit(merge(Cl(CRB), Cl(GSG), Cl(DBC)))
+		colnames(out) = spl('CRB,GSG,DBC')
+	temp = out / t(repmat(as.vector(out[1,]),1,nrow(out)))
+		
+	layout(1:2)
+	plota(temp, ylim=range(temp))
+		plota.lines(temp[,1],col=1)
+		plota.lines(temp[,2],col=2)
+		plota.lines(temp[,3],col=3)
+	plota.legend(colnames(temp),1:3)
+			
+	temp = compute.cor(temp / mlag(temp)- 1, 'pearson')
+			temp[] = plota.format(100 * temp, 0, '', '%')
+	plot.table(temp)	
+}	
+	

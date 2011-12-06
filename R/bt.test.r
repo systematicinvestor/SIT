@@ -269,3 +269,156 @@ dev.off()
 	
 	
 }
+
+
+
+###############################################################################
+# Rotational Trading Strategies : ETF Sector Strategy
+# http://www.etfscreen.com/sectorstrategy.php
+###############################################################################
+bt.rotational.trading.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU,IWB,IWD,IWF,IWM,IWN,IWO,IWP,IWR,IWS,IWV,IWW,IWZ')	
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='keep.all', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices  
+	n = len(tickers)  
+
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+		month.ends = month.ends[month.ends > 0]		
+		
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[month.ends,] = ntop(prices, n)[month.ends,]	
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	equal.weight = bt.run(data, type='share')
+		
+			
+	# Rank on 6 month return
+	position.score = prices / mlag(prices, 126)	
+	
+	# Select Top 2 funds
+	data$weight[] = NA
+		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2 = bt.run(data, type='share', trade.summary=T)
+
+	# Seletop Top 2 funds,  and Keep then till they are in 1:6 rank
+	data$weight[] = NA
+		data$weight[month.ends,] = ntop.keep(position.score[month.ends,], 2, 6)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.keep6 = bt.run(data, type='share', trade.summary=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+				
+	# put all reports into one pdf file
+	pdf(file = 'report.pdf', width=8.5, height=11)
+		plotbt.custom.report(top2.keep6, top2, equal.weight, trade.summary=T)
+	dev.off()	
+	
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(top2.keep6, top2, equal.weight, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(top2.keep6, top2, equal.weight, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part3(top2.keep6, top2, equal.weight, trade.summary=T)
+dev.off()	
+
+	
+		
+}
+
+###############################################################################
+# A Quantitative Approach to Tactical Asset Allocation by M. Faber (2006)
+# http://www.mebanefaber.com/timing-model/
+###############################################################################
+bt.timing.model.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('VTI,VEU,IEF,VNQ,DBC')	
+	tickers = spl('VTI,EFA,IEF,ICF,DBC,SHY')	
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) cat( i, format(index(data[[i]][1,]), '%d%b%y'), '\n')
+
+	# extend data for Commodities
+	CRB = get.CRB()
+		index = max(which( index(CRB) < index(data$DBC[1,]) ))
+		scale = as.vector(Cl(data$DBC[1,])) / as.vector(Cl(CRB[(index + 1),]))
+		temp = CRB[1 : (index + 1),] * repmat(scale, index + 1, 6)		
+	data$DBC = rbind( temp[1:index,], data$DBC )
+		
+	bt.prep(data, align='remove.na', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices 	
+	n = len(tickers)  
+	
+	# ignore cash when selecting funds
+	prices.select = prices
+		prices.select$SHY = NA
+	
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+		month.ends = month.ends[month.ends > 0]		
+		
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[month.ends,] = ntop(prices.select, n)[month.ends,]	
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	equal.weight = bt.run(data, type='share')
+		
+	# BuyRule, price > 10 month SMA
+	buy.rule = prices > bt.apply.matrix(prices, function(x) { SMA(x, 200) } )		
+	
+	# Strategy
+	weight = ntop(prices.select, n)[month.ends,]	
+	buy.rule = buy.rule[month.ends,]	
+		weight[is.na(buy.rule)] = 0
+		weight[!buy.rule] = 0
+		# keep in cash the rest of the funds
+		weight$SHY = 1 - rowSums(weight)
+
+	data$weight[] = NA		
+		data$weight[month.ends,] = weight		
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	timing = bt.run(data, type='share', trade.summary=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+			
+	# put all reports into one pdf file
+	pdf(file = 'report.pdf', width=8.5, height=11)
+		plotbt.custom.report(timing, equal.weight, trade.summary=T)
+	dev.off()	
+}

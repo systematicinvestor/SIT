@@ -143,7 +143,7 @@ ntop.helper <- function
 # Select top N for each period, and keep them till they drop below keepn rank
 # http://www.etfscreen.com/sectorstrategy.php
 ############################################################################### 
-ntop_keep <- function
+ntop.keep <- function
 (
 	data, 		# matrix with observations
 	topn = 1, 	# top n
@@ -155,7 +155,7 @@ ntop_keep <- function
 	out[] = NA
 	
 	for( i in 1:nrow(data) ) {
-		x = data[i,]
+		x = coredata(data[i,])
 		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
 		index = which(!is.na(x))
 		x[] = NA
@@ -166,7 +166,7 @@ ntop_keep <- function
 		
 			# keepn logic
 			if( i>=2 ) {
-				y = out[(i-1),]		# prev period selection
+				y = coredata(out[(i-1),])		# prev period selection
 				n1 = min(keepn,len(index))
 				y[-o[1:n1]] = NA	# remove all not in top keepn
 				

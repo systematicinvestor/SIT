@@ -418,7 +418,9 @@ bt.trade.summary <- function
 			trades$symbol = symbolnames[trades$symbol]
 			trades$entry.date = index(weight)[trades$entry.date]
 			trades$exit.date = index(weight)[trades$exit.date]
-			trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)
+			trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)			
+			trades$entry.price = round(trades$entry.price, 2)
+			trades$exit.price = round(trades$exit.price, 2)			
 			trades$weight = round(100*(trades$weight),1)		
 
 		out$trades = as.matrix(trades)		
