@@ -222,4 +222,27 @@ get.CRB.test <- function()
 			temp[] = plota.format(100 * temp, 0, '', '%')
 	plot.table(temp)	
 }	
+
+
+###############################################################################
+# Get Dow Jones Components
+# http://finance.yahoo.com/q/cp?s=^DJI+Components
+###############################################################################
+dow.jones.components <- function()
+{
+	url = 'http://finance.yahoo.com/q/cp?s=^DJI+Components'
+	txt = join(readLines(url))
+
+	# extract table from this page
+	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = T)
+	tickers = temp[, 'Symbol']
+
+	return(tickers)
+}
 	
+	
+	
+
+# pracma package
+# http://exploringdatablog.blogspot.com/2011/11/cleaning-time-series-and-other-data.html
+# Renamed outlierMAD() to hampel()	

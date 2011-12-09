@@ -386,7 +386,8 @@ plota.ohlc <- function
 plota.hl <- function
 (
 	y,					# xts object to plot
-	col = plota.volume.col(y)
+	col = plota.volume.col(y),
+	border = plota.control$col.border
 )
 {
 	dx = plota.dx(y)
@@ -397,7 +398,7 @@ plota.hl <- function
 		plota.hl.lwd(y, col = col, lwd = 1)
 	} else {
 		rect(index(y) - dx/2, Lo(y), index(y) + dx/2, Hi(y), 
-			col = col, border = plota.control$col.border)
+			col = col, border = border)
 	}
 }
 
@@ -436,7 +437,8 @@ plota.hl.lwd <- function
 plota.volume <- function
 (
 	y,							# xts object to plot
-	col = plota.volume.col(y)	# color
+	col = plota.volume.col(y),	# color
+	border = plota.control$col.border
 )
 {
 	dx = plota.dx(y)
@@ -447,7 +449,7 @@ plota.volume <- function
 		segments(index(y), 0, index(y), Vo(y), col = col, lwd = 1, lend = 2)	
 	} else {
 		rect(index(y) - dx/2, 0, index(y) + dx/2, Vo(y), 
-			col = col, border = plota.control$col.border)
+			col = col, border = border)
 	}
 		
 	idv = grep('Volume', colnames(y)) 

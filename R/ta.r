@@ -110,15 +110,34 @@ TSI <- function
 ############################################################################### 
 ntop <- function
 (
-	x, 		# matrix with observations
-	n=1, 	# top n
+	data,		# matrix with observations
+	topn = 1, 	# top n
 	dirMaxMin = TRUE
 ) 
 {
-	out = x 
-	out[] = t( apply( coredata(x) , 1, ntop.helper, n) )
+	# work with matrix
+	temp = coredata(data)
+	
+	for( i in 1:nrow(data) ) {
+		x = temp[i,]
+		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
+		index = which(!is.na(x))
+		x[] = NA
+		
+		if(len(index)>0) {
+			n = min(topn, len(index))
+			x[o[1:n]] = 1/n
+		}
+		temp[i,] = x
+	}
+	temp[is.na(temp)] = 0
+	
+	# work with xts
+	out = data
+	out[] = temp		
 	return( out )
 }
+
 
 ntop.helper <- function
 (
@@ -139,6 +158,48 @@ ntop.helper <- function
 	return(x) 
 }	
 
+ntop.speed.test <- function()
+{
+	#to.monthly(IEF, indexAt='endof')
+	#IEF = adjustOHLC(IEF, use.Adjusted=TRUE)
+	
+	
+	
+	load.packages('quantmod')	
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU,IWB,IWD,IWF,IWM,IWN,IWO,IWP,IWR,IWS,IWV,IWW,IWZ')	
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', dates='1970::2011')
+
+	prices = data$prices  
+	n = len(tickers)  
+
+	a = coredata(prices)
+	b = a
+	c = a
+	
+tic(12)
+	for( i in 1:nrow(b) ) {
+		b[i,] = ntop.helper(b[i,], n, T)
+	}
+toc(12)
+
+	# working directly with xts is alot slower
+tic(12)
+	d = prices
+	for( i in 1:nrow(c) ) {
+		d[i,] = ntop.helper(c[i,], n, T)
+	}
+toc(12)
+
+	range(b-d)	
+
+	
+
+}
+
 ############################################################################### 
 # Select top N for each period, and keep them till they drop below keepn rank
 # http://www.etfscreen.com/sectorstrategy.php
@@ -151,11 +212,11 @@ ntop.keep <- function
 	dirMaxMin = TRUE
 ) 
 {
-	out = data
-	out[] = NA
+	# work with matrix
+	temp = coredata(data)
 	
-	for( i in 1:nrow(data) ) {
-		x = coredata(data[i,])
+	for( i in 1:nrow(temp) ) {
+		x = temp[i,]
 		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
 		index = which(!is.na(x))
 		x[] = NA
@@ -166,7 +227,7 @@ ntop.keep <- function
 		
 			# keepn logic
 			if( i>=2 ) {
-				y = coredata(out[(i-1),])		# prev period selection
+				y = coredata(temp[(i-1),])		# prev period selection
 				n1 = min(keepn,len(index))
 				y[-o[1:n1]] = NA	# remove all not in top keepn
 				
@@ -182,11 +243,13 @@ ntop.keep <- function
 				}
 			}
 		}		
-		out[i,] = x/sum(x,na.rm=T)	
+		temp[i,] = x/sum(x,na.rm=T)	
 	}
-	out[is.na(out)] = 0
+	temp[is.na(temp)] = 0
 	
+	# work with xts
+	out = data
+	out[] = temp		
 	return( out )
 }
-
 

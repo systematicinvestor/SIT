@@ -296,7 +296,10 @@ plotbt <- function
 	}
 
 	# prepare plot
-	nlag = len(last(temp[[1]], '12 months'))
+	last.date = index(last(temp[[1]]))
+	prev.year.last.date = as.Date(paste(format(last.date, '%d/%m'), date.year(last.date) - 1, sep='/'), '%d/%m/%Y')	
+	nlag = max( 0, nrow(temp[[1]]) - which.min(abs(index(temp[[1]]) - prev.year.last.date)) )
+	# nlag = len(last(temp[[1]], '12 months'))
    	yrange=c();   	   	
    	for( i in 1:n ) {
    		itemp = temp[[i]]
@@ -379,6 +382,8 @@ plotbt.monthly.table <- function(equity)
 	dates = index(equity)
 	equity = coredata(equity)
 
+# !!! endpoints 'months' not working on annual data
+	
 	# find period ends
 	month.ends = unique(c(endpoints(dates, 'months'), len(dates)))
 		month.ends = month.ends[month.ends>0]

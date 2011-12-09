@@ -106,7 +106,7 @@ bt.prep <- function
 	out = bt.merge(b, align, dates)
 	for( i in 1:nsymbols ) {
 		b[[ symbolnames[i] ]] = 
-			make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],], out$all.dates)
+			make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
 	}	
 
 	# dates
@@ -677,6 +677,19 @@ compute.cvar <- function(x, probs=0.05)
 	mean( x[ x < quantile(x, probs=probs) ] )
 }
 
+
+compute.stats <- function(data, fns) 
+{
+	out = matrix(double(), len(fns), len(data))
+		colnames(out) = names(data)
+		rownames(out) = names(fns)
+	for(c in 1:len(data)) {
+		for(r in 1:len(fns)) {
+			out[r,c] = match.fun(fns[[r]])(data[[c]])
+		}
+	}
+	return(out)
+}
 
 
 ###############################################################################
