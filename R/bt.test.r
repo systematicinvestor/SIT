@@ -507,7 +507,7 @@ bt.meom.test <- function()
 		position.score[!buy.rule] = NA
 	
 	# Strategy MEOM - top 2    
-	data$weight[] = NA;
+	data$weight[] = NA
 		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)		
 		data$weight[month.ends2,] = 0		
 		

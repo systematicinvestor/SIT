@@ -498,7 +498,7 @@ dev.off()
 # Forecast-Free Algorithms: A New Benchmark For Tactical Strategies
 # http://cssanalytics.wordpress.com/2011/08/09/forecast-free-algorithms-a-new-benchmark-for-tactical-strategies/
 #
-# Follow up FAQ: “Forecast-Free” Algorithms and Minimum Correlation Algorithm
+# Follow up FAQ: Forecast-Free Algorithms and Minimum Correlation Algorithm
 # http://cssanalytics.wordpress.com/2011/08/15/follow-up-faq-forecast-free-algorithms-and-minimum-correlation-algorithm/
 ###############################################################################
 aa.avg.cor.test <- function()

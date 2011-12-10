@@ -56,8 +56,8 @@ bt.merge <- function
 	
 	# find business days
 	all.dates = seq(temp[1], temp[2], by=1)
-		week.dates = date.dayofweek(all.dates)
-		all.dates = all.dates[!(week.dates == 0 | week.dates == 6)]
+#		week.dates = date.dayofweek(all.dates)
+#		all.dates = all.dates[!(week.dates == 0 | week.dates == 6)]
 	
 	# date map
 	date.map = matrix(NA, nr = len(all.dates), nsymbols)
@@ -102,12 +102,17 @@ bt.prep <- function
 	symbolnames = b$symbolnames
 	nsymbols = len(symbolnames) 
 	
-	# merge
-	out = bt.merge(b, align, dates)
-	for( i in 1:nsymbols ) {
-		b[[ symbolnames[i] ]] = 
-			make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
-	}	
+	if( nsymbols > 1 ) {
+		# merge
+		out = bt.merge(b, align, dates)
+		for( i in 1:nsymbols ) {
+			b[[ symbolnames[i] ]] = 
+				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
+		}	
+	} else {
+		if(!is.null(dates)) b[[ symbolnames[1] ]] = b[[ symbolnames[1] ]][dates,]	
+		out = list(all.dates = index(b[[ symbolnames[1] ]]) )
+	}
 
 	# dates
 	b$dates = out$all.dates
@@ -685,7 +690,7 @@ compute.stats <- function(data, fns)
 		rownames(out) = names(fns)
 	for(c in 1:len(data)) {
 		for(r in 1:len(fns)) {
-			out[r,c] = match.fun(fns[[r]])(data[[c]])
+			out[r,c] = match.fun(fns[[r]])( na.omit(data[[c]]) )
 		}
 	}
 	return(out)

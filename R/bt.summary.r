@@ -295,10 +295,13 @@ plotbt <- function
 		}
 	}
 
+	
 	# prepare plot
-	last.date = index(last(temp[[1]]))
-	prev.year.last.date = as.Date(paste(format(last.date, '%d/%m'), date.year(last.date) - 1, sep='/'), '%d/%m/%Y')	
-	nlag = max( 0, nrow(temp[[1]]) - which.min(abs(index(temp[[1]]) - prev.year.last.date)) )
+	#last.date = index(last(temp[[1]]))
+	#prev.year.last.date = last.date - 365
+	#nlag = max( 1, nrow(temp[[1]]) - which.min(abs(index(temp[[1]]) - prev.year.last.date)) )
+	nlag = max( 1, compute.annual.factor(temp[[1]]) )
+	
 	# nlag = len(last(temp[[1]], '12 months'))
    	yrange=c();   	   	
    	for( i in 1:n ) {
@@ -338,7 +341,7 @@ plotbt.transition.map <- function(weight)
 	icols=rainbow(ncol(weight), start=0, end=.9)	
 	
 	weight[is.na(weight)] = 0	
-	plota.stacked(index(weight), weight, col = icols)	
+	plota.stacked(index(weight), weight, col = icols, type='s')	
 }
 	
 ###############################################################################
@@ -379,26 +382,39 @@ plotbt.holdings.time <- function(weight)
 ###############################################################################
 plotbt.monthly.table <- function(equity) 
 {
-	dates = index(equity)
-	equity = coredata(equity)
+	equity = map2monthly(equity)
 
-# !!! endpoints 'months' not working on annual data
+	dates = index(equity)
+	equity = coredata(equity)	
 	
+# just keep both versions for now	
+if(T) {		
+	# find period ends
+	month.ends = date.month.ends(dates)
+	year.ends =  date.year.ends(dates[month.ends])
+		year.ends = month.ends[year.ends]
+	nr = len(year.ends) + 1
+		
+} else {		
 	# find period ends
 	month.ends = unique(c(endpoints(dates, 'months'), len(dates)))
 		month.ends = month.ends[month.ends>0]
 	year.ends =  unique(c(endpoints(dates[month.ends], 'years'), len(month.ends)))
 		year.ends = year.ends[year.ends>0]
 		year.ends = month.ends[year.ends]
-	nr = len(year.ends) + 1
-		
+	nr = len(year.ends) + 1	
+}
+	
+
+
+
 	# create plot matrix
 	temp = matrix( double(), nr, 12 + 2)
 		rownames(temp) = c(date.year(dates[year.ends]), 'Avg')
 		colnames(temp) = spl('Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec,Year,MaxDD')
 	
 	# compute yearly profit and drawdown
-	index = unique( c(1, year.ends) )
+	index = c(1, year.ends)
 	for(iyear in 2:len(index)) {
 		iequity = equity[ index[(iyear-1)] : index[iyear] ]
 		iequity = ifna( ifna.prev(iequity), 0)
@@ -408,10 +424,10 @@ plotbt.monthly.table <- function(equity)
 	}
 
 	# compute monthly profit
-	index = unique( c(1, month.ends) )
-		monthly.returns = diff(equity[index]) / equity[index[-len(index)]]
+	index = month.ends
+		monthly.returns = c(NA, diff(equity[index]) / equity[index[-len(index)]])
 		
-		index = date.month(range(dates[index[-1]]))
+		index = date.month(range(dates[index]))
 		monthly.returns = c( rep(NA, index[1]-1), monthly.returns, rep(NA, 12-index[2]) )
 		temp[1:(nr - 1), 1:12] = matrix(monthly.returns, ncol=12, byrow = T)
 			

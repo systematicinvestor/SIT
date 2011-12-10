@@ -141,21 +141,61 @@ run.count <- function
 ###############################################################################
 # Day of Week
 ############################################################################### 
-date.dayofweek <- function(ddate) 
+date.dayofweek <- function(dates) 
 {	
-	return(as.double(format(ddate, '%w')))
+	return(as.double(format(dates, '%w')))
+}
+
+date.day <- function(dates) 
+{	
+	return(as.double(format(dates, '%d')))
+}
+
+date.week <- function(dates) 
+{	
+	return(as.double(format(dates, '%U')))
 }
  
-date.year <- function(ddate) 
+date.month <- function(dates) 
 {	
-	return(as.double(format(ddate, '%Y')))
+	return(as.double(format(dates, '%m')))
 }
 
-date.month <- function(ddate) 
+date.year <- function(dates) 
 {	
-	return(as.double(format(ddate, '%m')))
+	return(as.double(format(dates, '%Y')))
 }
 
+
+date.week.ends <- function(dates) 
+{	
+	return( unique(c(which(diff( 100*date.year(dates) + date.week(dates) ) != 0), len(dates))) )
+}
+
+date.month.ends <- function(dates) 
+{	
+	return( unique(c(which(diff( 100*date.year(dates) + date.month(dates) ) != 0), len(dates))) )
+}
+
+date.year.ends <- function(dates) 
+{	
+	return( unique(c(which(diff( date.year(dates) ) != 0), len(dates))) )
+}
+
+map2monthly <- function(equity) 
+{
+	dates = index(equity)
+	equity = coredata(equity)
+
+	temp = as.Date(c('', 10000*date.year(dates) + 100*date.month(dates) + 1), '%Y%m%d')[-1]
+	new.dates = seq(temp[1], last(temp), by = 'month')		
+	
+	map = match( 100*date.year(dates) + date.month(dates), 100*date.year(new.dates) + date.month(new.dates) ) 
+	temp = rep(NA, len(new.dates))
+	temp[map] = equity
+	
+	return( make.xts( ifna.prev(temp), new.dates) )
+}
 
 
 ###############################################################################
