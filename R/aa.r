@@ -1145,6 +1145,8 @@ min.risk.portfolio <- function
 	binary.vec = 0
 	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
 	
+	if(is.null(ia$cov.temp)) ia$cov.temp = ia$cov
+	
 	sol = try(solve.QP.bounds(Dmat = ia$cov.temp, dvec = rep(0, nrow(ia$cov.temp)) , 
 		Amat=constraints$A, bvec=constraints$b, constraints$meq,
 		lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec),TRUE) 

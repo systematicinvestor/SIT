@@ -217,7 +217,8 @@ bt.run <- function
 	do.lag = 1, 		# lag signal
 	do.CarryLastObservationForwardIfNA = TRUE, 
 	type = c('weight', 'share'),
-	silent = F
+	silent = F,
+	capital = 100000
 ) 
 {
 	# setup
@@ -277,7 +278,7 @@ bt.run <- function
 
 	# prepare output
 	bt = list()
-		bt = bt.summary(weight, ret, type)
+		bt = bt.summary(weight, ret, type, capital)
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
@@ -299,7 +300,8 @@ bt.summary <- function
 (
 	weight, 	# signal / weights matrix
 	ret, 		# returns for type='weight' and prices for type='share'
-	type = c('weight', 'share')
+	type = c('weight', 'share'),
+	capital = 100000
 ) 
 {
 	type = type[1]
@@ -311,6 +313,7 @@ bt.summary <- function
     	
 	if( type == 'weight') {    	    	
     	bt$ret = make.xts(rowSums(ret * weight), index(ret))
+    	
     } else {
     	bt$share = weight
     	prices = ret
@@ -320,15 +323,36 @@ bt.summary <- function
 		prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
 		prices[] = prices1
 		
-   		if( all(weight>=0) ) {
-			portfolio.ret = rowSums(weight * prices, na.rm=T) / rowSums(weight * mlag(prices), na.rm=T) - 1
-			bt$weight = weight * mlag(prices) / rowSums(weight * mlag(prices), na.rm=T)
+		# new logic
+		cash = capital - rowSums(bt$share * mlag(prices), na.rm=T)
+		
+			# find trade dates
+			share.nextday = mlag(bt$share, -1)
+			tstart = bt$share != share.nextday & share.nextday != 0
+			
+			index = mlag(apply(tstart, 1, any))
+				index = ifna(index, FALSE)
+				
+				
+			totalcash = NA * cash
+				totalcash[index] = cash[index]
+			totalcash = ifna.prev(totalcash)
+		
+		portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
+		bt$weight = bt$share * mlag(prices) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) )
+		
+		
+		
+		if(F){
+   		if( all( bt$share >= 0) ) {
+			portfolio.ret = rowSums(bt$share * prices, na.rm=T) / rowSums(bt$share * mlag(prices), na.rm=T) - 1
+			bt$weight = bt$share * mlag(prices) / rowSums(bt$share * mlag(prices), na.rm=T)
 		} else { # short positions			
 			# cash left after transactions: for longs substract, for shorts add
-			cash = rowSums(abs(weight) * mlag(prices), na.rm=T) - rowSums(weight * mlag(prices), na.rm=T)
+			cash = rowSums(abs(bt$share) * mlag(prices), na.rm=T) - rowSums(bt$share * mlag(prices), na.rm=T)
 			
-			weight1 = mlag(weight, -1)
-			tstart = weight != weight1 & weight1 != 0
+			share1 = mlag(bt$share, -1)
+			tstart = bt$share != share1 & share1 != 0
 			
 			index = mlag(apply(tstart, 1, any))
 				index = ifna(index, FALSE)
@@ -337,9 +361,11 @@ bt.summary <- function
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
 				
-			portfolio.ret = (totalcash + rowSums(weight * prices, na.rm=T) ) / (totalcash + rowSums(weight * mlag(prices), na.rm=T) ) - 1
-			bt$weight = weight * mlag(prices) / (totalcash + rowSums(weight * mlag(prices), na.rm=T) )
+			portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1
+			bt$weight = bt$share * mlag(prices) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) )
 		}		
+		}
+		
 		bt$weight[is.na(bt$weight)] = 0		
 		bt$ret = make.xts(ifna(portfolio.ret,0), index(ret))
     }
@@ -592,6 +618,30 @@ dev.off()
 		plotbt.custom.report(sma.cross, buy.hold, trade.summary=T)
 	dev.off()	
 
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	
+	data$weight[] = NA
+		data$weight$SPY = 1
+	temp = bt.run(data)
+
+	data$weight[] = NA
+		data$weight$SPY = 2
+	temp = bt.run(data)
+
+	data$weight[] = NA
+		data$weight$SPY = 1
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	temp = bt.run(data, type='share', capital=capital)
+
+	data$weight[] = NA
+		data$weight$SPY = 2
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	temp = bt.run(data, type='share', capital=capital)
+	
 }
 
 

@@ -539,3 +539,137 @@ dev.off()
 
 			
 }
+
+
+
+###############################################################################
+# Forecast-Free Algorithms: A New Benchmark For Tactical Strategies
+# Rebalancing was done on a weekly basis and quarterly data was used to estimate correlations.
+# http://cssanalytics.wordpress.com/2011/08/09/forecast-free-algorithms-a-new-benchmark-for-tactical-strategies/
+#
+# Minimum Variance Sector Rotation
+# http://quantivity.wordpress.com/2011/04/20/minimum-variance-sector-rotation/
+#
+# The volatility mystery continues
+# http://www.portfolioprobe.com/2011/12/05/the-volatility-mystery-continues/
+###############################################################################
+bt.min.var.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,quadprog,lpSolve')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	data.weekly <- new.env()
+		for(i in tickers) data.weekly[[i]] = to.weekly(data[[i]], indexAt='endof')
+					
+	bt.prep(data, align='remove.na', dates='1990::2011')
+	bt.prep(data.weekly, align='remove.na', dates='1990::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	n = ncol(prices)
+	
+	# find week ends
+	week.ends = endpoints(prices, 'weeks')
+		week.ends = week.ends[week.ends > 0]		
+
+		
+	# Equal Weight 1/N Benchmark
+	data$weight[] = NA
+		data$weight[week.ends,] = ntop(prices[week.ends,], n)		
+		
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	equal.weight = bt.run(data, type='share')
+		
+	#*****************************************************************
+	# Create Constraints
+	#*****************************************************************
+	constraints = new.constraints(n, lb = -Inf, ub = +Inf)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+
+		
+	ret = prices / mlag(prices) - 1
+	weight = coredata(prices)
+		weight[] = NA
+		
+	for( i in week.ends[week.ends >= (63 + 1)] ) {
+		# one quarter = 63 days
+		hist = ret[ (i- 63 +1):i, ]
+		
+		# create historical input assumptions
+		ia = create.historical.ia(hist, 252)
+			s0 = apply(coredata(hist),2,sd)		
+			ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
+			
+		weight[i,] = min.risk.portfolio(ia, constraints)
+	}
+
+	# Minimum Variance
+	data$weight[] = weight		
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	min.var.daily = bt.run(data, type='share', capital=capital)
+
+	#*****************************************************************
+	# Code Strategies: Weekly
+	#****************************************************************** 
+	
+	retw = data.weekly$prices / mlag(data.weekly$prices) - 1
+	weightw = coredata(prices)
+		weightw[] = NA
+	
+	for( i in week.ends[week.ends >= (63 + 1)] ) {	
+		# map
+		j = which(index(ret[i,]) == index(retw))
+		
+		# one quarter = 13 weeks
+		hist = retw[ (j- 13 +1):j, ]
+		
+		# create historical input assumptions
+		ia = create.historical.ia(hist, 52)
+			s0 = apply(coredata(hist),2,sd)		
+			ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
+
+		weightw[i,] = min.risk.portfolio(ia, constraints)
+	}	
+		
+	data$weight[] = weightw		
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	min.var.weekly = bt.run(data, type='share', capital=capital)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+	
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(min.var.weekly, min.var.daily, equal.weight)
+dev.off()	
+
+png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(min.var.weekly, min.var.daily, equal.weight)
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	layout(1:2)
+	plotbt.transition.map(min.var.daily$weight)
+		legend('topright', legend = 'min.var.daily', bty = 'n')
+	plotbt.transition.map(min.var.weekly$weight)
+		legend('topright', legend = 'min.var.weekly', bty = 'n')
+dev.off()	
+
+}
+

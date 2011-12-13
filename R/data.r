@@ -246,3 +246,4 @@ dow.jones.components <- function()
 # pracma package
 # http://exploringdatablog.blogspot.com/2011/11/cleaning-time-series-and-other-data.html
 # Renamed outlierMAD() to hampel()	
+
