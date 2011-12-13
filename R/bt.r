@@ -332,8 +332,7 @@ bt.summary <- function
 			
 			index = mlag(apply(tstart, 1, any))
 				index = ifna(index, FALSE)
-				
-				
+								
 			totalcash = NA * cash
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
@@ -341,30 +340,7 @@ bt.summary <- function
 		portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
 		bt$weight = bt$share * mlag(prices) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) )
 		
-		
-		
-		if(F){
-   		if( all( bt$share >= 0) ) {
-			portfolio.ret = rowSums(bt$share * prices, na.rm=T) / rowSums(bt$share * mlag(prices), na.rm=T) - 1
-			bt$weight = bt$share * mlag(prices) / rowSums(bt$share * mlag(prices), na.rm=T)
-		} else { # short positions			
-			# cash left after transactions: for longs substract, for shorts add
-			cash = rowSums(abs(bt$share) * mlag(prices), na.rm=T) - rowSums(bt$share * mlag(prices), na.rm=T)
-			
-			share1 = mlag(bt$share, -1)
-			tstart = bt$share != share1 & share1 != 0
-			
-			index = mlag(apply(tstart, 1, any))
-				index = ifna(index, FALSE)
-				
-			totalcash = NA * cash
-				totalcash[index] = cash[index]
-			totalcash = ifna.prev(totalcash)
-				
-			portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1
-			bt$weight = bt$share * mlag(prices) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) )
-		}		
-		}
+
 		
 		bt$weight[is.na(bt$weight)] = 0		
 		bt$ret = make.xts(ifna(portfolio.ret,0), index(ret))

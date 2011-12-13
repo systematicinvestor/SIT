@@ -182,8 +182,11 @@ date.year.ends <- function(dates)
 	return( unique(c(which(diff( date.year(dates) ) != 0), len(dates))) )
 }
 
+# map any time series to monthly
 map2monthly <- function(equity) 
 {
+	#a = coredata(Cl(to.monthly(equal.weight$equity)))
+
 	dates = index(equity)
 	equity = coredata(equity)
 
@@ -194,8 +197,25 @@ map2monthly <- function(equity)
 	temp = rep(NA, len(new.dates))
 	temp[map] = equity
 	
+	#range(a - temp)
+	
 	return( make.xts( ifna.prev(temp), new.dates) )
 }
+
+
+# http://www.mysmp.com/options/options-expiration-week.html
+# The week beginning on Monday prior to the Saturday of options expiration is referred to as options expiration week. 
+# Since the markets are closed on Saturday, the third Friday of each month represents options expiration.
+# If the third Friday of the month is a holiday, all trading dates are moved forward; meaning that Thursday will be the last trading day to exercise options.
+# http://www.cboe.com/TradTool/ExpirationCalendar.aspx
+
+# The expiration date of stock options (3rd Friday of the month)
+# http://bytes.com/topic/python/answers/161147-find-day-week-month-year
+third.friday.month <- function(year, month)
+{
+	c(20,19,18,17,16,15,21)[1 + date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )]
+}
+
 
 
 ###############################################################################
