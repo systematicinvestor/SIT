@@ -255,7 +255,7 @@ dev.off()
 		
 		capital = 100000
 		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	roc.cross.share = bt.run(data, type='share', trade.summary=T)					
+	roc.cross.share = bt.run(data, type='share', trade.summary=T, capital=capital)					
 		
 
 	#*****************************************************************
@@ -307,7 +307,7 @@ bt.rotational.trading.test <- function()
 		data$weight[month.ends,] = ntop(prices, n)[month.ends,]	
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	equal.weight = bt.run(data, type='share')
+	equal.weight = bt.run(data, type='share', capital=capital)
 		
 			
 	# Rank on 6 month return
@@ -318,14 +318,14 @@ bt.rotational.trading.test <- function()
 		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)	
 		capital = 100000
 		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
-	top2 = bt.run(data, type='share', trade.summary=T)
+	top2 = bt.run(data, type='share', trade.summary=T, capital=capital)
 
 	# Seletop Top 2 funds,  and Keep then till they are in 1:6 rank
 	data$weight[] = NA
 		data$weight[month.ends,] = ntop.keep(position.score[month.ends,], 2, 6)	
 		capital = 100000
 		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
-	top2.keep6 = bt.run(data, type='share', trade.summary=T)
+	top2.keep6 = bt.run(data, type='share', trade.summary=T, capital=capital)
 	
 	#*****************************************************************
 	# Create Report
@@ -399,7 +399,7 @@ bt.timing.model.test <- function()
 		data$weight[month.ends,] = ntop(prices.select, n)[month.ends,]	
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	equal.weight = bt.run(data, type='share')
+	equal.weight = bt.run(data, type='share', capital=capital)
 		
 	# BuyRule, price > 10 month SMA
 	buy.rule = prices > bt.apply.matrix(prices, function(x) { SMA(x, 200) } )		
@@ -416,7 +416,7 @@ bt.timing.model.test <- function()
 		data$weight[month.ends,] = weight		
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	timing = bt.run(data, type='share', trade.summary=T)
+	timing = bt.run(data, type='share', trade.summary=T, capital=capital)
 	
 	#*****************************************************************
 	# Create Report
@@ -472,7 +472,7 @@ bt.meom.test <- function()
 		
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	meom.equal.weight = bt.run(data, type='share')
+	meom.equal.weight = bt.run(data, type='share', capital=capital)
 
 	#*****************************************************************
 	# Rank1 = MA( C/Ref(C,-2), 5 ) * MA( C/Ref(C,-2), 40 )
@@ -496,7 +496,7 @@ bt.meom.test <- function()
 		
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	meom.top2.rank1 = bt.run(data, type='share', trade.summary=T)
+	meom.top2.rank1 = bt.run(data, type='share', trade.summary=T, capital=capital)
 	
 	#*****************************************************************
 	# Rank2 = MA( C/Ref(C,-2), 5 ) * Ref( MA( C/Ref(C,-2), 10 ), -5 )
@@ -513,7 +513,7 @@ bt.meom.test <- function()
 		
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	meom.top2.rank2 = bt.run(data, type='share', trade.summary=T)	
+	meom.top2.rank2 = bt.run(data, type='share', trade.summary=T, capital=capital)
 	
 	#*****************************************************************
 	# Create Report
@@ -589,7 +589,7 @@ bt.min.var.test <- function()
 		
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
-	equal.weight = bt.run(data, type='share')
+	equal.weight = bt.run(data, type='share', capital=capital)
 		
 	#*****************************************************************
 	# Create Constraints
