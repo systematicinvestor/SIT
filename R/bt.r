@@ -316,6 +316,7 @@ bt.summary <- function
     	
     } else {
     	bt$share = weight
+    	bt$capital = capital
     	prices = ret
     		
     	# backfill prices
@@ -353,6 +354,70 @@ bt.summary <- function
     	
     return(bt)    
 }
+
+###############################################################################
+# Portfolio turnover	
+# http://wiki.fool.com/Portfolio_turnover
+# sales or purchases and dividing it by the average monthly value of the fund's assets
+###############################################################################
+compute.turnover <- function
+(	
+	bt,		# backtest object
+	b 		# enviroment with symbols time series
+) 
+{ 
+	year.ends =  unique(c(endpoints(index(bt$weight), 'years'), nrow(bt$weight)))	
+		year.ends = year.ends[year.ends>0]	
+		nr = len(year.ends)
+	period.index = c(1, year.ends)
+
+	
+	if( bt$type == 'weight') {    	    	
+		portfolio.value = rowSums(abs(bt$weight), na.rm=T)
+		portfolio.turnover = rowSums( abs(bt$weight - mlag(bt$weight)) )
+	} else {
+		# logic from bt.summary function				
+		cash = bt$capital - rowSums(bt$share * mlag(b$prices), na.rm=T)
+		
+			# find trade dates
+			share.nextday = mlag(bt$share, -1)
+			tstart = bt$share != share.nextday & share.nextday != 0
+			
+			index = mlag(apply(tstart, 1, any))
+				index = ifna(index, FALSE)
+								
+			totalcash = NA * cash
+				totalcash[index] = cash[index]
+			totalcash = ifna.prev(totalcash)
+		
+		portfolio.value = totalcash + rowSums(bt$share * mlag(b$prices), na.rm=T)		
+		
+		portfolio.turnover = rowSums( mlag(b$prices) * abs(bt$share - mlag(bt$share)) )				
+	}
+	
+	portfolio.turnover[1:2] = 0
+	temp = NA * period.index			
+	for(iyear in 2:len(period.index)) {
+		temp[iyear] = sum( portfolio.turnover[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T) / 
+						mean( portfolio.value[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T)			
+	}
+	return( mean(temp, na.rm=T) )			
+}
+
+
+###############################################################################
+# Compute Portfolio Maximum Deviation
+###############################################################################
+compute.max.deviation <- function
+(
+	bt,
+	target.allocation
+)
+{
+	weight = bt$weight[-1,]
+	max(abs(weight - repmat(target.allocation, nrow(weight), 1)))
+}
+
 
 ###############################################################################
 # Backtest Trade summary

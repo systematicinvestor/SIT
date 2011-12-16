@@ -335,13 +335,18 @@ plotbt <- function
 ###############################################################################
 # Plot Transition Map
 ###############################################################################
-plotbt.transition.map <- function(weight) 
+plotbt.transition.map <- function
+(
+	weight,
+	name = '',
+	col = rainbow(ncol(weight), start=0, end=.9)
+) 
 {
 	par(mar=c(2, 4, 1, 1), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
-	icols=rainbow(ncol(weight), start=0, end=.9)	
+	
 	
 	weight[is.na(weight)] = 0	
-	plota.stacked(index(weight), weight, col = icols, type='s')	
+	plota.stacked(index(weight), weight, col = col, type='s', main = iif(nchar(name) > 0, paste('Transition Map for', name), ''))	
 }
 	
 ###############################################################################

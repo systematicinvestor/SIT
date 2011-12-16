@@ -213,7 +213,9 @@ map2monthly <- function(equity)
 # http://bytes.com/topic/python/answers/161147-find-day-week-month-year
 third.friday.month <- function(year, month)
 {
-	c(20,19,18,17,16,15,21)[1 + date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )]
+	day = date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )
+	day = c(20,19,18,17,16,15,21)[1 + day]
+	return(as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1])
 }
 
 

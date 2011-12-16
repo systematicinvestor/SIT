@@ -65,8 +65,8 @@ extract.table.from.webpage <- function
 		temp = t( sapply(temp[[1]], function(x) x[1:n]) )
 		
 		if(hasHeader) {
-			colnames(temp) = temp[1, ]
-			temp = temp[-1, ]
+			colnames(temp) = temp[(hasHeader + 0), ]
+			temp = temp[-c(1:(hasHeader + 0)), ]
 		}
 
 	}, error = function(ex) {
@@ -240,7 +240,21 @@ dow.jones.components <- function()
 	return(tickers)
 }
 	
-	
+###############################################################################
+# Get NASDAQ 100 Components
+# http://www.nasdaq.com/markets/indices/nasdaq-100.aspx
+###############################################################################
+nasdaq.100.components <- function()
+{
+	url = 'http://www.nasdaq.com/markets/indices/nasdaq-100.aspx'
+	txt = join(readLines(url))
+
+	# extract table from this page
+	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = 2)
+	tickers = temp[, 'Symbol']
+
+	return(tickers)
+}
 	
 
 # pracma package

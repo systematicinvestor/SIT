@@ -673,3 +673,180 @@ dev.off()
 
 }
 
+
+###############################################################################
+# Investigate Rebalancing methods:
+# 1. Periodic Rebalancing: rebalance to the target mix every month, quarter, year.
+# 2. Maximum Deviation Rebalancing: rebalance to the target mix when asset weights deviate more than a given percentage from the target mix.
+# 3. Same as 2, but rebalance half-way to target
+###############################################################################
+
+# helper function to create barplot with labels
+barplot.with.labels <- function(data, main, plotX = TRUE) {
+	par(mar=c( iif(plotX, 6, 2), 4, 2, 2))
+	x = barplot(100 * data, main = main, las = 2, names.arg = iif(plotX, names(data), ''))
+	# http://r.789695.n4.nabble.com/Highliting-a-text-in-a-plot-td828378.html
+	text(x, 100 * data, round(100 * data,1), adj=c(0.5,1), xpd = TRUE)
+}
+
+bt.rebalancing.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	tickers = spl('SPY,TLT')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='remove.na', dates='1900::2011')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	nperiods = nrow(prices)
+	target.allocation = matrix(c(0.5, 0.5), nrow=1)
+	
+	# Buy & Hold	
+	data$weight[] = NA	
+		data$weight[1,] = target.allocation
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	buy.hold = bt.run(data, type='share', capital=capital)
+
+	
+	# Rebalance periodically
+	models = list()
+	for(period in spl('months,quarters,years')) {
+		data$weight[] = NA	
+			data$weight[1,] = target.allocation
+			
+			period.ends = endpoints(prices, period)
+				period.ends = period.ends[period.ends > 0]		
+			data$weight[period.ends,] = repmat(target.allocation, len(period.ends), 1)
+						
+			capital = 100000
+			data$weight[] = (capital / prices) * data$weight
+		models[[period]] = bt.run(data, type='share', capital=capital)	
+	}
+	models$buy.hold = buy.hold				
+	
+	# Compute Portfolio Turnover 
+	compute.turnover(models$years, data)		
+	
+	# Compute Portfolio Maximum Deviation
+	compute.max.deviation(models$years, target.allocation)		
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 				
+	# put all reports into one pdf file
+	pdf(file = 'report.pdf', width=8.5, height=11)
+		plotbt.custom.report(models)
+	dev.off()	
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(models)
+dev.off()	
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	# Plot BuyHold and Monthly Rebalancing Weights
+	layout(1:2)
+	plotbt.transition.map(models$buy.hold$weight, 'buy.hold', spl('red,orange'))
+		abline(h=50)
+	plotbt.transition.map(models$months$weight, 'months', spl('red,orange'))
+		abline(h=50)		
+dev.off()
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each Rebalancing method
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	
+
+	#*****************************************************************
+	# Code Strategies that rebalance based on maximum deviation
+	#****************************************************************** 
+	
+	# rebalance to target.allocation when portfolio weights are 5% away from target.allocation
+	models$smart5.all = bt.max.deviation.rebalancing(data, buy.hold, target.allocation, 5/100, 0) 
+	
+	# rebalance half-way to target.allocation when portfolio weights are 5% away from target.allocation
+	models$smart5.half = bt.max.deviation.rebalancing(data, buy.hold, target.allocation, 5/100, 0.5) 
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 			
+			
+png(filename = 'plot4.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')
+	# Plot BuyHold, Years and Max Deviation Rebalancing Weights	
+	layout(1:4)
+	plotbt.transition.map(models$buy.hold$weight, 'buy.hold', spl('red,orange'))
+		abline(h=50)
+	plotbt.transition.map(models$smart5.all$weight, 'Max Deviation 5%, All the way', spl('red,orange'))
+		abline(h=50)
+	plotbt.transition.map(models$smart5.half$weight, 'Max Deviation 5%, Half the way', spl('red,orange'))
+		abline(h=50)
+	plotbt.transition.map(models$years$weight, 'years', spl('red,orange'))
+		abline(h=50)
+dev.off()	
+
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each Rebalancing method
+	layout(1:2)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover', F)
+	barplot.with.labels(sapply(models, compute.max.deviation, target.allocation), 'Maximum Deviation from Target Mix')
+dev.off()
+
+png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Strategy Statistics  Side by Side
+	plotbt.strategy.sidebyside(models)
+dev.off()	
+	
+}
+
+
+# Rebalancing method based on maximum deviation
+bt.max.deviation.rebalancing <- function
+(
+	data,
+	model, 
+	target.allocation, 
+	max.deviation = 3/100, 
+	rebalancing.ratio = 0	# 0 means rebalance all-way to target.allocation
+							# 0.5 means rebalance half-way to target.allocation
+) 
+{
+	start.index = 1
+	nperiods = nrow(model$weight)
+	action.index = rep(F, nperiods)
+	
+	while(T) {	
+		# find rows that violate max.deviation
+		weight = model$weight
+		index = which( apply(abs(weight - repmat(target.allocation, nperiods, 1)), 1, max) > max.deviation)	
+	
+		if( len(index) > 0 ) {
+			index = index[ index > start.index ]
+		
+			if( len(index) > 0 ) {
+				action.index[index[1]] = T
+				
+				data$weight[] = NA	
+					data$weight[1,] = target.allocation
+					
+					temp = repmat(target.allocation, sum(action.index), 1)
+					data$weight[action.index,] = temp + 
+						rebalancing.ratio * (weight[action.index,] - temp)					
+					
+					capital = 100000
+					data$weight[] = (capital / data$prices) * data$weight
+				model = bt.run(data, type='share', capital=capital, silent=T)	
+				start.index = index[1]
+			} else break			
+		} else break		
+	}
+	return(model)
+}
