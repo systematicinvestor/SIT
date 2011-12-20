@@ -487,7 +487,7 @@ bt.meom.test <- function()
 	
 	# Rank1 = MA( C/Ref(C,-2), 5 ) * MA( C/Ref(C,-2), 40 )
 	position.score = bt.apply.matrix(ret2, SMA, 5) * bt.apply.matrix(ret2, SMA, 40)
-		position.score[!buy.rule] = NA
+		position.score[!buy.rule,] = NA
 			
 	# Strategy MEOM - top 2    
 	data$weight[] = NA;
@@ -504,7 +504,7 @@ bt.meom.test <- function()
 	
 	# Rank2 = MA( C/Ref(C,-2), 5 ) * Ref( MA( C/Ref(C,-2), 10 ), -5 )
 	position.score = bt.apply.matrix(ret2, SMA, 5) * mlag( bt.apply.matrix(ret2, SMA, 10), 5)
-		position.score[!buy.rule] = NA
+		position.score[!buy.rule,] = NA
 	
 	# Strategy MEOM - top 2    
 	data$weight[] = NA
@@ -537,6 +537,33 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 	plotbt.custom.report.part3(meom.top2.rank2, meom.top2.rank1, meom.equal.weight, equal.weight, trade.summary=T)
 dev.off()	
 
+	#*****************************************************************
+	# Modify MEOM logic -  maybe sell in 1 day
+	#****************************************************************** 
+	
+	month.ends1 = iif(month.ends + 1 > nperiods, nperiods, month.ends + 1)
+		
+	# Strategy MEOM - top 2, maybe sell in 1 day
+	data$weight[] = NA
+		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)		
+		data$weight[month.ends2,] = 0		
+
+		# Close next day if Today’s Close > Today’s Open
+		popen = bt.apply(data, Op)
+		data$weight[month.ends1,] = iif((prices > popen)[month.ends1,], 0, NA)		
+				
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	meom.top2.rank2.hold12 = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(meom.top2.rank2.hold12, meom.top2.rank2, meom.top2.rank1, meom.equal.weight, equal.weight, trade.summary=T)
+dev.off()	
+
+png(filename = 'plot5.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(meom.top2.rank2.hold12, meom.top2.rank2, meom.top2.rank1, meom.equal.weight, equal.weight, trade.summary=T)
+dev.off()	
+	
 			
 }
 
@@ -738,7 +765,7 @@ bt.rebalancing.test <- function()
 	
 	# Compute Portfolio Maximum Deviation
 	compute.max.deviation(models$years, target.allocation)		
-	
+		
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 				
@@ -805,6 +832,31 @@ png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize =
 	plotbt.strategy.sidebyside(models)
 dev.off()	
 	
+	#*****************************************************************
+	# Periodic Rebalancing Seasonality
+	#****************************************************************** 			
+	# maQuant annual rebalancing (september/october showed the best results)	
+	months = spl('Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')		
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]		
+	models = list()
+	for(i in 1:12) {
+		index = which( date.month(index(prices)[period.ends]) == i )
+		data$weight[] = NA	
+			data$weight[1,] = target.allocation			
+			data$weight[period.ends[index],] = repmat(target.allocation, len(index), 1)
+						
+			capital = 100000
+			data$weight[] = (capital / prices) * data$weight
+		models[[ months[i] ]] = bt.run(data, type='share', capital=capital)	
+	}
+
+png(filename = 'plot7.png', width = 1200, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	plotbt.strategy.sidebyside(models)
+dev.off()	
+		
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
 }
 
 
@@ -849,4 +901,201 @@ bt.max.deviation.rebalancing <- function
 		} else break		
 	}
 	return(model)
+}
+
+
+###############################################################################
+# Rotational Trading: how to reduce trades and improve returns by Frank Hassler
+# http://engineering-returns.com/2011/07/06/rotational-trading-how-to-reducing-trades-and-improve-returns/
+###############################################################################
+# Custom Summary function to replicate tables from Engineering Returns
+engineering.returns.kpi <- function
+(
+	bt,		# backtest object
+	trade.summary = NULL
+) 
+{	
+	if( !is.null(bt$trade.summary) ) trade.summary = bt$trade.summary
+	
+	out = list()
+	out$Period = join( format( range(index(bt$equity)), '%b%Y'), ' - ')
+		
+	out$Cagr = compute.cagr(bt$equity)
+	out$DVR = compute.DVR(bt)
+	out$Sharpe = compute.sharpe(bt$ret)		
+	out$R2 = compute.R2(bt$equity)
+		
+	if( !is.null(trade.summary) ) {
+		out$Win.Percent = trade.summary$stats['win.prob', 'All']
+		out$Avg.Trade = trade.summary$stats['avg.pnl', 'All']
+	}
+		
+	out$MaxDD = compute.max.drawdown(bt$equity)
+
+	# format
+	out = lapply(out, function(x) if(is.double(x)) round(100*x,1) else x)
+				
+	if( !is.null(trade.summary) ) out$Num.Trades = trade.summary$stats['ntrades', 'All']			
+			
+	return( list(System=out))
+}
+
+
+bt.rotational.trading.trades.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU,IWB,IWD,IWF,IWM,IWN,IWO,IWP,IWR,IWS,IWV,IWW,IWZ')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies : weekly rebalancing
+	#****************************************************************** 
+	prices = data$prices  
+	n = len(tickers)  
+
+	# find week ends
+	week.ends = endpoints(prices, 'weeks')
+		week.ends = week.ends[week.ends > 0]		
+
+		
+	# Rank on ROC 200
+	position.score = prices / mlag(prices, 200)	
+		position.score.ma = position.score		
+		buy.rule = T
+
+	# Select Top 2 funds daily
+	data$weight[] = NA
+		data$weight[] = ntop(position.score, 2)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)				
+	top2.d = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+	# Select Top 2 funds weekly
+	data$weight[] = NA
+		data$weight[week.ends,] = ntop(position.score[week.ends,], 2)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.w = bt.run(data, type='share', trade.summary=T, capital=capital)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Strategy Metrics Side by Side
+	plotbt.strategy.sidebyside(top2.d, top2.w, perfromance.fn = 'engineering.returns.kpi')	
+dev.off()
+	
+	#*****************************************************************
+	# Code Strategies : different entry/exit rank
+	#****************************************************************** 
+	
+	# Select Top 2 funds, Keep till they are in 4/6 rank
+	data$weight[] = NA
+		data$weight[] = ntop.keep(position.score, 2, 4)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.d.keep4 = bt.run(data, type='share', trade.summary=T, capital=capital)
+	
+	data$weight[] = NA
+		data$weight[] = ntop.keep(position.score, 2, 6)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.d.keep6 = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')				
+	# Plot Strategy Metrics Side by Side
+	plotbt.strategy.sidebyside(top2.d, top2.d.keep4, top2.d.keep6, perfromance.fn = 'engineering.returns.kpi')
+dev.off()
+
+	#*****************************************************************
+	# Code Strategies : Rank smoothing
+	#****************************************************************** 
+
+	models = list()
+	models$Bench = top2.d
+	for( avg in spl('SMA,EMA') ) {
+		for( i in c(3,5,10,20) ) {		
+			position.score.smooth = bt.apply.matrix(position.score.ma, avg, i)	
+				position.score.smooth[!buy.rule,] = NA
+			
+			data$weight[] = NA
+				data$weight[] = ntop(position.score.smooth, 2)	
+				capital = 100000
+				data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+			models[[ paste(avg,i) ]] = bt.run(data, type='share', trade.summary=T, capital=capital)		
+		}
+	}
+		
+png(filename = 'plot3.png', width = 1200, height = 600, units = 'px', pointsize = 12, bg = 'white')				
+	# Plot Strategy Metrics Side by Side
+	plotbt.strategy.sidebyside(models, perfromance.fn = 'engineering.returns.kpi')
+dev.off()
+	
+	#*****************************************************************
+	# Code Strategies : Combination
+	#****************************************************************** 
+
+	# Select Top 2 funds daily, Keep till they are 6 rank, Smooth Rank by 10 day EMA
+	position.score.smooth = bt.apply.matrix(position.score.ma, 'EMA', 10)	
+		position.score.smooth[!buy.rule,] = NA
+	data$weight[] = NA
+		data$weight[] = ntop.keep(position.score.smooth, 2, 6)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.d.keep6.EMA10 = bt.run(data, type='share', trade.summary=T, capital=capital)
+		
+	# Select Top 2 funds weekly, Keep till they are 6 rank
+	data$weight[] = NA
+		data$weight[week.ends,] = ntop.keep(position.score[week.ends,], 2, 6)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.w.keep6 = bt.run(data, type='share', trade.summary=T, capital=capital)
+	
+	# Select Top 2 funds weekly, Keep till they are 6 rank, Smooth Rank by 10 week EMA
+	position.score.smooth[] = NA
+		position.score.smooth[week.ends,] = bt.apply.matrix(position.score.ma[week.ends,], 'EMA', 10)	
+			position.score.smooth[!buy.rule,] = NA
+	
+	data$weight[] = NA
+		data$weight[week.ends,] = ntop.keep(position.score.smooth[week.ends,], 2, 6)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
+	top2.w.keep6.EMA10 = bt.run(data, type='share', trade.summary=T, capital=capital)
+	
+		
+png(filename = 'plot4.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')				
+	# Plot Strategy Metrics Side by Side
+	plotbt.strategy.sidebyside(top2.d, top2.d.keep6, top2.d.keep6.EMA10, top2.w, top2.w.keep6, top2.w.keep6.EMA10, perfromance.fn = 'engineering.returns.kpi')
+dev.off()
+	
+
+
+
+	#*****************************************************************
+	# Possible Improvements to reduce drawdowns
+	#****************************************************************** 
+	# Equal Weight
+	data$weight[] = ntop(prices, n)
+	ew = bt.run(data)	
+
+	# Avoiding severe draw downs
+	# http://engineering-returns.com/2010/07/26/rotational-trading-system/
+	# Only trade the system when the index is either above the 200 MA or 30 MA
+	# Usually these severe draw downs  happen bellow the 200MA average and 
+	# the second 30 MA average will help to get in when the recovery happens	
+	buy.rule = (ew$equity > SMA(ew$equity,200)) | (ew$equity > SMA(ew$equity,30))
+	buy.rule = (ew$equity > SMA(ew$equity,200))
+		buy.rule = ifna(buy.rule, F)
+		    	
+	# Rank using TSI by Frank Hassler, TSI is already smoothed and slow varying, 
+	# so SMA will filter will not very effective
+	#http://engineering-returns.com/tsi/
+	position.score = bt.apply(data, function(x) TSI(HLC(x)) )		
+		position.score.ma = position.score
+		position.score[!buy.rule,] = NA
+		
 }

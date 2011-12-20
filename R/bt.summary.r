@@ -254,14 +254,15 @@ bt.detail.summary <- function
 plotbt.strategy.sidebyside <- function
 ( 
 	... , 
-	perfromance.metric = spl('System,Trade,Period') 
+	perfromance.metric = spl('System,Trade,Period'), 
+	perfromance.fn = 'bt.detail.summary'
 ) 
 {
 	models = variable.number.arguments( ... )
 	out = list()
 	
 	for( i in 1:len(models) ) {
-		out[[ names(models)[i] ]] = bt.detail.summary(models[[ i ]])[[ perfromance.metric[1] ]]
+		out[[ names(models)[i] ]] = match.fun(perfromance.fn)(models[[ i ]])[[ perfromance.metric[1] ]]
 	}
 	plot.table( list2matrix(out, keep.names=F), smain = perfromance.metric[1] )
 }

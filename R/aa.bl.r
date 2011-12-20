@@ -25,9 +25,6 @@
 ###############################################################################
 # He & Litterman: The intuition Behind Black- Litterman Model Portfolios
 # T. Idzorek: A STEP-BY-STEP GUIDE TO THE BLACK-LITTERMAN MODEL
-
-
-# T. Idzorek: A STEP-BY-STEP GUIDE TO THE BLACK-LITTERMAN MODEL
 # note (5)
 #
 bl.compute.risk.aversion <- function(bench, risk.free = 0)
