@@ -187,6 +187,8 @@ map2monthly <- function(equity)
 {
 	#a = coredata(Cl(to.monthly(equal.weight$equity)))
 
+	if(compute.annual.factor(equity) >= 12) return(equity)
+	
 	dates = index(equity)
 	equity = coredata(equity)
 

@@ -1075,6 +1075,8 @@ dev.off()
 
 
 
+
+
 	#*****************************************************************
 	# Possible Improvements to reduce drawdowns
 	#****************************************************************** 
@@ -1099,3 +1101,103 @@ dev.off()
 		position.score[!buy.rule,] = NA
 		
 }
+
+
+
+###############################################################################
+# Charting the Santa Claus Rally
+# http://ibankcoin.com/woodshedderblog/2011/12/15/charting-the-santa-claus-rally/
+#
+# Trading Calendar
+# http://www.cxoadvisory.com/trading-calendar/
+###############################################################################
+bt.december.trading.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na', dates='1970::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices  
+	n = len(tickers)  
+	ret = prices / mlag(prices) - 1
+
+	
+	# find prices in December
+	dates = index(prices)
+	years = date.year(dates)	
+	index = which(date.month(dates) == 12)
+	
+	# rearrange data in trading days
+	trading.days = sapply(tapply(ret[index,], years[index], function(x) coredata(x)), function(x) x[1:22])
+		
+	# average return each trading days, excluding current year
+	avg.trading.days = apply(trading.days[, -ncol(trading.days)], 1, mean, na.rm=T)
+	current.year = trading.days[, ncol(trading.days)]
+	
+	# cumulative
+	avg.trading.days = 100 * ( cumprod(1 + avg.trading.days) - 1 )
+	current.year = 100 * ( cumprod(1 + current.year) - 1 )
+	
+	#*****************************************************************
+	# Create Plot
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	# plot	
+	par(mar=c(4,4,1,1))
+	plot(avg.trading.days, type='b', col=1,
+		ylim=range(avg.trading.days,current.year,na.rm=T),
+		xlab = 'Number of Trading Days in December',
+		ylab = 'Avg % Profit/Loss'
+		)
+		lines(current.year, type='b', col=2)
+	grid()
+	plota.legend('Avg SPY,SPY Dec 2011', 1:2)
+dev.off()	
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	# Buy & Hold	
+	data$weight[] = 1
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	buy.hold = bt.run(data, type='share', capital=capital)
+
+	
+	# Find Last trading days in November and December
+	index = which(date.month(dates) == 11)
+	last.day.november = match(tapply(dates[index], years[index], function(x) tail(x,1)), dates)
+	index = which(date.month(dates) == 12)
+	last.day.december = match(tapply(dates[index], years[index], function(x) tail(x,1)), dates)
+	
+	# December
+	data$weight[] = NA	
+		data$weight[last.day.november,] = 1
+		data$weight[last.day.december,] = 0
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	december = bt.run(data, type='share', capital=capital, trade.summary=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	plotbt.custom.report.part1(december, buy.hold, trade.summary=T)	
+dev.off()	
+
+png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(december, buy.hold, trade.summary=T)	
+dev.off()	
+	
+}
+
