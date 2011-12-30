@@ -205,6 +205,27 @@ map2monthly <- function(equity)
 }
 
 
+# create monthly table
+create.monthly.table <- function(monthly.data) 
+{
+	nperiods = nrow(monthly.data)
+	
+	years = date.year(index(monthly.data[c(1,nperiods)]))
+		years = years[1] : years[2]
+
+	# create monthly matrix
+	temp = matrix( double(), len(years), 12)
+		rownames(temp) = years
+		colnames(temp) = spl('Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
+	
+	# align months
+	index = date.month(index(monthly.data[c(1,nperiods)]))
+	temp[] = matrix( c( rep(NA, index[1]-1), monthly.data, rep(NA, 12-index[2]) ), ncol=12, byrow = T)
+		
+	return(temp)
+}
+		
+
 # http://www.mysmp.com/options/options-expiration-week.html
 # The week beginning on Monday prior to the Saturday of options expiration is referred to as options expiration week. 
 # Since the markets are closed on Saturday, the third Friday of each month represents options expiration.
@@ -274,6 +295,7 @@ toc <- function
     } else {
     	cat('Toc error\n')
     }    
+    return (paste('Elapsed time is', round(diffTimeSecs,2), 'seconds', sep=' '))
 }
 
 ###############################################################################
@@ -392,7 +414,7 @@ make.xts <- function
 ###############################################################################
 # Write XTS object to file
 ###############################################################################
-write_xts <- function
+write.xts <- function
 (
 	x,			# XTS object
 	filename	# file name
@@ -401,3 +423,21 @@ write_xts <- function
 	write.csv(x, row.names = index(x), filename)	
 }
 
+###############################################################################
+# Work with file names
+###############################################################################
+get.extension <- function(x) 
+{ 
+	trim( tail(spl(x,'\\.'),1) ) 
+}	
+
+get.full.filename <- function(x) 
+{ 
+	trim( tail(spl(gsub('\\\\','/',x),'/'),1) ) 
+}
+
+get.filename <- function(x) 
+{ 
+	temp = spl(get.full.filename(x),'\\.')
+	join(temp[-len(temp)])
+}

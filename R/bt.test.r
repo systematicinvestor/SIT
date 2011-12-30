@@ -1201,3 +1201,59 @@ dev.off()
 	
 }
 
+
+###############################################################################
+# Seasonality Case Study
+# Historical Seasonality Analysis: What company in DOW is likely to do well in January? 
+###############################################################################
+bt.seasonality.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')		
+	tickers = dow.jones.components()
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
+	bt.prep(data, align='keep.all', dates='1970::2011')
+		
+	#*****************************************************************
+	# Compute monthly returns
+	#****************************************************************** 
+	prices = data$prices   
+	n = ncol(prices)	
+	
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+	
+	prices = prices[month.ends,]
+	ret = prices / mlag(prices) - 1
+
+	# keep only January	
+	ret = ret[date.month(index(ret)) == 1, ]
+	
+	# keep last 20 years
+	ret = last(ret,20)
+
+	#*****************************************************************
+	# Compute stats
+	#****************************************************************** 
+	stats = matrix(rep(NA,2*n), nc=n)
+		colnames(stats) = colnames(prices)
+		rownames(stats) = spl('N,Positive')
+		
+	for(i in 1:n) {
+		stats['N',i] = sum(!is.na(ret[,i]))
+		stats['Positive',i] = sum(ret[,i]>0, na.rm=T)	
+	}
+	sort(stats['Positive',], decreasing =T)
+	
+png(filename = 'plot1.png', width = 600, height = 200, units = 'px', pointsize = 12, bg = 'white')										
+	plot.table(stats[, order(stats['Positive',], decreasing =T)[1:10]])
+dev.off()	
+	
+	
+	
+}
