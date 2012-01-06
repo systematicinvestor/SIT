@@ -1311,6 +1311,87 @@ dev.off()
 # Regime Switching System Using Volatility Forecast by Quantum Financier
 # http://quantumfinancier.wordpress.com/2010/08/27/regime-switching-system-using-volatility-forecast/
 ###############################################################################
+# Benchmarking Garch algorithms 
+# garch from tseries package is faster than garchFit from fGarch package
+###############################################################################
+bt.test.garch.speed <- function() 
+{
+	load.packages('tseries,fGarch,rbenchmark')	
+
+	temp = garchSim(n=252)
+
+	test1 <- function() {
+		fit1=garch(temp, order = c(1, 1), control = garch.control(trace = F))
+	}
+	test2 <- function() {
+		fit2=garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F)
+	}
+		 	
+	benchmark(
+		test1(),
+		test2(),
+		columns=spl('test,replications,elapsed,relative'),
+		order='relative',
+		replications=100
+	)
+}
+
+###############################################################################
+# One day ahead forecast functions for garch (tseries) and garchFit(fGarch)
+# Sigma[t]^2 = w + a* Sigma[t-1]^2 + b*r[t-1]^2
+# r.last - last return, h.last - last volatility
+###############################################################################
+garch.predict.one.day <- function(fit, r.last) 
+{
+	h.last = tail( fitted(fit)[,1] ,1)			
+	sqrt(sum( coef(fit) * c(1,  r.last^2, h.last^2) ))	
+}
+
+# same as predict( fit, n.ahead=1, doplot=F)[3]
+garchFit.predict.one.day <- function(fit, r.last) 
+{
+	h.last = tail(sqrt(fit@h.t), 1)
+	sqrt(sum( fit@fit$matcoef[,1] * c(1,  r.last^2, h.last^2) ))
+}
+	
+###############################################################################
+# Forecast Volatility using Garch
+# garch from tseries is fast, but does not consistently converge
+# garchFit from fGarch is slower, but converges consistently
+###############################################################################
+bt.forecast.garch.volatility <- function(ret.log, est.period = 252) 
+{		
+	nperiods = nrow(ret.log)		
+	garch.vol = NA * ret.log
+	
+	for( i in (est.period + 1) : nperiods ) {
+		temp = as.vector(ret.log[ (i - est.period + 1) : i, ])
+		r.last =  tail( temp, 1 )
+		
+		fit = tryCatch( garch(temp, order = c(1, 1), control = garch.control(trace = F)),
+	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
+	                    
+		if( !is.logical( fit ) ) {
+			if( i == est.period + 1 ) garch.vol[1:est.period] = fitted(fit)[,1]
+			garch.vol[i] = garch.predict.one.day(fit, r.last)
+		} else {
+			fit = tryCatch( garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F),
+	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
+	    				
+			if( !is.logical( fit ) ) {
+				if( i == est.period + 1 ) garch.vol[1:est.period] = sqrt(fit@h.t)
+				garch.vol[i] = garchFit.predict.one.day(fit, r.last)
+			} 
+		}			
+		if( i %% 100 == 0) cat(i, '\n')
+	}
+	garch.vol = ifna.prev(garch.vol)
+	return(garch.vol)
+}	
+
+###############################################################################
+# Volatility Forecasting using Garch(1,1) based
+###############################################################################
 bt.volatility.garch <- function() 
 {
 	#*****************************************************************
@@ -1393,51 +1474,10 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()		
 
 	#*****************************************************************
-	# Forecast Volatility using Garch	
-	# garch from tseries is fast, but does not consistently converge
-	# garchFit from fGarch is slower, but converges consistently
-	#****************************************************************** 
-	load.packages('tseries,fGarch')	
-			
-	# Sigma[t]^2 = w + a* Sigma[t-1]^2 + b*r[t-1]^2
-	garch.predict.one.day <- function(fit, r1) {
-		hl = tail( fitted(fit)[,1] ,1)			
-		sqrt(sum( coef(fit) * c(1,  rl^2, hl^2) ))	
-	}
-
-	# same as predict( fit, n.ahead=1, doplot=F)[3]
-	garchFit.predict.one.day <- function(fit, r1) {
-		hl = tail(sqrt(fit@h.t), 1)
-		sqrt(sum( fit@fit$matcoef[,1] * c(1,  rl^2, hl^2) ))
-	}
-	
-	garch.vol = NA * hist.vol
-	for( i in (252+1):nperiods ) {
-		temp = as.vector(ret.log[ (i-252+1):i, ])
-		rl =  tail( temp, 1 )
-			
-		fit = tryCatch( garch(temp, order = c(1, 1), control = garch.control(trace = F)),
-	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
-	                    
-		if( !is.logical( fit ) ) {
-			if( i == 252+1 ) garch.vol[1:252] = fitted(fit)[,1]
-			garch.vol[i] = garch.predict.one.day(fit, r1)
-		} else {
-			fit = tryCatch( garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F),
-	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
-	    				
-			if( !is.logical( fit ) ) {
-				if( i == 252+1 ) garch.vol[1:252] = sqrt(fit@h.t)
-				garch.vol[i] = garchFit.predict.one.day(fit, r1)
-			} 
-		}			
-		if( i %% 100 == 0) cat(i, '\n')
-	}
-	garch.vol = ifna.prev(garch.vol)
-
-	#*****************************************************************
 	# Regime Switching using Garch
 	#****************************************************************** 		
+	load.packages('tseries,fGarch')	
+	garch.vol = bt.forecast.garch.volatility(ret.log, 252)	
 	vol.rank = percent.rank(SMA(percent.rank(garch.vol, 252), 21), 250)
 
 	# Regime Switching Garch
@@ -1450,7 +1490,6 @@ dev.off()
 		data$weight[] = (capital / prices) * bt.exrem(data$weight)
 	regime.switching.garch = bt.run(data, type='share', capital=capital, trade.summary=T)
 	
-
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 
@@ -1459,34 +1498,6 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 	plotbt.custom.report.part1(regime.switching.garch, regime.switching, buy.hold, trade.summary=T)
 	
 dev.off()	
-	
-	return()	
-
-	#*****************************************************************
-	# Aside, Benchmarking Garch algorithms 
-	# garch from tseries package is faster than garchFit from fGarch package
-	#****************************************************************** 
-	load.packages('tseries,fGarch,rbenchmark')	
-
-	temp = garchSim(n=252)
-
-	test1 <- function() {
-		fit1=garch(temp, order = c(1, 1), control = garch.control(trace = F))
-	}
-	test2 <- function() {
-		fit2=garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F)
-	}
-		 	
-	benchmark(
-		test1(),
-		test2(),
-		columns=spl('test,replications,elapsed,relative'),
-		order='relative',
-		replications=100
-	)
-	
-	
-	
 }
 
 
