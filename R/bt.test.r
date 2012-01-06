@@ -387,29 +387,28 @@ bt.timing.model.test <- function()
 	n = len(tickers)  
 	
 	# ignore cash when selecting funds
-	prices.select = prices
-		prices.select$SHY = NA
+	position.score = prices
+		position.score$SHY = NA
 	
 	# find month ends
-	month.ends = endpoints(prices, 'months')
-		month.ends = month.ends[month.ends > 0]		
+	month.ends = date.month.ends(index(prices))
 		
 	# Equal Weight
 	data$weight[] = NA
-		data$weight[month.ends,] = ntop(prices.select, n)[month.ends,]	
+		data$weight[month.ends,] = ntop(position.score[month.ends,], n)	
 		capital = 100000
 		data$weight[] = (capital / prices) * data$weight
 	equal.weight = bt.run(data, type='share', capital=capital)
 		
 	# BuyRule, price > 10 month SMA
-	buy.rule = prices > bt.apply.matrix(prices, function(x) { SMA(x, 200) } )		
+	sma = bt.apply.matrix(prices, SMA, 200)
+	buy.rule = prices > sma
+		buy.rule = ifna(buy.rule, F)
 	
 	# Strategy
-	weight = ntop(prices.select, n)[month.ends,]	
-	buy.rule = buy.rule[month.ends,]	
-		weight[is.na(buy.rule)] = 0
-		weight[!buy.rule] = 0
+	weight = ntop(position.score[month.ends,], n)	
 		# keep in cash the rest of the funds
+		weight[!buy.rule[month.ends,]] = 0
 		weight$SHY = 1 - rowSums(weight)
 
 	data$weight[] = NA		
@@ -419,13 +418,60 @@ bt.timing.model.test <- function()
 	timing = bt.run(data, type='share', trade.summary=T, capital=capital)
 	
 	#*****************************************************************
+	# Code Strategies : Daily
+	#****************************************************************** 
+	weight = ntop(position.score, n)	
+		# keep in cash the rest of the funds
+		weight[!buy.rule] = 0
+		weight$SHY = 1 - rowSums(weight)
+
+	data$weight[] = NA
+		data$weight[] = weight		
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	timing.d = bt.run(data, type='share', trade.summary=T, capital=capital)	
+	
+	#*****************************************************************
 	# Create Report
 	#****************************************************************** 
 			
 	# put all reports into one pdf file
 	pdf(file = 'report.pdf', width=8.5, height=11)
-		plotbt.custom.report(timing, equal.weight, trade.summary=T)
-	dev.off()	
+		plotbt.custom.report(timing, timing.d, equal.weight, trade.summary=T)
+	dev.off()
+	
+	#*****************************************************************
+	# Code Strategies : Daily with Counter-Trend Entries by david varadi
+	# see bt.improving.trend.following.test
+	#****************************************************************** 
+	dv = bt.apply(data, function(x) { DV(HLC(x), 1, TRUE) } )	
+	
+	data$weight[] = NA
+		data$weight[] = iif(prices > sma & dv < 0.25, 0.2, data$weight)
+		data$weight[] = iif(prices < sma & dv > 0.75, 0, data$weight)
+		data$weight$SHY = 0
+		
+		
+		data$weight = bt.apply.matrix(data$weight, ifna.prev)
+		data$weight$SHY = 1 - rowSums(data$weight)
+		
+		data$weight = bt.exrem(data$weight)
+
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	timing.d1 = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+	# compute turnover	
+	models = variable.number.arguments(timing.d1, timing.d, timing, equal.weight)
+		sapply(models, compute.turnover, data)
+	
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+	
+	plotbt.custom.report.part1(timing.d1, timing.d, timing, equal.weight)
+
 }
 
 ###############################################################################
@@ -1257,3 +1303,190 @@ dev.off()
 	
 	
 }
+
+
+###############################################################################
+# Volatility Forecasting using Garch(1,1) based
+#
+# Regime Switching System Using Volatility Forecast by Quantum Financier
+# http://quantumfinancier.wordpress.com/2010/08/27/regime-switching-system-using-volatility-forecast/
+###############################################################################
+bt.volatility.garch <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'SPY'
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na', dates='2000::2012')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices  
+	n = len(tickers)  
+	nperiods = nrow(prices)
+	
+	# Buy & Hold	
+	data$weight[] = 1
+	buy.hold = bt.run(data)	
+
+		
+	# Mean-Reversion(MR) strategy - RSI2
+	rsi2 = bt.apply.matrix(prices, RSI, 2)
+	data$weight[] = NA
+		data$weight[] = iif(rsi2 < 50, 1, -1)	
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	mr = bt.run(data, type='share', capital=capital, trade.summary=T)
+				
+		
+	# Trend Following(TF) strategy - MA 50/200 crossover
+	sma.short = bt.apply.matrix(prices, SMA, 50)
+	sma.long = bt.apply.matrix(prices, SMA, 200)
+	data$weight[] = NA
+		data$weight[] = iif(sma.short > sma.long, 1, -1)
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	tf = bt.run(data, type='share', capital=capital, trade.summary=T)
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	plotbt.custom.report.part1(mr, tf, buy.hold, trade.summary=T)
+	
+dev.off()		
+	#*****************************************************************
+	# Regime Switching  Historical
+	#****************************************************************** 
+	#classify current volatility by percentile using a 252 day lookback period
+	#The resulting series oscillate between 0 and 1, and is smoothed using a 21 day percentrankSMA (developed by David Varadi) using a 252 day lookback period.
+	#percentrank(MA(percentrank(Stdev( diff(log(close)) ,21),252),21),250)
+
+	ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+	hist.vol = bt.apply.matrix(ret.log, runSD, n = 21)
+	vol.rank = percent.rank(SMA(percent.rank(hist.vol, 252), 21), 250)
+
+	# Regime Switching  Historical
+	data$weight[] = NA
+		data$weight[] = iif(vol.rank > 0.5, 
+							iif(rsi2 < 50, 1, -1),
+							iif(sma.short > sma.long, 1, -1)
+						)
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	regime.switching = bt.run(data, type='share', capital=capital, trade.summary=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+		
+	plotbt.custom.report.part1(regime.switching, mr, tf, buy.hold, trade.summary=T)
+	
+dev.off()		
+
+	#*****************************************************************
+	# Forecast Volatility using Garch	
+	# garch from tseries is fast, but does not consistently converge
+	# garchFit from fGarch is slower, but converges consistently
+	#****************************************************************** 
+	load.packages('tseries,fGarch')	
+			
+	# Sigma[t]^2 = w + a* Sigma[t-1]^2 + b*r[t-1]^2
+	garch.predict.one.day <- function(fit, r1) {
+		hl = tail( fitted(fit)[,1] ,1)			
+		sqrt(sum( coef(fit) * c(1,  rl^2, hl^2) ))	
+	}
+
+	# same as predict( fit, n.ahead=1, doplot=F)[3]
+	garchFit.predict.one.day <- function(fit, r1) {
+		hl = tail(sqrt(fit@h.t), 1)
+		sqrt(sum( fit@fit$matcoef[,1] * c(1,  rl^2, hl^2) ))
+	}
+	
+	garch.vol = NA * hist.vol
+	for( i in (252+1):nperiods ) {
+		temp = as.vector(ret.log[ (i-252+1):i, ])
+		rl =  tail( temp, 1 )
+			
+		fit = tryCatch( garch(temp, order = c(1, 1), control = garch.control(trace = F)),
+	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
+	                    
+		if( !is.logical( fit ) ) {
+			if( i == 252+1 ) garch.vol[1:252] = fitted(fit)[,1]
+			garch.vol[i] = garch.predict.one.day(fit, r1)
+		} else {
+			fit = tryCatch( garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F),
+	    				error=function( err ) FALSE, warning=function( warn ) FALSE )
+	    				
+			if( !is.logical( fit ) ) {
+				if( i == 252+1 ) garch.vol[1:252] = sqrt(fit@h.t)
+				garch.vol[i] = garchFit.predict.one.day(fit, r1)
+			} 
+		}			
+		if( i %% 100 == 0) cat(i, '\n')
+	}
+	garch.vol = ifna.prev(garch.vol)
+
+	#*****************************************************************
+	# Regime Switching using Garch
+	#****************************************************************** 		
+	vol.rank = percent.rank(SMA(percent.rank(garch.vol, 252), 21), 250)
+
+	# Regime Switching Garch
+	data$weight[] = NA
+		data$weight[] = iif(vol.rank > 0.5, 
+							iif(rsi2 < 50, 1, -1),
+							iif(sma.short > sma.long, 1, -1)
+						)
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	regime.switching.garch = bt.run(data, type='share', capital=capital, trade.summary=T)
+	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	plotbt.custom.report.part1(regime.switching.garch, regime.switching, buy.hold, trade.summary=T)
+	
+dev.off()	
+	
+	return()	
+
+	#*****************************************************************
+	# Aside, Benchmarking Garch algorithms 
+	# garch from tseries package is faster than garchFit from fGarch package
+	#****************************************************************** 
+	load.packages('tseries,fGarch,rbenchmark')	
+
+	temp = garchSim(n=252)
+
+	test1 <- function() {
+		fit1=garch(temp, order = c(1, 1), control = garch.control(trace = F))
+	}
+	test2 <- function() {
+		fit2=garchFit(~ garch(1,1), data = temp, include.mean=FALSE, trace=F)
+	}
+		 	
+	benchmark(
+		test1(),
+		test2(),
+		columns=spl('test,replications,elapsed,relative'),
+		order='relative',
+		replications=100
+	)
+	
+	
+	
+}
+
+

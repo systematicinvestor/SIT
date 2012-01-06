@@ -257,6 +257,25 @@ nasdaq.100.components <- function()
 }
 	
 
+###############################################################################
+# Get Sector SPDR Components
+# http://www.sectorspdr.com/spdr/composition/?symbol=XLE
+# tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
+# tickers.desc = spl('ConsumerCyclicals,ConsumerStaples,Energy,Financials,HealthCare,Industrials,Materials,Technology,Utilities')
+###############################################################################
+sector.spdr.components <- function(sector.etf = 'XLE')
+{
+	url = paste('http://www.sectorspdr.com/spdr/composition/?symbol=', sector.etf, sep='')
+	txt = join(readLines(url))
+
+	# extract table from this page
+	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = T)
+	tickers = temp[, 'Symbol']
+
+	return(tickers)
+}
+
+
 # pracma package
 # http://exploringdatablog.blogspot.com/2011/11/cleaning-time-series-and-other-data.html
 # Renamed outlierMAD() to hampel()	

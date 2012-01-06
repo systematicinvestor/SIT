@@ -597,6 +597,23 @@ bt.exrem <- function(weight)
 	})
 }	
 
+###############################################################################
+# Timed Exit: Remove excessive signal
+###############################################################################
+bt.exrem.time.exit <- function(signal, nlen) {
+	signal[is.na(signal)] = FALSE
+	signal.index = which(signal)			
+	nperiods = len(signal)	
+	
+	for(i in signal.index) {
+		if( signal[i] ) {
+			signal[ (i+1) : iif(i + nlen - 1 > nperiods, nperiods, i + nlen - 1) ] = FALSE
+		}
+	}
+	return(signal)
+}
+
+
 
 
 ###############################################################################

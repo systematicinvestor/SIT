@@ -1678,13 +1678,17 @@ dev.off()
 }
 
 
-
+###############################################################################
 # Historical Country Capitalizations from worldbank.org
 # Select Countries, Series. Type in "capitalization" and select Years
 # http://databank.worldbank.org/ddp/home.do?Step=12&id=4&CNO=2
 #
 # Alternative Source : "World Federation of Exchanges"
 # http://www.world-exchanges.org/statistics/time-series
+#
+# How to invest in the world with a few ETFs _ Decision Science News
+# http://www.decisionsciencenews.com/2011/12/29/youve-got-the-whole-world-in-your-portfolio/
+###############################################################################
 aa.test.hist.capitalization <- function()
 {
 	symbols = spl('Australia	Canada	France	Germany	Japan	United Kingdom	United States', '\t')
