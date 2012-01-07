@@ -136,6 +136,10 @@ delete.constraints <- function
 	return( constraints )				
 }
 
+type.constraints <- function(constraints)
+{
+	c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
+}
 
 
 
