@@ -93,6 +93,8 @@ iif <- function
 		else 
 			falsepart[cond] = truepart[cond]
 			
+		#falsepart[!is.na(cond)] = temp
+
 		return(falsepart);
 	}
 } 
