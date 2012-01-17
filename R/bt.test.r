@@ -1670,6 +1670,345 @@ dev.off()
 	
 }	
 
+###############################################################################
+# Time Series Matching Backtest
+#
+# New weighting scheme : seight each match by its distance
+###############################################################################
+bt.matching.backtest.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY,^GSPC')
+
+	data <- new.env()
+	quantmod:::getSymbols(tickers, src = 'yahoo', from = '1950-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='keep.all')
+
+	# compare common part [ SPY and ^GSPC match only if not adjusted for dividends]
+	#temp = data$prices['1993:01:29::']
+	#plot(temp[,1]/as.double(temp[1,1]) - temp[,2]/as.double(temp[1,2]), main='Diff between SPY and ^GSPC')
+
+	# combine SPY and ^GSPC
+	scale = as.double( data$prices$SPY['1993:01:29'] / data$prices$GSPC['1993:01:29'] )
+	hist = c(scale * data$prices$GSPC['::1993:01:28'], data$prices$SPY['1993:01:29::'])
+
+	#*****************************************************************
+	# Backtest setup:
+	# Starting January 1994, each month search for the 10 best matches 
+	# similar to the last 90 days in the last 10 years of history data
+	#
+	# Invest next month if distance weighted prediction is positive
+	# otherwise stay in cash
+	#****************************************************************** 
+	# find month ends
+	month.ends = endpoints(hist, 'months')
+		month.ends = month.ends[month.ends > 0]		
+	
+	start.index = which(date.year(index(hist[month.ends])) == 1994)[1]
+	weight = hist * NA
+	
+	for( i in start.index : len(month.ends) ) {
+		#obj = bt.matching.find(hist[1:month.ends[i],], n.match=10, normalize.fn = normalize.mean, plot=T)
+		#matches = bt.matching.overlay(obj, future=hist[(month.ends[i]+1):(month.ends[i]+22),], plot=T)
+		#bt.matching.overlay.table(obj, matches, weights=NA, plot=T)
+
+		obj = bt.matching.find(hist[1:month.ends[i],], normalize.fn = normalize.first)
+		matches = bt.matching.overlay(obj)
+		
+		# compute prediction for next month
+		n.match = len(obj$min.index)
+		n.query = len(obj$query)				
+		month.ahead.forecast = matches[,(2*n.query+22)]/ matches[,2*n.query] - 1
+		
+		# Average, mean(month.ahead.forecast[1:n.match]) 
+		weights = rep(1/n.match, n.match)
+		avg.direction = weighted.mean(month.ahead.forecast[1:n.match], w=weights)
+				
+		# Distance weighted average
+		temp = round(100*(obj$dist / obj$dist[1] - 1))		
+			n.weight = max(temp) + 1
+			weights = (n.weight - temp) / ( n.weight * (n.weight+1) / 2)
+		weights = weights / sum(weights)
+			# barplot(weights)
+		avg.direction = weighted.mean(month.ahead.forecast[1:n.match], w=weights)
+		
+		# Logic
+		weight[month.ends[i]] = 0
+		if( avg.direction > 0 ) weight[month.ends[i]] = 1
+		
+		# print progress		
+		if( i %% 10 == 0) cat(i, '\n')
+	}
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	tickers = 'SPY'
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1950-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='keep.all')
+	
+	prices = data$prices  
+	
+	# Buy & Hold	
+	data$weight[] = 1
+	buy.hold = bt.run(data)	
+
+	# Strategy
+	data$weight[] = NA
+		data$weight[] = weight['1993:01:29::']
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	test = bt.run(data, type='share', capital=capital, trade.summary=T)
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	plotbt.custom.report.part1(test, buy.hold, trade.summary=T)
+	
+dev.off()		
 	
 	
 	
+}
+
+
+	
+###############################################################################
+# Time Series Matching helper functions
+###############################################################################
+# functions to normalize data
+###############################################################################
+normalize.mean <- function(x) { x - mean(x) }
+normalize.mean.sd <- function(x) { (x - mean(x)) / sd(x) }
+normalize.first <- function(x) { x/as.double(x[1]) }
+
+###############################################################################
+# functions to compute distance
+###############################################################################
+dist.euclidean <- function(x) { stats:::dist(x) }
+
+###############################################################################
+# Find historical matches similar to the given query(pattern)
+###############################################################################
+bt.matching.find <- function
+(
+	data,				# time series
+	n.query=90, 		# length of pattern i.e. last 90 days
+	n.reference=252*10, # length of history to look for pattern
+	n.match=10, 		# number of matches to find
+	normalize.fn = normalize.mean.sd, 	# function to normalize data
+	dist.fn = dist.euclidean,	# function to compute distance
+	plot=FALSE,			# flag to create plot
+	layout = NULL		# flag to idicate if layout is already set	
+)
+{
+	#*****************************************************************
+	# Setup search
+	#****************************************************************** 
+	data = last(data, n.reference)
+	reference = coredata(data)
+		n = len(reference)
+		query = reference[(n - n.query + 1):n]	
+		reference = reference[1:(n - n.query)]
+		
+		n.query = len(query)
+		n.reference = len(reference)
+
+	#*****************************************************************
+	# Compute Distance
+	#****************************************************************** 		
+	dist = rep(NA, n.reference)
+	query.normalized = match.fun(normalize.fn)(query)	
+	
+	for( i in n.query : n.reference ) {
+		window = reference[ (i - n.query + 1) : i]
+		window.normalized = match.fun(normalize.fn)(window)	
+		dist[i] = match.fun(dist.fn)(rbind(query.normalized, window.normalized))
+	}
+
+	#*****************************************************************
+	# Find Matches
+	#****************************************************************** 			
+	min.index = c()
+	
+	# only look at the minimums 
+	temp = dist
+		temp[ temp > mean(dist, na.rm=T) ] = NA
+		
+	# remove n.query, points to the left/right of the minimums
+	for(i in 1:n.match) {
+		if(any(!is.na(temp))) {
+			index = which.min(temp)
+			min.index[i] = index
+			temp[max(0,index - 2*n.query) : min(n.reference,(index + n.query))] = NA
+		}
+	}
+	n.match = len(min.index)
+
+	
+	#*****************************************************************
+	# Plot Matches
+	#****************************************************************** 		
+	if(plot) {	
+		dates = index(data)[1:len(dist)]
+	
+		if(is.null(layout)) layout(1:2)		
+		par(mar=c(2, 4, 2, 2))
+		plot(dates, dist, type='l',col='gray', main='Top Matches', ylab='Euclidean Distance', xlab='')
+			abline(h = mean(dist, na.rm=T), col='darkgray', lwd=2)
+			points(dates[min.index], dist[min.index], pch=22, col='red', bg='red')
+			text(dates[min.index], dist[min.index], 1:n.match, adj=c(1,1), col='black',xpd=TRUE)
+			
+		plota(data, type='l', col='gray')
+			plota.lines(last(data,90), col='blue')
+			for(i in 1:n.match) {
+			plota.lines(data[(min.index[i]-n.query + 1):min.index[i]], col='red')
+			}
+			text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
+				adj=c(1,-1), col='black',xpd=TRUE)
+			plota.legend('Pattern,Match #','blue,red')	
+	}
+	
+	return(list(min.index=min.index, dist=dist[min.index], query=query, reference=reference, dates = index(data)))
+}
+		
+
+###############################################################################
+# Create matrix that overlays all matches one on top of each other
+###############################################################################
+# helper function to plot dots and labels
+###############################################################################
+bt.plot.dot.label <- function(x, data, xfun, col='red') {
+	for(j in 1:len(xfun)) {
+		y = match.fun(xfun[[j]])(data)
+		points(x, y, pch=21, lwd=4, col=col, bg=col)
+		text(x, y, paste(names(xfun)[j], ':', round(y,1),'%'),
+			adj=c(-0.1,0), cex = 0.8, col=col,xpd=TRUE)			
+	}
+}
+
+bt.matching.overlay <- function
+(
+	obj, 				# object from bt.matching.find function
+	future=NA,			# time series of future, only used for plotting
+ 	plot=FALSE,			# flag to create plot
+	layout = NULL		# flag to idicate if layout is already set	
+)
+{
+	min.index = obj$min.index
+	query = obj$query
+	reference = obj$reference
+	
+	n.match = len(min.index)
+	n.query = len(query)
+	n.reference = len(reference)
+
+	#*****************************************************************
+	# Overlay all Matches
+	#****************************************************************** 		
+	matches = matrix(NA, nr=(n.match+1), nc=3*n.query)
+	temp = c(rep(NA, n.query), reference, query, future)
+	for(i in 1:n.match) {
+		matches[i,] = temp[ (min.index[i] - n.query + 1):(min.index[i] + 2*n.query) ]	
+	}
+	#reference[min.index] == matches[,(2*n.query)]
+	
+	matches[(n.match+1),] = temp[ (n.reference + 1):(n.reference + 3*n.query) ]		
+	#matches[(n.match+1), (n.query+1):(2*n.query)] == query
+	
+	for(i in 1:(n.match+1)) {
+		matches[i,] = matches[i,] / iif(!is.na(matches[i,n.query]), matches[i,n.query], matches[i,(n.query+1)])
+	}
+	
+	#*****************************************************************
+	# Plot all Matches
+	#****************************************************************** 				
+	if(plot) {	
+		temp = 100 * ( t(matches[,-c(1:n.query)]) - 1)
+		
+		if(is.null(layout)) layout(1)
+		par(mar=c(2, 4, 2, 2))
+		matplot(temp, type='l',col='gray',lwd=2, lty='dotted', xlim=c(1,2.5*n.query),
+			main = paste('Pattern Prediction with', n.match, 'neighbours'),ylab='Normalized', xlab='')
+			lines(temp[,(n.match+1)], col='black',lwd=4)
+		
+		points(rep(2*n.query,n.match), temp[2*n.query,1:n.match], pch=21, lwd=2, col='gray', bg='gray')
+						
+		bt.plot.dot.label(2*n.query, temp[2*n.query,1:n.match], 
+			list(Min=min,Max=max,Median=median,'Bot 25%'=function(x) quantile(x,0.25),'Top 75%'=function(x) quantile(x,0.75)))
+		bt.plot.dot.label(n.query, temp[n.query,(n.match+1)], list(Current=min))	
+	}
+	
+	return(matches)
+}	
+
+
+###############################################################################
+# Create matches summary table
+###############################################################################
+bt.matching.overlay.table <- function
+(
+	obj, 				# object from bt.matching.find function
+	matches, 			# matches from bt.matching.overlay function
+	weights=NA, 		# weights to compute average
+ 	plot=FALSE,			# flag to create plot
+	layout = NULL		# flag to idicate if layout is already set	
+)
+{
+	min.index = obj$min.index
+	query = obj$query
+	reference = obj$reference
+	dates = obj$dates
+	
+	n.match = len(min.index)
+	n.query = len(query)
+	n.reference = len(reference)
+	
+	if(is.na(weights)) weights = rep(1/n.match, n.match)
+
+	#*****************************************************************
+	# Table with predictions
+	#****************************************************************** 		
+	temp = matrix( double(), nr=(n.match + 4), 6)
+		rownames(temp) = c(1:n.match, spl('Current,Min,Average,Max'))
+		colnames(temp) = spl('Start,End,Return,Week,Month,Quarter')
+		
+	# compute returns
+	temp[1:(n.match+1),'Return'] = matches[,2*n.query]/ matches[,n.query]
+	temp[1:(n.match+1),'Week'] = matches[,(2*n.query+5)]/ matches[,2*n.query]
+	temp[1:(n.match+1),'Month'] = matches[,(2*n.query+20)]/ matches[,2*n.query]
+	temp[1:(n.match+1),'Quarter'] = matches[,(2*n.query+60)]/ matches[,2*n.query]
+			
+	# compute average returns
+	index = spl('Return,Week,Month,Quarter')
+	temp['Min', index] = apply(temp[1:(n.match+0),index],2,min,na.rm=T)
+	#temp['Average', index] = apply(temp[1:(n.match+0),index],2,mean,na.rm=T)
+	temp['Average', index] = apply(temp[1:(n.match+0),index],2,weighted.mean,w=weights,na.rm=T)
+	temp['Max', index] = apply(temp[1:(n.match+0),index],2,max,na.rm=T)
+	
+	# format
+	temp[] = plota.format(100*(temp-1),1,'','%')
+		
+	# enter dates
+	temp['Current', 'Start'] = format(dates[(n.reference+1)], '%d %b %Y')
+	temp['Current', 'End'] = format(dates[len(dates)], '%d %b %Y')
+	for(i in 1:n.match) {
+		temp[i, 'Start'] = format(dates[min.index[i] - n.query + 1], '%d %b %Y')
+		temp[i, 'End'] = format(dates[min.index[i]], '%d %b %Y')	
+	}
+		
+	# plot table
+	if(plot) {			
+		if(is.null(layout)) layout(1)
+		plot.table(temp, smain='Match #')	
+	}
+	
+	return(temp)
+}
+		
