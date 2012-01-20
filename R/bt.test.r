@@ -1521,7 +1521,24 @@ bt.matching.test <- function()
 	data = getSymbols(tickers, src = 'yahoo', from = '1950-01-01', auto.assign = F)
 
 	#*****************************************************************
-	# Setup search
+	# New: logic moved to functions
+	#****************************************************************** 
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	obj = bt.matching.find(Cl(data), plot=T)
+dev.off()
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	matches = bt.matching.overlay(obj, plot=T)
+dev.off()
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	bt.matching.overlay.table(obj, matches, plot=T)
+dev.off()	
+	
+
+	#*****************************************************************
+	# Original logic: Setup search
 	#****************************************************************** 
 	data = last(data, 252*10)
 	reference = coredata(Cl(data))
@@ -1820,6 +1837,12 @@ bt.matching.find <- function
 		n.query = len(query)
 		n.reference = len(reference)
 
+		dist.fn.name = ''
+		if(is.character(dist.fn)) {
+			dist.fn.name = paste('with',dist.fn)
+			dist.fn = get(dist.fn)					
+		}
+		
 	#*****************************************************************
 	# Compute Distance
 	#****************************************************************** 		
@@ -1830,6 +1853,9 @@ bt.matching.find <- function
 		window = reference[ (i - n.query + 1) : i]
 		window.normalized = match.fun(normalize.fn)(window)	
 		dist[i] = match.fun(dist.fn)(rbind(query.normalized, window.normalized))
+		
+		# print progress		
+		if( i %% 100 == 0) cat(i, '\n')
 	}
 
 	#*****************************************************************
@@ -1860,7 +1886,7 @@ bt.matching.find <- function
 	
 		if(is.null(layout)) layout(1:2)		
 		par(mar=c(2, 4, 2, 2))
-		plot(dates, dist, type='l',col='gray', main='Top Matches', ylab='Euclidean Distance', xlab='')
+		plot(dates, dist, type='l',col='gray', main=paste('Top Matches', dist.fn.name), ylab='Distance', xlab='')
 			abline(h = mean(dist, na.rm=T), col='darkgray', lwd=2)
 			points(dates[min.index], dist[min.index], pch=22, col='red', bg='red')
 			text(dates[min.index], dist[min.index], 1:n.match, adj=c(1,1), col='black',xpd=TRUE)
@@ -1898,6 +1924,7 @@ bt.matching.overlay <- function
 	obj, 				# object from bt.matching.find function
 	future=NA,			# time series of future, only used for plotting
  	plot=FALSE,			# flag to create plot
+ 	plot.index=NA,		# range of data to plot
 	layout = NULL		# flag to idicate if layout is already set	
 )
 {
@@ -1929,18 +1956,30 @@ bt.matching.overlay <- function
 	#*****************************************************************
 	# Plot all Matches
 	#****************************************************************** 				
-	if(plot) {	
+	if(plot) {		
 		temp = 100 * ( t(matches[,-c(1:n.query)]) - 1)
+		if(!is.na(plot.index[1])) temp=temp[plot.index,]
+		n = nrow(temp)
 		
 		if(is.null(layout)) layout(1)
 		par(mar=c(2, 4, 2, 2))
-		matplot(temp, type='l',col='gray',lwd=2, lty='dotted', xlim=c(1,2.5*n.query),
-			main = paste('Pattern Prediction with', n.match, 'neighbours'),ylab='Normalized', xlab='')
-			lines(temp[,(n.match+1)], col='black',lwd=4)
 		
-		points(rep(2*n.query,n.match), temp[2*n.query,1:n.match], pch=21, lwd=2, col='gray', bg='gray')
+		matplot(temp, type='n',col='gray',lwd=2, lty='dotted', xlim=c(1, n + 0.15*n),
+			main = paste('Pattern Prediction with', n.match, 'neighbours'),ylab='Normalized', xlab='')
+			
+		col=adjustcolor('yellow', 0.5)
+		rect(0, par('usr')[3],n.query, par('usr')[4], col=col, border=col)
+		box()
+
+		
+		matlines(temp, col='gray',lwd=2, lty='dotted')
+		lines(temp[,(n.match+1)], col='black',lwd=4)
+		
+		
+			
+		points(rep(n, n.match), temp[n, 1:n.match], pch=21, lwd=2, col='gray', bg='gray')
 						
-		bt.plot.dot.label(2*n.query, temp[2*n.query,1:n.match], 
+		bt.plot.dot.label(n, temp[n, 1:n.match], 
 			list(Min=min,Max=max,Median=median,'Bot 25%'=function(x) quantile(x,0.25),'Top 75%'=function(x) quantile(x,0.75)))
 		bt.plot.dot.label(n.query, temp[n.query,(n.match+1)], list(Current=min))	
 	}
@@ -2011,4 +2050,98 @@ bt.matching.overlay.table <- function
 	
 	return(temp)
 }
-		
+
+
+
+###############################################################################
+# Time Series Matching with Dynamic time warping
+#
+# Based on Jean-Robert Avettand-Fenoel - How to Accelerate Model Deployment using Rook
+# http://www.londonr.org/Sep%2011%20LondonR_AvettandJR.pdf
+###############################################################################
+# functions to compute distance
+###############################################################################
+#dist.euclidean <- function(x) { stats:::dist(x) }
+dist.MOdist <- function(x) { MOdist(t(x)) }
+dist.DTW <- function(x) { dtw(x[1,], x[2,])$distance }
+
+bt.matching.dtw.test <- function() 
+{
+	#*****************************************************************
+	# Example of Dynamic time warping from dtw help
+	#****************************************************************** 
+	load.packages('dtw')
+	
+	# A noisy sine wave as query
+	idx = seq(0,6.28,len=100)
+	query = sin(idx)+runif(100)/10
+	
+	# A cosine is for reference; sin and cos are offset by 25 samples
+	reference = cos(idx)
+	
+	# map one to one, typical distance
+	alignment<-dtw(query, reference, keep=TRUE)
+	alignment$index1 = 1:100
+	alignment$index2 = 1:100
+
+png(filename = 'plot0.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	plot(alignment,main='Example of 1 to 1 mapping', type='two',off=3)
+dev.off()
+
+	# map one to many, dynamic time warping
+	alignment<-dtw(query, reference, keep=TRUE)
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	plot(alignment,main='Example of 1 to many mapping (DTW)', type='two',off=3)
+dev.off()
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'SPY'
+
+	data = getSymbols(tickers, src = 'yahoo', from = '1950-01-01', auto.assign = F)	
+
+	#*****************************************************************
+	# Euclidean distance	
+	#****************************************************************** 
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	obj = bt.matching.find(Cl(data), normalize.fn = normalize.mean, dist.fn = 'dist.euclidean', plot=T)
+dev.off()
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	matches = bt.matching.overlay(obj, plot.index=1:90, plot=T)
+dev.off()
+
+png(filename = 'plot4.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:2)
+	matches = bt.matching.overlay(obj, plot=T, layout=T)
+	bt.matching.overlay.table(obj, matches, plot=T, layout=T)
+dev.off()
+
+	#*****************************************************************
+	# Dynamic time warping distance	
+	#****************************************************************** 
+	# http://en.wikipedia.org/wiki/Dynamic_time_warping
+	# http://dtw.r-forge.r-project.org/
+	#****************************************************************** 
+
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	obj = bt.matching.find(Cl(data), normalize.fn = normalize.mean, dist.fn = 'dist.DTW', plot=T)
+dev.off()
+
+png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	matches = bt.matching.overlay(obj, plot.index=1:90, plot=T)
+dev.off()
+
+
+png(filename = 'plot7.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:2)
+	matches = bt.matching.overlay(obj, plot=T, layout=T)
+	bt.matching.overlay.table(obj, matches, plot=T, layout=T)
+dev.off()
+
+
+}		
