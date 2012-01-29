@@ -2065,6 +2065,7 @@ bt.matching.overlay.table <- function
 dist.MOdist <- function(x) { MOdist(t(x)) }
 dist.DTW <- function(x) { dtw(x[1,], x[2,])$distance }
 
+
 bt.matching.dtw.test <- function() 
 {
 	#*****************************************************************
@@ -2143,5 +2144,311 @@ png(filename = 'plot7.png', width = 600, height = 800, units = 'px', pointsize =
 	bt.matching.overlay.table(obj, matches, plot=T, layout=T)
 dev.off()
 
+	#*****************************************************************
+	# Dynamic time warping distance	
+	#****************************************************************** 
+
+png(filename = 'plot8.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	obj = bt.matching.find(Cl(data), normalize.fn = normalize.mean, dist.fn = 'dist.DTW1', plot=T)
+dev.off()
+
+png(filename = 'plot9.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	matches = bt.matching.overlay(obj, plot.index=1:90, plot=T)
+dev.off()
+
+
+png(filename = 'plot10.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:2)
+	matches = bt.matching.overlay(obj, plot=T, layout=T)
+	bt.matching.overlay.table(obj, matches, plot=T, layout=T)
+dev.off()
+
+
+
+	#*****************************************************************
+	# Dynamic time warping distance	
+	#****************************************************************** 
+
+png(filename = 'plot11.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	obj = bt.matching.find(Cl(data), normalize.fn = normalize.mean, dist.fn = 'dist.DDTW', plot=T)
+dev.off()
+
+png(filename = 'plot12.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	matches = bt.matching.overlay(obj, plot.index=1:90, plot=T)
+dev.off()
+
+
+png(filename = 'plot13.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:2)
+	matches = bt.matching.overlay(obj, plot=T, layout=T)
+	bt.matching.overlay.table(obj, matches, plot=T, layout=T)
+dev.off()
+
+
+
+}		
+
+
+###############################################################################      
+# Derivative Dynamic Time Warping by Eamonn J. Keogh† and Michael J. Pazzani
+# http://www.cs.rutgers.edu/~mlittman/courses/statai03/DDTW-2001.pdf
+# 
+# page 3
+# To align two sequences using DTW we construct an n-by-m matrix where the (ith, jth)
+# element of the matrix contains the distance d(qi,cj) between the two points qi and cj
+# (Typically the Euclidean distance is used, so d(qi,cj) = (qi - cj)2 ).
+# 
+# page 6
+# With DDTW the distance measure d(qi,cj) is not Euclidean but rather the square of the 
+# difference of the estimated derivatives of qi and cj. 
+# This estimate is simply the average of the slope of the line through the point in 
+# question and its left neighbor, and the slope of the line through the left neighbor and the
+# right neighbor. Empirically this estimate is more robust to outliers than any estimate
+# considering only two datapoints. Note the estimate is not defined for the first and last
+# elements of the sequence. Instead we use the estimates of the second and next-to-last
+# elements respectively.
+###############################################################################
+derivative.est <- function(x) {
+	x = as.vector(x)
+	n = len(x)
+	d = (( x - mlag(x) ) + ( mlag(x,-1)- mlag(x) ) / 2) / 2
+	d[1] = d[2]
+	d[n] = d[(n-1)]
+	d
+}
+
+dist.DDTW <- function(x) { 
+	y = x
+	x[1,] = derivative.est(x[1,])
+	x[2,] = derivative.est(x[2,])
+	
+	alignment = dtw(x[1,], x[2,])
+	stats:::dist(rbind(y[1,alignment1$index1],y[2,alignment1$index2]))
+	#proxy::dist(y[1,alignment1$index1],y[2,alignment1$index2],method='Euclidean',by_rows=F)	
+}	
+
+dist.DTW1 <- function(x) { 
+	alignment = dtw(x[1,], x[2,])
+	stats:::dist(rbind(x[1,alignment1$index1],x[2,alignment1$index2]))
+}
+
+
+bt.ddtw.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'SPY'
+
+	data = getSymbols(tickers, src = 'yahoo', from = '1950-01-01', auto.assign = F)	
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 
+	load.packages('dtw')
+	
+	query = as.vector(coredata(last(Cl(data['2011::2011']), 60)))
+	reference = as.vector(coredata(last(Cl(data['2010::2010']), 60)))	
+	
+	#*****************************************************************
+	# Dynamic Time Warping 	
+	#****************************************************************** 
+	alignment = dtw(query, reference, keep=TRUE)
+
+png(filename = 'plot1.ddtw.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	plot(alignment,main='DTW Alignment', type='two',off=20)
+dev.off()
+		
+	
+	#*****************************************************************
+	# Derivative Dynamic Time Warping by Eamonn J. Keogh† and Michael J. Pazzani
+	# http://www.cs.rutgers.edu/~mlittman/courses/statai03/DDTW-2001.pdf
+	#****************************************************************** 
+	derivative.est <- function(x) {
+		x = as.vector(x)
+		n = len(x)
+		d = (( x - mlag(x) ) + ( mlag(x,-1)- mlag(x) ) / 2) / 2
+		d[1] = d[2]
+		d[n] = d[(n-1)]
+		d
+	}
+	
+	alignment0 = dtw(derivative.est(query), derivative.est(reference), keep=TRUE)
+	alignment$index1 = alignment0$index1
+	alignment$index2 = alignment0$index2
+		
+png(filename = 'plot2.ddtw.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	plot(alignment,main='Derivative DTW Alignment', type='two',off=20)
+dev.off()
+	
+	
+}
+	
+	
+###############################################################################
+# determine date when fundamental data is available
+# use 'date preliminary data loaded' when available
+# otherwise lag 'quarter end date' 2 months for Q1/2/3 and 3 months for Q4
+###############################################################################		
+date.fund.data <- function(data)
+{
+	# construct date
+	quarter.end.date = as.Date(paste(data['quarter end date',], '/1', sep=''), '%Y/%m/%d')	
+	quarterly.indicator = data['quarterly indicator',]
+	date.preliminary.data.loaded = as.Date(data['date preliminary data loaded',], '%Y-%m-%d') + 1
+	
+	months = seq(quarter.end.date[1], tail(quarter.end.date,1)+365, by='1 month') 
+	index = match(quarter.end.date, months)
+	quarter.end.date = months[ iif(quarterly.indicator == '4', index+3, index+2) + 1 ] - 1
+		
+	fund.date = date.preliminary.data.loaded
+		fund.date[is.na(fund.date)] = quarter.end.date[is.na(fund.date)] 
+
+	return(fund.date)
+}
+
+fund.data.test <- function()
+{
+	#*****************************************************************
+	# Load historical fundamental data
+	# http://advfn.com/p.php?pid=financials&symbol=NYSE:WMT&mode=quarterly_reports
+	#****************************************************************** 
+	Symbol = 'NYSE:WMT'	
+	fund = fund.data(Symbol, 80)
+	
+	# construct date
+	fund.date = date.fund.data(fund)	
+	
+	#*****************************************************************
+	# Create and Plot Earnings per share
+	#****************************************************************** 
+	total.capitalization = as.double(gsub(',', '', fund['total capitalization',]))
+		total.capitalization = as.xts(total.capitalization, fund.date)		
+	barplot(total.capitalization)
+
+	
+	EPS.Q = as.double(fund['Diluted EPS from Total Operations',])
+		EPS.Q = as.xts(EPS.Q, fund.date)	
+	EPS = runSum(EPS.Q, 4)
+
+	# Plot
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	layout(1:2)
+	par(mar=c(2,2,2,1))
+	x = barplot(EPS.Q, main='Wal-Mart Quarterly Earnings per share', border=NA)
+	text(x, EPS.Q, fund['quarterly indicator',], adj=c(0.5,-0.3), cex=0.8, xpd = TRUE)
+
+	barplot(EPS, main='Wal-Mart Rolling Annual Earnings per share', border=NA)
+dev.off()
+	
+
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	tickers = 'WMT'
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	data$WMT = merge(data$WMT, EPS)
+		# back fill EPS
+		data$WMT$EPS = ifna.prev(coredata(data$WMT$EPS))	
+	
+	# Plot
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	y = data$WMT['1990::']
+	plota(Cl(y), type = 'l', LeftMargin=3)
+			
+	plota2Y(y$EPS, type='l', las=1, col='red', col.axis = 'red')
+								
+	plota.legend('WMT(rhs),WMT.EPS(lhs)', 'blue,red', list(Cl(y),y$EPS))
+dev.off()
+			
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')		
+	tickers = dow.jones.components()
+	
+	# get fundamental data
+	data.fund <- new.env()
+		temp = paste(iif( nchar(tickers) <= 3, 'NYSE:', 'NASDAQ:'), tickers, sep='')
+		for(i in 1:len(tickers)) data.fund[[tickers[i]]] = fund.data(temp[i], 80)
+	#sapply(data.fund, function(x) ncol(x))
+	#save(data.fund, file='data.fund.Rdata')
+	
+		
+	# get pricing data
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
+	#save(data, file='data.Rdata')
+	
+	#load(file='data.fund.Rdata')
+	#load(file='data.Rdata')
+	
+			
+	# combine fundamental and pricing data
+	for(i in tickers) {
+		fund = data.fund[[i]]
+		fund.date = date.fund.data(fund)
+		
+		EPS.Q = as.double(fund['Diluted EPS from Total Operations',])
+			EPS.Q = as.xts(EPS.Q, fund.date)	
+		EPS = runSum(EPS.Q, 4)
+				
+		data[[i]] = merge(data[[i]], EPS)
+	}
+
+	bt.prep(data, align='keep.all', dates='1995::2011')
+		
+	#*****************************************************************
+	# Compute monthly factors
+	#****************************************************************** 
+	prices = data$prices
+		prices = bt.apply.matrix(prices, function(x) ifna.prev(x))
+	
+	# create factors
+	factors = list()
+
+	# E/P
+	EPS = bt.apply(data, function(x) ifna.prev(x[, 'EPS']))
+	factors$EP = EPS / prices
+			
+	# VOMO - Volume x Momentum
+	volume = bt.apply(data, function(x) ifna.prev(Vo(x)))
+	factors$VOMO = (prices / mlag(prices,10) - 1) * bt.apply.matrix(volume, runMean, 22) / bt.apply.matrix(volume, runMean, 66)
+		
+	
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+	
+	prices = prices[month.ends,]
+	n = ncol(prices)
+	nperiods = nrow(prices)
+	
+	ret = prices / mlag(prices) - 1
+	next.month.ret = mlag(ret, -1)
+	
+	factors$EP = factors$EP[month.ends,]	
+	factors$VOMO = factors$VOOM[month.ends,]	
+		
+	#*****************************************************************
+	# Correlation Analysis
+	#****************************************************************** 
+	x = as.vector(factors$EP)
+ 	y = as.vector(next.month.ret)
+ 	
+ 	cor.test(x, y, use = 'complete.obs', method = 'pearson')			
+
+ 	# Plot
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	par(mar=c(4,4,2,1)) 	 	 	
+ 	plot(x, y, pch=20, main='Correlation Analysis for EP factor', xlab='EP', ylab='Next Month Return')
+ 		abline(lm(y ~ x), col='blue', lwd=2)
+dev.off() 	
 
 }		

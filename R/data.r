@@ -276,7 +276,83 @@ sector.spdr.components <- function(sector.etf = 'XLE')
 }
 
 
-# pracma package
-# http://exploringdatablog.blogspot.com/2011/11/cleaning-time-series-and-other-data.html
-# Renamed outlierMAD() to hampel()	
 
+###############################################################################
+# Get Fundamental Data from advfn
+# http://advfn.com/p.php?pid=financials&symbol=CSCO&mode=quarterly_reports
+# http://advfn.com/p.php?pid=financials&symbol=CSCO&mode=annual_reports
+###############################################################################
+fund.data <- function
+(
+	Symbol, 		# ticker 
+	n=10, 			# number of periods
+	mode=c('quarterly','annual'), # periodicity
+	max.attempts=5	# maximum number of attempts to download before exiting
+)
+{
+	all.data = c()
+	option.value = -1
+	
+	repeat {
+		# download Quarterly Financial Report data
+		if(option.value >= 0) {
+			url = paste('http://advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports&istart_date=', option.value, sep = '')	
+		} else {
+			url = paste('http://advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports', sep = '')
+		}
+		cat('Downloading', url, '\n')
+		
+		#txt = join(readLines(url))		
+		for(iattempt in 1:max.attempts) { 
+			flag = T
+		    tryCatch({
+		    	txt = join(readLines(url))
+			}, interrupt = function(ex) {
+				flag <<-  F
+		  		Sys.sleep(0.1)
+			}, error = function(ex) {
+				flag <<-  F
+				Sys.sleep(0.1)
+			}, finally = {
+				if(flag) break
+			})
+		}
+		
+		# extract table from this page
+		data = extract.table.from.webpage(txt, 'INDICATORS', hasHeader = T)
+			colnames(data) = data[1,]
+			rownames(data) = data[,1]
+			data = data[,-1,drop=F]
+		
+		# only add not already present data
+		add.index = which( is.na(match( colnames(data), colnames(all.data) )) )			
+		all.data = cbind(data[,add.index,drop=F], all.data)
+	
+		# check if it is time to stop
+		if(ncol(all.data) >= n) break
+		if(option.value == 0)  break
+		
+		# extract option value to go to the next page
+		temp = gsub(pattern = '<option', replacement = '<tr>', txt, perl = TRUE)
+		temp = gsub(pattern = '</option>', replacement = '</tr>', temp, perl = TRUE)	
+		temp = extract.table.from.webpage(temp, 'All amounts', hasHeader = T)
+		
+		index.selected = grep('selected', temp[,1])
+		option.value = as.double( gsub('.*value=\'([0-9]*).*', '\\1', temp[index.selected,1]) )
+		
+		if(option.value > 0) {
+			# can only get 5 time periods at a time
+			option.value = option.value - 5
+			option.value = max(0, option.value)		
+		} else {
+			break
+		}
+	}
+	
+	if( ncol(all.data) > n ) {	
+		return(all.data[,(ncol(all.data)-n+1):ncol(all.data)])
+	} else {
+		return(all.data)
+	}
+}
+	
