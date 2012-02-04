@@ -90,8 +90,10 @@ iif <- function
 		
 		if(length(truepart) == 1) 
 			falsepart[cond] = truepart 
-		else 
+		else {
+			cond = ifna(cond,F)
 			falsepart[cond] = truepart[cond]
+		}
 			
 		#falsepart[!is.na(cond)] = temp
 
@@ -374,11 +376,9 @@ compute.cor <- function
 	method = c("pearson", "kendall", "spearman")
 )
 {
-	nr = nrow(data) 
-	nc = ncol(data) 
-	
+	nc = ncol(data) 	
 	corm = matrix(NA,nc,nc)
-	colnames(corm) = rownames(corm) = colnames(data)
+		colnames(corm) = rownames(corm) = colnames(data)
 		
 	for( i in 1:(nc-1) ) {
 		temp = data[,i]
@@ -389,11 +389,30 @@ compute.cor <- function
 	return(corm)
 }
 
+
+###############################################################################
+# Find location: row, col in the matrix, given index of of observation
+#
+# lookup.index(factors$TV$BP, which(factors$TV$BP > 8)) 		
+# plot(factors$TV$BP$BAC)
+###############################################################################
+lookup.index <- function(data, i) {
+	irow = i %% nrow(data)
+	icol = (i %/% nrow(data)) +1
+	list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[(irow-5):(irow+5),icol])
+}	
+
+
 ###############################################################################
 # XTS helper functions
 ###############################################################################
 # Create XTS object
 ###############################################################################
+
+# must set timezone before any calls to xts
+Sys.setenv(TZ = 'GMT')
+
+
 make.xts <- function
 (
 	x,			# data

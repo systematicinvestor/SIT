@@ -196,6 +196,7 @@ plot.table <- function
 	# remove N/As
 	plot.matrix[which(trim(plot.matrix) == 'NA')] = ''
 	plot.matrix[which(trim(plot.matrix) == 'NA%')] = ''
+	plot.matrix[which(is.na(plot.matrix))] = ''
 	
 	# add space to the right if colorbar will be drawn
 	if(colorbar) {
