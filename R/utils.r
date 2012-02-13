@@ -402,6 +402,15 @@ lookup.index <- function(data, i) {
 	list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[(irow-5):(irow+5),icol])
 }	
 
+###############################################################################
+# Convert beta or slope (coefficient of x) to degrees
+# http://r.789695.n4.nabble.com/slope-calculation-td858652.html	
+###############################################################################
+beta.degree <- function(beta) 
+{ 
+	atan(beta)*360/(2*pi) 
+}
+
 
 ###############################################################################
 # XTS helper functions
@@ -462,3 +471,4 @@ get.filename <- function(x)
 	temp = spl(get.full.filename(x),'\\.')
 	join(temp[-len(temp)])
 }
+

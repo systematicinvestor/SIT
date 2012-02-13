@@ -207,13 +207,13 @@ fm.fund.factor.test <- function()
 			temp = paste(iif( nchar(tickers) <= 3, 'NYSE:', 'NASDAQ:'), tickers, sep='')
 			for(i in 1:len(tickers)) data.fund[[tickers[i]]] = fund.data(temp[i], 80)
 		#sapply(data.fund, function(x) ncol(x))
-		#save(data.fund, file='data.fund.Rdata')
+		save(data.fund, file='data.fund.Rdata')
 				
 		# get pricing data
 		data <- new.env()
 		getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
 			for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
-		#save(data, file='data.Rdata')
+		save(data, file='data.Rdata')
 		
 	} else {
 		# get fundamental data
@@ -236,7 +236,7 @@ fm.fund.factor.test <- function()
 	for(i in tickers) {
 		fund = data.fund[[i]]
 		fund.date = date.fund.data(fund)
-		
+					
 		# Earnings per Share		
 		EPS = get.fund.data('Diluted EPS from Total Operations', fund, fund.date, is.12m.rolling=T)
 		
@@ -280,7 +280,7 @@ fm.fund.factor.test <- function()
 	# Market Value - capitalization
 	CSHO =  bt.apply(data, function(x) ifna.prev(x[, 'CSHO']))
 	MKVAL = prices * CSHO
-			
+	
 	# Price / Earnings
 	EPS = bt.apply(data, function(x) ifna.prev(x[, 'EPS']))
 	factors$TV$EP = EPS / prices
@@ -305,17 +305,7 @@ fm.fund.factor.test <- function()
 	factors$TV$SP[, sectors == 'Financials'] = NA
 	factors$TV$CFP[, sectors == 'Financials'] = NA
 	
-	
-	#*****************************************************************
-	# Create Price Reversal [not finished]
-	#****************************************************************** 
-	factors$PR = list()
-	
-	# VOMO - Volume x Momentum
-	volume = bt.apply(data, function(x) ifna.prev(Vo(x)))
-	factors$PR$VOMO = (prices / mlag(prices,10) - 1) * bt.apply.matrix(volume, runMean, 22) / bt.apply.matrix(volume, runMean, 66)
-	
-	
+		
 	#*****************************************************************
 	# Convert to monthly
 	#****************************************************************** 
@@ -339,22 +329,6 @@ fm.fund.factor.test <- function()
 
 	
 	#*****************************************************************
-	# Create Relative Value
-	#****************************************************************** 
-	factors$RV = list()
-	
-	# relative 
-	for(i in spl('EP,SP,CFP')) {
-		factors$RV[[paste('r',i,sep='')]] = factors$TV[[i]] - sector.mean(factors$TV[[i]], sectors) 
-	}
-		
-	# spreads, 5 Year Avg = 60 months
-	for(i in spl('rEP,rSP,rCFP')) {
-		factors$RV[[paste('s',i,sep='')]] = factors$RV[[i]] - 
-		apply(factors$RV[[i]], 2, function(x) if(all(is.na(x))) x else SMA(x,60) )
-	}
-
-	#*****************************************************************
 	# Create the overall Traditional Value factor 
 	#****************************************************************** 
 	# check missing data for financial firms
@@ -377,19 +351,19 @@ fm.fund.factor.test <- function()
 		factors$TV$AVG[] = apply(temp, c(1,2), mean, na.rm=T)
 		
 		
-	# plot quintiles for all Traditional Value factors
+	# plot quantiles for all Traditional Value factors
 	# http://www.quantequityinvesting.com/factor-time-series-chart.php
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 	layout(matrix(1:6,nc=2))
 	sapply(1:len(factors$TV), function(i)
-		compute.quintiles(factors$TV[[i]], next.month.ret, paste(names(factors$TV)[i], 'Traditional Value'))
+		compute.quantiles(factors$TV[[i]], next.month.ret, paste(names(factors$TV)[i], 'Traditional Value'))
 	)
 dev.off() 		
 	
 	#*****************************************************************
 	# Backtest qutiles and qutile spread
 	#****************************************************************** 
-	out = compute.quintiles(factors$TV$AVG, next.month.ret, plot=F)	
+	out = compute.quantiles(factors$TV$AVG, next.month.ret, plot=F)	
 		
 	prices = data$prices
 		prices = bt.apply.matrix(prices, function(x) ifna.prev(x))
@@ -399,7 +373,7 @@ dev.off()
 	
 	for(i in 1:5) {
 		data$weight[] = NA
-			data$weight[month.ends,] = iif(out$quintiles == i, out$weights, 0)
+			data$weight[month.ends,] = iif(out$quantiles == i, out$weights, 0)
 			capital = 100000
 			data$weight[] = (capital / prices) * (data$weight)	
 		models[[paste('Q',i,sep='')]] = bt.run(data, type='share', capital=capital)
@@ -407,8 +381,8 @@ dev.off()
 	
 	# spread
 	data$weight[] = NA
-		data$weight[month.ends,] = iif(out$quintiles == 5, out$weights, 
-									iif(out$quintiles == 1, -out$weights, 0))
+		data$weight[month.ends,] = iif(out$quantiles == 5, out$weights, 
+									iif(out$quantiles == 1, -out$weights, 0))
 		capital = 100000
 		data$weight[] = (capital / prices) * (data$weight)
 	models$Q5_Q1 = bt.run(data, type='share', capital=capital)
@@ -426,3 +400,522 @@ dev.off()
 		
 }		
 
+
+###############################################################################
+# Multiple Factor Model – Building All Factors and 
+# Running Cross-Sectional Regression
+#http://www.accountingcoach.com/accounting-topics.html
+###############################################################################		
+fm.all.factor.test <- function()
+{			
+	#*****************************************************************
+	# Find Sectors for each company in DOW 30
+	#****************************************************************** 
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
+	tickers.desc = spl('ConsumerCyclicals,ConsumerStaples,Energy,Financials,HealthCare,Industrials,Materials,Technology,Utilities')
+	
+	sector.map = c()
+	for(i in 1:len(tickers)) {
+		sector.map = rbind(sector.map, 
+				cbind(sector.spdr.components(tickers[i]), tickers.desc[i])
+			)
+	}
+	colnames(sector.map) = spl('ticker,sector')
+
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,abind')	
+	tickers = dow.jones.components()
+	
+	sectors = factor(sector.map[ match(tickers, sector.map[,'ticker']), 'sector'])
+		names(sectors) = tickers
+	
+	# just load historical fundamental data instead of downloading all data again	
+	if(FALSE) {
+		# get fundamental data
+		data.fund <- new.env()
+			temp = paste(iif( nchar(tickers) <= 3, 'NYSE:', 'NASDAQ:'), tickers, sep='')
+			for(i in 1:len(tickers)) data.fund[[tickers[i]]] = fund.data(temp[i], 80)
+		#sapply(data.fund, function(x) ncol(x))
+		save(data.fund, file='data.fund.Rdata')
+				
+		# get pricing data
+		data <- new.env()
+		getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+			for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
+		save(data, file='data.Rdata')
+		
+	} else {
+		# get fundamental data
+		load(file='data.fund.Rdata')
+		
+		# get pricing data
+		load(file='data.Rdata')
+	}
+	
+
+
+	#*****************************************************************
+	# Combine fundamental and pricing data
+	#****************************************************************** 
+	#VALUING FINANCIAL SERVICE FIRMS
+	#www.stern.nyu.edu/~adamodar/pdfiles/papers/finfirm.pdf
+	#http://people.stern.nyu.edu/adamodar/pdfiles/papers/
+	#"financial companies" "Sales" value
+	
+	for(i in tickers) {
+		fund = data.fund[[i]]
+		fund.date = date.fund.data(fund)
+			nperiods = ncol(fund)
+			
+		# D - holds all data to be merged with pricing data
+		D = list()
+		
+		#--------------------------------------------------------------
+		# Data for Traditional and Relative Value	
+		#--------------------------------------------------------------
+				
+		# Earnings per Share		
+		D$EPS = get.fund.data('Diluted EPS from Total Operations', fund, fund.date, is.12m.rolling=T)
+		
+		# Sales, exception not available for financial service firms
+		D$SALE = get.fund.data('total revenue', fund, fund.date, is.12m.rolling=T)
+		
+		# Common Shares Outstanding
+		D$CSHO = get.fund.data('total common shares out', fund, fund.date)
+
+		# Common Equity
+		D$CEQ = get.fund.data('total equity', fund, fund.date)
+
+		# Dividends
+		D$DV.PS = get.fund.data('dividends paid per share', fund, fund.date, is.12m.rolling=T)
+				
+		# Cash Flow
+		D$CFL = get.fund.data('net cash from operating activities', fund, fund.date, cash.flow=T, is.12m.rolling=T)
+			
+		#--------------------------------------------------------------
+		# Data for Historical Growth	
+		#--------------------------------------------------------------
+				
+		# Consecutive Quarters of Positive Changes in Trailing 12 Month Cash Flow
+		D$CFL.CON.CHG = consecutive.changes(D$CFL)		
+			# check
+			#merge(D$CFL, sign(diff(D$CFL)), consecutive.changes(D$CFL), consecutive.changes(D$CFL,F))
+		
+		# Consecutive Quarters of Positive Change in Quarterly Earnings
+		D$EPS.CON.CHG = consecutive.changes(D$EPS)
+		
+		# 12 Month Change in Quarterly Cash Flow
+		temp = get.fund.data('net cash from operating activities', fund, fund.date, cash.flow=T)
+		D$CFL.CHG = temp / mlag(temp,4)
+		
+		# http://ca.advfn.com/Help/eps-growth-rate-102.html
+		# 3 Year Average Annual Sales Growth
+		D$SALE.3YR.GR = D$SALE
+		if(!all(is.na(D$SALE))) D$SALE.3YR.GR = SMA(ifna(D$SALE / mlag(D$SALE,4) - 1,NA), 3*4)
+
+		# 3 Year Average Annual Earnings Growth
+		D$EPS.3YR.GR = SMA(D$EPS / mlag(D$EPS,4) - 1, 3*4)
+		
+		# 12 Quarter Trendline in Trailing 12 Month Earnings		
+		D$EPS.TREND = D$EPS * NA
+			D$EPS.TREND[12:nperiods] = sapply(12:nperiods, function(i) beta.degree(ols(cbind(1,1:12), D$EPS[(i-12+1):i])$coefficients[2]))
+			
+		# Slope of Trend Line Through Last 4 Quarters of Trailing 12M Cash Flows		
+		D$CFL.TREND = D$CFL * NA
+			D$CFL.TREND[4:nperiods] = sapply(4:nperiods, function(i) beta.degree(ols(cbind(1,1:4), D$CFL[(i-4+1):i])$coefficients[2]))
+
+		#--------------------------------------------------------------
+		# Data for Profit Trends	
+		#--------------------------------------------------------------
+		RECT = get.fund.data('receivables', fund, fund.date)
+		INVT = get.fund.data('inventories', fund, fund.date)
+		
+		D$AT = get.fund.data('total assets', fund, fund.date)
+		XSGA = get.fund.data('Selling, General & Administrative (SG&A) Expense', fund, fund.date, is.12m.rolling=T)
+		
+		# Consecutive Quarters of Declines in (Receivables+Inventories) / Sales
+		D$RS.CON.CHG = consecutive.changes((RECT + INVT) / D$SALE, F)
+				
+		# Consecutive Qtrs of Positive Change in Trailing 12M Cash Flow / Sales
+		D$CS.CON.CHG = consecutive.changes(D$CFL/D$SALE)
+		
+		# Overhead = sales, general and administrative costs
+		# http://moneyterms.co.uk/overhead_cost_ratio/
+		# Consecutive Quarters of Declines in Trailing 12 Month Overhead / Sales
+		D$OS.CON.CHG = consecutive.changes(XSGA/D$SALE, F)
+				
+		# (Industry Relative) Trailing 12 Month (Receivables+Inventories) / Sales
+		D$RS = (RECT + INVT) / D$SALE
+		
+		# (Industry Relative) Trailing 12 Month Sales / Assets
+		D$SA = D$SALE / D$AT
+		
+		# Trailing 12 Month Overhead / Sales
+		D$OS = XSGA / D$SALE
+		
+		# Trailing 12 Month Earnings / Sales
+		D$ES = D$EPS / D$SALE						
+							
+		#--------------------------------------------------------------
+		# Merge Fundamental and Pricing data
+		#--------------------------------------------------------------
+		
+		# merge	
+		data[[i]] = merge(data[[i]], as.xts(abind(D,along=2), fund.date))						
+	}
+	
+	bt.prep(data, align='keep.all', dates='1995::2011')
+
+	#*****************************************************************
+	# Create Factors
+	#****************************************************************** 
+	prices = data$prices	
+		prices = bt.apply.matrix(prices, function(x) ifna.prev(x))
+		
+	# re-map sectors
+	sectors	= sectors[colnames(prices)]	
+
+	# create factors
+	factors = list()
+	factor.names = list()
+	
+	#*****************************************************************
+	# Create Traditional Value
+	#****************************************************************** 
+	factors$TV = list()
+	factor.names$TV = 'Traditional Value'
+
+	# Market Value - capitalization
+	CSHO =  bt.apply(data, function(x) ifna.prev(x[, 'CSHO']))
+	MKVAL = prices * CSHO
+	
+	# Price / Earnings
+	EPS = bt.apply(data, function(x) ifna.prev(x[, 'EPS']))
+	factors$TV$EP = EPS / prices
+	
+	# Price / Trailing Sales
+	SALE = bt.apply(data, function(x) ifna.prev(x[, 'SALE']))	
+	factors$TV$SP = SALE / MKVAL
+	
+	# Price / Trailing Cash Flow
+	CFL = bt.apply(data, function(x) ifna.prev(x[, 'CFL']))
+	factors$TV$CFP = CFL / MKVAL
+	
+	# Dividend Yield
+	DV.PS = bt.apply(data, function(x) ifna.prev(x[, 'DV.PS']))
+	factors$TV$DY = DV.PS / prices
+	
+	# Price / Book Value		
+	CEQ = bt.apply(data, function(x) ifna.prev(x[, 'CEQ']))
+	factors$TV$BP = CEQ	/ MKVAL
+
+	# Eliminate Price/Sales and Price/Cash Flow for financial firms
+	factors$TV$SP[, sectors == 'Financials'] = NA
+	factors$TV$CFP[, sectors == 'Financials'] = NA
+	
+	#*****************************************************************
+	# Create Historical Growth
+	#****************************************************************** 
+	factors$HG = list()
+	factor.names$HG = 'Historical Growth'
+
+	for(i in spl('CFL.CON.CHG,EPS.CON.CHG,CFL.CHG,SALE.3YR.GR,EPS.3YR.GR,EPS.TREND,CFL.TREND')) {
+		factors$HG[[i]] = bt.apply(data, function(x) ifna.prev(x[, i]))
+	}
+
+	#*****************************************************************
+	# Create Profit Trends
+	#****************************************************************** 
+	factors$PT = list()		
+	factor.names$PT = 'Profit Trends'	
+	
+	for(i in spl('RS.CON.CHG,CS.CON.CHG,OS.CON.CHG,RS,SA,OS,ES')) {
+		factors$PT[[i]] = bt.apply(data, function(x) ifna.prev(x[, i]))
+	}
+	
+	#*****************************************************************
+	# Create Price Momentum
+	#****************************************************************** 
+	factors$PM = list()
+	factor.names$PM = 'Price Momentum'	
+	
+	# find week ends
+	week.ends = endpoints(prices, 'weeks')
+		week.prices = prices[week.ends,]
+		week.nperiods = nrow(week.prices)
+	
+	#Slope of 52 Week Trend Line (20 Day Lag)
+	factors$PM$S52W.TREND = bt.apply.matrix(week.prices, function(x) {
+		c(rep(NA,51),
+		sapply(52:week.nperiods, function(i) beta.degree(ols(cbind(1,1:52), x[(i - 52 + 1):i])$coefficients[2]))
+		)})
+	
+	# http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:price_oscillators
+	#4/52 Week Price Oscillator (20 Day Lag)
+	factors$PM$PP04.52W = bt.apply.matrix(week.prices, EMA, 4) / bt.apply.matrix(week.prices, EMA, 52)
+					
+	#39 Week Return (20 Day Lag)
+	factors$PM$R39W = week.prices / mlag(week.prices,39)
+			
+	# http://www.tradesignalonline.com/lexicon/view.aspx?id=Volume+Price+Trend+%28VPT%29
+	#51 Week Volume Price Trend (20 Day Lag)	
+	temp = bt.apply(data, function(x) cumsum(ifna(Vo(x),0)))
+	temp = temp[week.ends,]
+		week.volume = temp - mlag(temp)		
+	temp = (week.prices - mlag(week.prices)) * week.volume
+	factors$PM$VPT51W = bt.apply.matrix(temp, runSum, 51)
+			
+	# Convert weekly to daily
+	for(i in 1:len(factors$PM)) {
+		temp = prices * NA
+		temp[week.ends,] = factors$PM[[i]]
+		factors$PM[[i]] = bt.apply.matrix(temp, function(x) ifna.prev(x))
+	}
+	
+	#Percent Above 260 Day Low (20 Day Lag)
+	factors$PM$P260LOW = prices / bt.apply.matrix(prices, runMin, 260)
+	
+	# Flip sign
+	for(i in names(factors$PM)) factors$PM[[i]] = -factors$PM[[i]]
+	
+	#*****************************************************************
+	# Create Price Reversal
+	#****************************************************************** 
+	factors$PR = list()
+	factor.names$PR = 'Price Reversal'	
+		
+	#5 Day Industry Relative Return
+	factors$PR$r5DR = prices/mlag(prices,5)
+		factors$PR$r5DR = factors$PR$r5DR / sector.mean(factors$PR$r5DR, sectors)
+	
+	#5 Day Money Flow / Volume
+	factors$PR$MFV = bt.apply(data, function(x) {
+		MFI(cbind(ifna.prev(Hi(x)),ifna.prev(Lo(x)),ifna.prev(Cl(x))),5) / ifna.prev(Vo(x))
+	})
+			
+	#10 Day MACD - Signal Line
+	factors$PR$MACD = bt.apply.matrix(prices, function(x) {
+		temp=MACD(x,10)
+		temp[,'macd'] - temp[,'signal']
+		})		
+	
+	#14 Day RSI (Relative Strength Indicator)
+	factors$PR$RSI = bt.apply.matrix(prices, RSI, 14)
+			
+	#14 Day Stochastic
+	factors$PR$STOCH = bt.apply(data, function(x) {
+		stoch(cbind(ifna.prev(Hi(x)),ifna.prev(Lo(x)),ifna.prev(Cl(x))),14)[,'slowD']
+	})
+		
+	#4 Week Industry Relative Return
+	factors$PR$rR4W = week.prices / mlag(week.prices,4)
+		factors$PR$rR4W = factors$PR$rR4W / sector.mean(factors$PR$rR4W, sectors)
+		
+		# Convert weekly to daily
+		temp = prices * NA
+		temp[week.ends,] = factors$PR$rR4W
+		factors$PR$rR4W = bt.apply.matrix(temp, function(x) ifna.prev(x))
+	
+	
+	# VOMO - Volume x Momentum
+	volume = bt.apply(data, function(x) ifna.prev(Vo(x)))
+	factors$PR$VOMO = (prices / mlag(prices,10) - 1) * bt.apply.matrix(volume, runMean, 22) / bt.apply.matrix(volume, runMean, 66)
+	
+	# Flip sign
+	for(i in names(factors$PR)) factors$PR[[i]] = -factors$PR[[i]]
+	
+	#*****************************************************************
+	# Create Small Size
+	#****************************************************************** 		
+	factors$SS = list()
+	factor.names$SS = 'Small Size'		
+	
+	#Log of Market Capitalization
+	factors$SS$MC = log(MKVAL)
+	
+	#Log of Market Capitalization Cubed
+	factors$SS$MC3 = log(MKVAL)^3
+	
+	#Log of Stock Price
+	factors$SS$P = log(prices)
+	
+	#Log of Total Assets
+	factors$SS$AT = log(bt.apply(data, function(x) ifna.prev(x[, 'AT'])))
+	
+	#Log of Trailing-12-Month Sales
+	factors$SS$SALE = log(bt.apply(data, function(x) ifna.prev(x[, 'SALE'])))
+
+	# Flip sign
+	for(i in names(factors$SS)) factors$SS[[i]] = -factors$SS[[i]]
+	
+	#*****************************************************************
+	# Convert to monthly
+	#****************************************************************** 
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+	
+	prices = prices[month.ends,]
+		n = ncol(prices)
+		nperiods = nrow(prices)
+	
+	ret = prices / mlag(prices) - 1
+		next.month.ret = mlag(ret, -1)
+	
+	MKVAL = MKVAL[month.ends,]
+	
+	for(j in 1:len(factors)) {	
+		for(i in 1:len(factors[[j]])) {
+			factors[[j]][[i]] = factors[[j]][[i]][month.ends,]	
+			factors[[j]][[i]][] = ifna(factors[[j]][[i]],NA)
+		}
+	}
+
+	#*****************************************************************
+	# Create Relative Value
+	#****************************************************************** 
+	factors$RV = list()
+	factor.names$RV = 'Relative Value'		
+	
+	# relative 
+	for(i in spl('EP,SP,CFP')) {
+		factors$RV[[paste('r',i,sep='')]] = factors$TV[[i]] / sector.mean(factors$TV[[i]], sectors) 		
+	}
+		
+	# spreads, 5 Year Avg = 60 months
+	for(i in spl('rEP,rSP,rCFP')) {
+		factors$RV[[paste('s',i,sep='')]] = factors$RV[[i]] - 
+		apply(factors$RV[[i]], 2, function(x) if(all(is.na(x))) x else SMA(x,60) )
+	}
+	
+	#*****************************************************************
+	# Profit Trends (Relative)
+	#****************************************************************** 
+	
+	# relative 
+	for(i in spl('RS,SA')) {
+		factors$PT[[paste('r',i,sep='')]] = factors$PT[[i]] / sector.mean(factors$PT[[i]], sectors)
+	}		
+	
+	for(j in 1:len(factors)) {	
+		for(i in 1:len(factors[[j]])) {
+			factors[[j]][[i]][] = ifna(factors[[j]][[i]],NA)
+		}
+	}
+	
+	#*****************************************************************
+	# Normalize and add Average factor
+	#****************************************************************** 
+	for(j in names(factors)) {
+		factors[[j]] = normalize.normal(factors[[j]])
+		factors[[j]] = add.avg.factor(factors[[j]])
+	}
+
+	#*****************************************************************
+	# Create Composite Average factor
+	#****************************************************************** 	
+	factors.avg = list()
+	for(j in names(factors)) factors.avg[[j]] = factors[[j]]$AVG
+	
+	factors.avg = add.avg.factor(factors.avg)
+
+	#*****************************************************************
+	# Backtest qutiles and qutile spread
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	plot.quantiles(factors.avg, next.month.ret, 'Average')
+dev.off() 	
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	plot.bt.quantiles(factors.avg$AVG, next.month.ret, 'Composite Average', data)
+dev.off() 	
+
+
+	#*****************************************************************
+	# Run cross sectional regression and create Alpha model
+	#****************************************************************** 
+	nperiods = dim(factors.avg[[1]])[1]
+	n = dim(factors.avg[[1]])[2]
+
+	# get all factors
+	factors.avg = list()
+	for(j in names(factors)) factors.avg[[j]] = factors[[j]]$AVG
+
+		
+	# create matrix for each factor, combine with returns
+	factors.matrix = abind(factors.avg, along = 3)	
+	all.data = factors.matrix
+		all.data = abind(next.month.ret, all.data, along = 3)
+		dimnames(all.data)[[3]][1] = 'Ret'
+
+		
+	# estimate betas
+	beta = matrix(double(), nperiods, dim(all.data)[3]-1)
+		colnames(beta) = dimnames(all.data)[[3]][-1]
+		rownames(beta) = dimnames(all.data)[[1]]
+		
+	for(t in 12:(nperiods-1)) {
+		temp = all.data[t:t,,]
+		x = temp[,-1]
+		y = temp[,1]
+		beta[(t+1),] = lm(y~x-1)$coefficients
+	}
+	
+	
+	# create expected return forecasts
+	alpha = matrix(double(), nperiods, n)
+		colnames(alpha) = dimnames(all.data)[[2]]
+		rownames(alpha) = dimnames(all.data)[[1]]
+	for(t in 18:(nperiods-1)) {
+		coef = colMeans(beta[(t-5):t,],na.rm=T)
+		
+		coef = iif(coef > 0, coef, 0)
+		
+		alpha[t,] = rowSums(all.data[t,,-1] * t(repmat(coef, 1,n)), na.rm=T)	
+	}
+	
+
+	#*****************************************************************
+	# Backtest qutiles and qutile spread
+	#****************************************************************** 
+png(filename = 'plot4.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	layout(1:2)
+	temp = compute.quantiles(alpha, next.month.ret, plot=T)
+	plot.bt.quantiles(alpha, next.month.ret, 'Alpha', data)
+dev.off() 	
+
+	
+}		
+
+
+
+
+
+
+###############################################################################
+# Dow Jones Historical Components
+# http://en.wikipedia.org/wiki/Historical_components_of_the_Dow_Jones_Industrial_Average
+###############################################################################
+fm.hist.dow.jones.components <- function()
+{
+	tickers = spl('MMM	AA	MO	AXP	T	BAC	CAT	CVX	CSCO	C	KO	DD	XOM	GE	HPQ	HD	HON	INTC	IBM	IP	JNJ	JPM	KFT	MCD	MRK	MSFT	PFE	PG	BA	TRV	UTX	VZ	WMT	DIS', '\t')
+	
+	data = 
+'8-Jun-09	1	1	0	1	1	1	1	1	1	0	1	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+22-Sep-08	1	1	0	1	1	1	1	1	0	1	1	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	1	1	1	0	1	1	1	1
+19-Feb-08	1	1	0	1	1	1	1	1	0	1	1	1	1	1	1	1	0	1	1	0	1	1	0	1	1	1	1	1	1	0	1	1	1	1
+21-Nov-05	1	1	1	1	1	0	1	0	0	1	1	1	1	1	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	0	1	1	1	1
+8-Apr-04	1	1	1	1	1	0	1	0	0	1	1	1	1	1	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	0	1	1	1	1
+27-Jan-03	1	1	1	1	1	0	1	0	0	1	1	1	1	1	1	1	1	1	1	1	1	1	0	1	1	1	0	1	1	0	1	0	1	1
+1-Nov-99	1	1	1	1	1	0	1	0	0	1	1	1	1	1	1	1	1	0	1	1	1	1	0	1	1	1	0	1	1	0	1	0	1	1
+17-Mar-97	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	0	0	0	1	1	1	1	0	1	1	0	0	1	1	0	1	0	1	1
+6-May-91	1	1	1	1	1	0	1	1	0	1	1	1	1	1	1	0	0	0	1	1	1	1	0	1	1	0	0	1	1	0	1	0	1	1'
+
+
+	hist = matrix( spl( gsub('\n', '\t', data), '\t'), nrow = len(spl(data, '\n')), byrow=TRUE)			
+	hist = as.xts( matrix(as.double(hist[,-1]),nr=nrow(hist)), as.Date(hist[,1], '%d-%b-%y'))
+		colnames(hist) = tickers
+	return(hist)
+}
+										

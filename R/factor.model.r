@@ -20,13 +20,29 @@
 ###############################################################################
 
 
+
+###############################################################################
+# Count Consecutive Changes
+###############################################################################
+consecutive.changes <- function
+(
+	data, 		# data series
+	positive=T	# count positive consecutive changes
+) 
+{ 
+	if(positive) dir = diff(data) > 0 else dir = diff(data) < 0
+					
+	temp = cumsum(iif(dir, 1, 0))
+	temp - ifna.prev(iif(dir, NA, coredata(temp)))
+}
+
 ###############################################################################
 # Create plot of factors average correlations and returns
 ###############################################################################
 # http://stackoverflow.com/questions/4310727/what-is-rs-multidimensional-equivalent-of-rbind-and-cbind
 # apply(temp, 3, rbind)
 # http://r.789695.n4.nabble.com/Collapse-an-array-td850008.html
-factor.avgcor <- function(data, next.month.ret) { 
+factor.avgcor <- function(data, next.month.ret, name) { 
 	load.packages('abind')
 	# create matrix
 	temp = abind(data, along = 3)
@@ -36,7 +52,7 @@ factor.avgcor <- function(data, next.month.ret) {
 	# plot
 	temp = t(compute.avgcor(temp, 'spearman')[,-1])
 		temp[] = plota.format(100 * temp, 0, '', '%')
-		plot.table(temp, smain='Correlation')
+		plot.table(temp, smain=paste(name,'Correlation',sep=' \n '))
 }
 			
 ###############################################################################
@@ -45,7 +61,7 @@ factor.avgcor <- function(data, next.month.ret) {
 compute.avgcor <- function
 (
 	data, 		# matrix with data: [rows,cols,factors]
-	method = c("pearson", "kendall", "spearman")
+	method = c('pearson', 'kendall', 'spearman')
 )
 {
 	nr = dim(data)[1]
@@ -66,7 +82,12 @@ compute.avgcor <- function
 ###############################################################################
 # Compute Market Cap weighted mean
 ###############################################################################
-cap.weighted.mean <- function(data, capitalization) {
+cap.weighted.mean <- function
+(
+	data, 	# factor
+	capitalization	# market capitalization
+) 
+{
 	capitalization = capitalization * (!is.na(data))
 	weight = capitalization / rowSums(capitalization,na.rm=T)	
 	rowSums(data * weight,na.rm=T)	
@@ -75,7 +96,12 @@ cap.weighted.mean <- function(data, capitalization) {
 ###############################################################################
 # Compute factor mean for each sector
 ###############################################################################
-sector.mean <- function(data, sectors) { 
+sector.mean <- function
+(
+	data, 	# factor
+	sectors	# sectors
+) 
+{ 
 	out = data * NA
 	for(sector in levels(sectors)) {
 		index = (sector == sectors)
@@ -86,46 +112,209 @@ sector.mean <- function(data, sectors) {
 	
 
 ###############################################################################
-# Create quintiles
+# Create quantiles
 # http://en.wikipedia.org/wiki/Quantile
 # rank each month stocks according to E/P factor
-# create quintiles, and record their performance next month
+# create quantiles, and record their performance next month
 ###############################################################################
-compute.quintiles <- function(data, next.month.ret, smain='', plot=T) { 
+compute.quantiles <- function
+(
+	data, 			# factor
+	next.month.ret, # future returns
+	smain='', 		# title for plot
+	n.quantiles=5, 	# number of quantiles
+	plot=T			# flag to create plot
+) 
+{ 
 	n = ncol(data)
 	nperiods = nrow(data)
 	
 	data = coredata(ifna(data,NA))
 	next.month.ret = coredata(ifna(next.month.ret,NA))
 	
-	temp = matrix(NA, nperiods, 5)
-	hist.factor.quintiles = hist.ret.quintiles = temp
+	temp = matrix(NA, nperiods, n.quantiles)
+	hist.factor.quantiles = hist.ret.quantiles = temp
 	
 	temp = matrix(NA, nperiods, n)
-	quintiles = weights = temp
+	quantiles = weights = temp
 	
 	index = which(rowSums(!is.na(data * next.month.ret)) > n/2)
 	for(t in index) {
 		factor = data[t,]
 		ret = next.month.ret[t,]
 		
-		ranking = ceiling(5 * rank(factor, na.last = 'keep') / count(factor))
+		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
 	
-		quintiles[t,] = ranking
+		quantiles[t,] = ranking
 		weights[t,] = 1/tapply(rep(1,n), ranking, sum)[ranking]
 			
-		hist.factor.quintiles[t,] = tapply(factor, ranking, mean)
-		hist.ret.quintiles[t,] = tapply(ret, ranking, mean)
+		hist.factor.quantiles[t,] = tapply(factor, ranking, mean)
+		hist.ret.quantiles[t,] = tapply(ret, ranking, mean)
 	}
 	
+	# create plot
 	if(plot) {
 		par(mar=c(4,4,2,1)) 	 	 	
-		temp = 100*apply(hist.ret.quintiles,2,mean,na.rm=T)
- 		barplot(temp, names.arg=paste(1:5), ylab='%', 
- 			main=paste(smain, ', spread =',round(temp[5]-temp[1],2), '%'))
+		temp = 100*apply(hist.ret.quantiles,2,mean,na.rm=T)
+ 		barplot(temp, names.arg=paste(1:n.quantiles), ylab='%', 
+ 			main=paste(smain, ', spread =',round(temp[n.quantiles]-temp[1],2), '%'))
  	}
  		
- 	return(list(quintiles=quintiles, weights=weights))
+ 	return(list(quantiles=quantiles, weights=weights))
 }
 
 
+###############################################################################
+# Create Average factor
+###############################################################################
+add.avg.factor <- function
+(
+	data	# factors
+) 
+{ 
+	# compute the overall factor
+	temp = abind(data, along = 3)
+	data$AVG = data[[1]]
+	data$AVG[] = ifna(apply(temp, c(1,2), mean, na.rm=T),NA)
+	return(data)	
+}
+
+	
+###############################################################################
+# Convert factor to Z scores, normalize using market capitalization average
+###############################################################################
+normalize <- function
+(
+	data,	# factors
+	MKVAL	# capitalization
+) 
+{ 
+	# normalize (convert to z scores) cross sectionaly all factors
+	for(i in names(data)) {
+		#data[[i]] = (data[[i]] - apply(data[[i]], 1, mean, na.rm=T)) / apply(data[[i]], 1, sd, na.rm=T)
+		data[[i]] = (data[[i]] - cap.weighted.mean(data[[i]], MKVAL)) / 
+							apply(data[[i]], 1, sd, na.rm=T)
+	}
+	return(data)	
+}
+	
+
+###############################################################################
+# Convert factor to Z scores, only keep the ranks
+###############################################################################
+normal.transform <- function(data) 
+{	
+	rk=rank(data, na.last='keep', ties.method = 'first')
+	n = count(data)
+	x = qnorm((1:n) / (n+1))
+	return(x[rk])
+}
+
+normalize.normal <- function
+(
+	data	# factors
+)
+{ 
+	# normalize (convert to z scores) cross sectionaly all factors
+	for(i in names(data)) {
+		data[[i]] = t(apply(data[[i]], 1, normal.transform))
+	}
+	return(data)	
+}
+	
+
+###############################################################################
+# Plot Quantiles
+###############################################################################
+plot.quantiles <- function
+(
+	data, 			# factors
+	next.month.ret, # future one month returns
+	smain=''		# title
+) 
+{ 
+	layout(matrix(1:(2*ceiling(len(data)/2)), nc=2))
+	sapply(1:len(data), function(i)
+		compute.quantiles(data[[i]], next.month.ret, paste(names(data)[i],smain))
+	)	
+}
+
+###############################################################################
+# Plot Backtest Quantiles and spread (Q5-Q1)
+###############################################################################
+plot.bt.quantiles <- function
+(
+	factors,		# factors
+	next.month.ret, # future one month returns
+	smain='',		# title
+	data		 	# data 
+) 
+{ 
+	out = compute.quantiles(factors, next.month.ret, plot=F)	
+		
+	prices = data$prices
+		prices = bt.apply.matrix(prices, function(x) ifna.prev(x))
+		
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+
+	# create strategies that invest in each qutile
+	models = list()
+	
+	for(i in 1:5) {
+		data$weight[] = NA
+			data$weight[month.ends,] = iif(out$quantiles == i, out$weights, 0)
+			capital = 100000
+			data$weight[] = (capital / prices) * (data$weight)	
+		models[[paste('Q',i,sep='')]] = bt.run(data, type='share', capital=capital)
+	}
+	
+	# spread
+	data$weight[] = NA
+		data$weight[month.ends,] = iif(out$quantiles == 5, out$weights, 
+									iif(out$quantiles == 1, -out$weights, 0))
+		capital = 100000
+		data$weight[] = (capital / prices) * (data$weight)
+	models$Q5_Q1 = bt.run(data, type='share', capital=capital)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main=smain)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+}
+		
+		
+
+###############################################################################
+# Plot Factors details
+###############################################################################
+plot.factors <- function
+(
+	data, 			# factors
+	name, 			# name of factor group
+	next.month.ret	# future one month returns
+)
+{ 
+	x = as.vector(t(data))
+	y = as.vector(t(next.month.ret))
+		x = ifna(x,NA)
+		y = ifna(y,NA)
+		index = !is.na(x) & !is.na(y)
+		x = x[index]
+		y = y[index]	
+			 	
+	cor.p = round(100*cor(x, y, use = 'complete.obs', method = 'pearson'),1)
+	cor.s = round(100*cor(x, y, use = 'complete.obs', method = 'spearman'),1)
+			
+	# Plot
+	layout(1:2)
+	plot(x, pch=20)
+		
+	par(mar=c(4,4,2,1)) 	 	 	
+	plot(x, y, pch=20, xlab=name, ylab='Next Month Return')
+		abline(lm(y ~ x), col='blue', lwd=2)
+		plota.legend(paste('Pearson =',cor.p,',Spearman =', cor.s))
+}		 		
+		 		
+	

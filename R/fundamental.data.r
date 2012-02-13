@@ -180,7 +180,7 @@ get.fund.data <- function
 ) 
 {			
 	index = get.fund.data.index(label, fund)		
-	if( len(index) == 0 ) return(NA)
+	if( len(index) == 0 ) return(as.xts(rep(NA,len(fund.date)), fund.date))
 	
 	# remove commas
 	temp.q = as.double(gsub(',', '', fund[index,]))
