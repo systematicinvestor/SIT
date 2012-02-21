@@ -138,7 +138,8 @@ compute.quantiles <- function
 	temp = matrix(NA, nperiods, n)
 	quantiles = weights = temp
 	
-	index = which(rowSums(!is.na(data * next.month.ret)) > n/2)
+	#index = which(rowSums(!is.na(data * next.month.ret)) > n/2)
+	index = which(rowSums(!is.na(data)) > n/2)
 	for(t in index) {
 		factor = data[t,]
 		ret = next.month.ret[t,]
@@ -217,7 +218,7 @@ normalize.normal <- function
 { 
 	# normalize (convert to z scores) cross sectionaly all factors
 	for(i in names(data)) {
-		data[[i]] = t(apply(data[[i]], 1, normal.transform))
+		data[[i]][] = t(apply(data[[i]], 1, normal.transform))
 	}
 	return(data)	
 }

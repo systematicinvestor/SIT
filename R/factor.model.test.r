@@ -194,7 +194,7 @@ fm.fund.factor.test <- function()
 	#*****************************************************************
 	# Load historical data
 	#****************************************************************** 
-	load.packages('quantmod')		
+	load.packages('quantmod,abind')	
 	tickers = dow.jones.components()
 	
 	sectors = factor(sector.map[ match(tickers, sector.map[,'ticker']), 'sector'])
@@ -361,7 +361,7 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off() 		
 	
 	#*****************************************************************
-	# Backtest qutiles and qutile spread
+	# Backtest quantiles and quantile spread
 	#****************************************************************** 
 	out = compute.quantiles(factors$TV$AVG, next.month.ret, plot=F)	
 		
@@ -832,29 +832,34 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off() 	
 
 
+
+
+	#*****************************************************************
+	# Save CSFB factors to be used later to create multiple factor Risk Model
+	#****************************************************************** 
+	save(data, sectors, factors.avg, next.month.ret, file='data.factors.Rdata')
+		# remove Composite Average factor
+		factors.avg = factors.avg[which(names(factors.avg) != 'AVG')]
+	
+	
 	#*****************************************************************
 	# Run cross sectional regression and create Alpha model
 	#****************************************************************** 
-	nperiods = dim(factors.avg[[1]])[1]
-	n = dim(factors.avg[[1]])[2]
-
-	# get all factors
-	factors.avg = list()
-	for(j in names(factors)) factors.avg[[j]] = factors[[j]]$AVG
-
-		
-	# create matrix for each factor, combine with returns
+	nperiods = nrow(next.month.ret)
+	n = ncol(next.month.ret)
+			
+	# create matrix for each factor
 	factors.matrix = abind(factors.avg, along = 3)	
 	all.data = factors.matrix
-		all.data = abind(next.month.ret, all.data, along = 3)
+	
+	# betas
+	beta = all.data[,1,] * NA
+	
+	# append next.month.ret to all.data			
+	all.data = abind(next.month.ret, all.data, along = 3)
 		dimnames(all.data)[[3]][1] = 'Ret'
-
 		
-	# estimate betas
-	beta = matrix(double(), nperiods, dim(all.data)[3]-1)
-		colnames(beta) = dimnames(all.data)[[3]][-1]
-		rownames(beta) = dimnames(all.data)[[1]]
-		
+	# estimate betas (factor returns)
 	for(t in 12:(nperiods-1)) {
 		temp = all.data[t:t,,]
 		x = temp[,-1]
@@ -862,11 +867,9 @@ dev.off()
 		beta[(t+1),] = lm(y~x-1)$coefficients
 	}
 	
-	
-	# create expected return forecasts
-	alpha = matrix(double(), nperiods, n)
-		colnames(alpha) = dimnames(all.data)[[2]]
-		rownames(alpha) = dimnames(all.data)[[1]]
+	# create Alpha return forecasts
+	alpha = next.month.ret * NA
+		
 	for(t in 18:(nperiods-1)) {
 		coef = colMeans(beta[(t-5):t,],na.rm=T)
 		
@@ -876,17 +879,215 @@ dev.off()
 	}
 	
 
+	
+	
 	#*****************************************************************
 	# Backtest qutiles and qutile spread
 	#****************************************************************** 
 png(filename = 'plot4.png', width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+
 	layout(1:2)
 	temp = compute.quantiles(alpha, next.month.ret, plot=T)
 	plot.bt.quantiles(alpha, next.month.ret, 'Alpha', data)
+	
+	
 dev.off() 	
 
 	
 }		
+
+
+###############################################################################
+# Multiple Factor Model – Building Risk Model
+#
+# The risk factor model: MSCI Barra United States Equity Multi-Factor Model, page 101
+# http://www.alacra.com/alacra/help/barra_handbook_US.pdf
+###############################################################################		
+fm.risk.model.test <- function()
+{	
+	#*****************************************************************
+	# Load factor data that we saved at the end of the fm.all.factor.test functions
+	#****************************************************************** 
+	load.packages('quantmod,abind')	
+		
+	load(file='data.factors.Rdata')
+		# remove Composite Average factor
+		factors.avg = factors.avg[which(names(factors.avg) != 'AVG')]	
+		
+	#*****************************************************************
+	# Run cross sectional regression to estimate factor returns
+	#****************************************************************** 
+	nperiods = nrow(next.month.ret)
+	n = ncol(next.month.ret)
+		
+	# create sector dummy variables: binary 0/1 values for each sector
+	nsectors = len(levels(sectors))	
+	sectors.matrix = array(double(), c(nperiods, n, nsectors))
+		dimnames(sectors.matrix)[[3]] = levels(sectors)		
+	for(j in levels(sectors)) {
+		sectors.matrix[,,j] = matrix(sectors == j,  nr=nperiods, nc=n, byrow=T)
+	}
+	
+	# create matrix for each factor
+	factors.matrix = abind(factors.avg, along = 3)		
+	
+	# combine sector dummies and all factors
+	all.data = abind(sectors.matrix, factors.matrix)		
+	
+	# create betas and specific.return
+	beta = all.data[,1,] * NA
+	specific.return = next.month.ret * NA
+		nfactors = ncol(beta)
+		
+	# append next.month.ret to all.data			
+	all.data = abind(next.month.ret, all.data, along = 3)
+		dimnames(all.data)[[3]][1] = 'Ret'
+			
+	# estimate betas (factor returns)
+	for(t in 12:(nperiods-1)) {		
+		temp = all.data[t:t,,]
+		x = temp[,-c(1:2)]
+		y = temp[,1]
+		b = lm(y~x)$coefficients
+		
+		b[2:nsectors] = b[1] + b[2:nsectors]
+		beta[(t+1),] = b		
+		
+		specific.return[(t+1),] = y - rowSums(temp[,-1] * matrix(b, n, nfactors, byrow=T), na.rm=T)	
+	}
+	
+	#*****************************************************************
+	# Stock specific return - return not captured by common factors
+	# specific.return = company.return - exposures %*% beta 
+	#
+	# http://www.business.uconn.edu/finance/seminars/papers/Chanatip.Kitwiwattanachai_JMP.pdf
+	# page 17, risk model "industry dummy" "linearly dependent"	
+	#
+	# Northfield Fundamental Risk Model
+	# www.northinfo.com/documents/8.pdf
+	#
+	# There are a few alternative ways of running above regression in robust way
+	# load.packages('MASS')
+	# temp = rlm(y~x)$coefficients
+	#
+	# load.packages('quantreg')
+	# temp = rq(y ~ x, tau = 0.5)$coefficients
+	#*****************************************************************
+
+	
+
+	#*****************************************************************
+	# helper function
+	#****************************************************************** 	
+	fm.hist.plot <- function(temp, smain=NULL) {			
+		ntemp = ncol(temp)		
+		cols = plota.colors(ntemp)	
+		plota(temp, ylim = range(temp), log='y', main=smain)
+		for(i in 1:ntemp) plota.lines(temp[,i], col=cols[i])
+		plota.legend(colnames(temp), cols, as.list(temp))
+	}
+
+	#*****************************************************************
+	# Examine historical cumulative factor returns
+	#****************************************************************** 	
+	temp = make.xts(beta, index(next.month.ret))
+		temp = temp['2000::',]
+		temp[] = apply(coredata(temp), 2, function(x) cumprod(1 + ifna(x,0)))
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	fm.hist.plot(temp[,-c(1:nsectors)], 'Factor Returns')
+dev.off()	
+
+	#*****************************************************************
+	# Compute factor covariance using shrinkage estimator
+	# use var.shrink.eqcor function in BurStFin package to estimate a 
+	# variance matrix using Ledoit-Wolf shrinkage towards equal correlation
+	# http://www.portfolioprobe.com/wp-content/uploads/2010/08/pprobe_R_risk.txt
+	#
+	# There are a few alternative ways of estimating covariance
+	# load.packages('tawny')
+	# tawny::cov.shrink(beta)	
+	#
+	# Exponentially weighted
+	# lam = 0.9
+	# i = 0:(nrow(beta)-1)
+	# wt = lam^i
+	# wt = wt/sum(wt)
+	# cov.wt(beta, wt=rev(wt)) 	
+	#
+	# load.packages('corpcor')
+	# corpcor::cov.shrink(beta, w=rev(wt)) 		
+	#****************************************************************** 
+	load.packages('BurStFin')	
+	#var.shrink.eqcor(returns) 
+	#factor.model.stat(returns)
+	
+	
+	factor.covariance = array(double(), c(nperiods, nfactors, nfactors))
+		dimnames(factor.covariance)[[2]] = colnames(beta)
+		dimnames(factor.covariance)[[3]] = colnames(beta)
+
+	# estimate factor covariance
+	for(t in 36:(nperiods-1)) {
+		factor.covariance[t,,] = var.shrink.eqcor(beta[(t-23):t,])
+	}
+	
+	#*****************************************************************
+	# Compute stocks specific variance foreasts using GARCG(1,1)
+	# Rely on code in the Volatility Forecasting using Garch(1,1) post
+	#
+	# Stock specific return - return not captured by common factors
+	# specific.return = company.return - exposures %*% beta 
+	#****************************************************************** 		
+	load.packages('tseries,fGarch')	
+	specific.variance = next.month.ret * NA
+	for(i in 1:n) specific.variance[,i] = bt.forecast.garch.volatility(specific.return[,i], 24) 
+
+	#*****************************************************************
+	# Compute portfolio risk
+	#****************************************************************** 
+	portfolio = rep(1/n, n)
+		portfolio = matrix(portfolio, n, nfactors)
+	
+	portfolio.risk = next.month.ret[,1] * NA
+	for(t in 36:(nperiods-1)) {
+	
+		#exposure = portfolio %*% exposures		
+		portfolio.exposure = colSums(portfolio * all.data[t,,-1], na.rm=T)
+		
+		#risk = sqrt(exposure %*% factor.covariance %*% t(exposure) + specific.variance %*% portfolio^2)
+		portfolio.risk[t] = sqrt(
+			portfolio.exposure %*% factor.covariance[t,,] %*% (portfolio.exposure) + 
+			sum(specific.variance[t,]^2 * portfolio[,1]^2, na.rm=T)
+			)
+	}
+	
+			
+	#*****************************************************************
+	# Compute historical portfolio risk
+	#****************************************************************** 
+	portfolio = rep(1/n, n)
+		portfolio = t(matrix(portfolio, n, nperiods))
+	
+	portfolio.returns = next.month.ret[,1] * NA
+		portfolio.returns[] = rowSums(mlag(next.month.ret) * portfolio, na.rm=T)
+	
+	hist.portfolio.risk = runSD(portfolio.returns, 24)
+	
+	#*****************************************************************
+	# Plot risks
+	#****************************************************************** 			
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	plota(portfolio.risk['2000::',], type='l')
+		plota.lines(hist.portfolio.risk, col='blue')
+		plota.legend('Risk,Historical Risk', 'black,blue')
+		
+dev.off()	
+	
+	
+}
 
 
 

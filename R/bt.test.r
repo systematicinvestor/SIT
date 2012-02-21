@@ -950,6 +950,86 @@ bt.max.deviation.rebalancing <- function
 }
 
 
+
+
+bt.rebalancing1.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	# SHY - cash
+	tickers = spl('SPY,TLT,GLD,FXE,USO,SHY')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='remove.na', dates='1900::2011')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	nperiods = nrow(prices)
+	target.allocation = matrix(rep(1/6,6), nrow=1)
+	
+	# Buy & Hold	
+	data$weight[] = NA	
+		data$weight[1,] = target.allocation
+		capital = 100000
+		data$weight[] = (capital / prices) * data$weight
+	buy.hold = bt.run(data, type='share', capital=capital)
+
+	
+	# Rebalance periodically
+	models = list()
+	for(period in spl('months,quarters,years')) {
+		data$weight[] = NA	
+			data$weight[1,] = target.allocation
+			
+			period.ends = endpoints(prices, period)
+				period.ends = period.ends[period.ends > 0]		
+			data$weight[period.ends,] = repmat(target.allocation, len(period.ends), 1)
+						
+			capital = 100000
+			data$weight[] = (capital / prices) * data$weight
+		models[[period]] = bt.run(data, type='share', capital=capital)	
+	}
+	models$buy.hold = buy.hold				
+	
+
+	#*****************************************************************
+	# Code Strategies that rebalance based on maximum deviation
+	#****************************************************************** 
+	
+	# rebalance to target.allocation when portfolio weights are 3% away from target.allocation
+	models$smart3.all = bt.max.deviation.rebalancing(data, buy.hold, target.allocation, 3/100, 0) 
+	
+	# rebalance half-way to target.allocation when portfolio weights are 3% away from target.allocation
+	models$smart3.half = bt.max.deviation.rebalancing(data, buy.hold, target.allocation, 3/100, 0.5) 
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 			
+			
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+	# Plot Portfolio Turnover for each Rebalancing method
+	layout(1:2)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover', F)
+	barplot.with.labels(sapply(models, compute.max.deviation, target.allocation), 'Maximum Deviation from Target Mix')
+	
+	
+dev.off()
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Strategy Statistics  Side by Side
+	plotbt.strategy.sidebyside(models)
+dev.off()	
+	
+}
+
+
 ###############################################################################
 # Rotational Trading: how to reduce trades and improve returns by Frank Hassler
 # http://engineering-returns.com/2011/07/06/rotational-trading-how-to-reducing-trades-and-improve-returns/
@@ -1385,7 +1465,7 @@ bt.forecast.garch.volatility <- function(ret.log, est.period = 252)
 		}			
 		if( i %% 100 == 0) cat(i, '\n')
 	}
-	garch.vol = ifna.prev(garch.vol)
+	garch.vol[] = ifna.prev(coredata(garch.vol))
 	return(garch.vol)
 }	
 
