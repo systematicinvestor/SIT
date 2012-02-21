@@ -1033,7 +1033,7 @@ dev.off()
 	}
 	
 	#*****************************************************************
-	# Compute stocks specific variance foreasts using GARCG(1,1)
+	# Compute stocks specific variance foreasts using GARCH(1,1)
 	# Rely on code in the Volatility Forecasting using Garch(1,1) post
 	#
 	# Stock specific return - return not captured by common factors
