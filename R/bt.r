@@ -588,11 +588,11 @@ bt.apply.matrix <- function
 ###############################################################################
 bt.exrem <- function(weight)
 {
-	bt.apply.matrix(weight, function(x) {
-		temp = ifna(ifna.prev(x),0)
+	bt.apply.matrix(weight, function(x) {		
+		temp = c(0, ifna(ifna.prev(x),0))
 			itemp = which(temp != mlag(temp))
 		x[] = NA 
-		x[itemp] = temp[itemp]
+		x[(itemp-1)] = temp[itemp]	
 		return(x)
 	})
 }	

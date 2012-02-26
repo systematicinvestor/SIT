@@ -419,7 +419,8 @@ beta.degree <- function(beta)
 ###############################################################################
 
 # must set timezone before any calls to xts
-Sys.setenv(TZ = 'GMT')
+#Sys.setenv(TZ = 'GMT')
+Sys.setenv(TZ = 'EST')
 
 
 make.xts <- function
@@ -428,7 +429,7 @@ make.xts <- function
 	order.by	# date
 )
 {
-	Sys.setenv(TZ = 'GMT')
+	Sys.setenv(TZ = 'EST')
 	tzone = Sys.getenv('TZ')
 	
     orderBy = class(order.by)

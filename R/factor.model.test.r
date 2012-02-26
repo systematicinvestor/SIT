@@ -906,7 +906,7 @@ dev.off()
 fm.risk.model.test <- function()
 {	
 	#*****************************************************************
-	# Load factor data that we saved at the end of the fm.all.factor.test functions
+	# Load factor data that we saved at the end of the fm.all.factor.test function
 	#****************************************************************** 
 	load.packages('quantmod,abind')	
 		
@@ -1028,7 +1028,7 @@ dev.off()
 		dimnames(factor.covariance)[[3]] = colnames(beta)
 
 	# estimate factor covariance
-	for(t in 36:(nperiods-1)) {
+	for(t in 36:nperiods) {
 		factor.covariance[t,,] = var.shrink.eqcor(beta[(t-23):t,])
 	}
 	
@@ -1043,6 +1043,13 @@ dev.off()
 	specific.variance = next.month.ret * NA
 	for(i in 1:n) specific.variance[,i] = bt.forecast.garch.volatility(specific.return[,i], 24) 
 
+
+	#*****************************************************************
+	# Save multiple factor risk model to be used later during portfolio construction
+	#****************************************************************** 
+	save(all.data, factor.covariance, specific.variance, file='risk.model.Rdata')
+			
+	
 	#*****************************************************************
 	# Compute portfolio risk
 	#****************************************************************** 
@@ -1089,6 +1096,169 @@ dev.off()
 	
 }
 
+
+
+###############################################################################
+# Why do we need a risk model
+#
+# Portfolio Optimization with Factors, Scenarios, and Realistic Short Positions
+# by B. Jacobs, K. Levy, H. Markowitz
+###############################################################################		
+fm.risk.model.optimization.test <- function()
+{	
+	#*****************************************************************
+	# Load data
+	#****************************************************************** 
+	load.packages('quantmod')	
+
+	# Load factor data that we saved at the end of the fm.all.factor.test function
+	load(file='data.factors.Rdata')
+		nperiods = nrow(next.month.ret)
+		n = ncol(next.month.ret)
+		tickers = colnames(next.month.ret)
+		
+	# Load multiple factor risk model data that we saved at the end of the fm.risk.model.test function	
+	load(file='risk.model.Rdata')
+		
+		
+	#*****************************************************************
+	# Construct minimum variance portfolio using the sample covariance matrix
+	#****************************************************************** 
+	load.packages('quadprog,corpcor')
+	
+	#--------------------------------------------------------------------------
+	# Create Covariance matrix
+	#--------------------------------------------------------------------------
+	temp = last(mlag(next.month.ret),24)
+	cov.temp = cov(temp, use='complete.obs', method='pearson')	
+	hist.cov = cov.temp
+	
+	#--------------------------------------------------------------------------
+	# Adjust Covariance matrix
+	#--------------------------------------------------------------------------
+	if(!is.positive.definite(cov.temp)) {
+		cov.temp <- make.positive.definite(cov.temp, 0.000000001)
+	}	
+		
+	#--------------------------------------------------------------------------
+	# Create constraints
+	#--------------------------------------------------------------------------
+	# set min/max wgts for individual stocks: 0 =< x <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+	
+	# wgts must sum to 1 (fully invested)
+	constraints = add.constraints(rep(1,n), 1, type = '=', constraints)
+	
+		
+	#--------------------------------------------------------------------------
+	# Solve QP problem
+	#--------------------------------------------------------------------------		
+	sol = solve.QP.bounds(Dmat = cov.temp, dvec = rep(0, nrow(cov.temp)) , 
+		Amat=constraints$A, bvec=constraints$b, constraints$meq,
+		lb = constraints$lb, ub = constraints$ub)
+
+	print(sqrt(sol$value))
+	#--------------------------------------------------------------------------
+	# Plot Portfolio weights
+	#--------------------------------------------------------------------------				
+	x = round(sol$solution,4)
+		x = iif(x < 0, 0, x)
+		names(x) = colnames(next.month.ret)
+	hist.min.var.portfolio = x
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		
+	barplot(100*x,las = 2, 
+		main = 'Minimum variance portfolio weights (sample covariance matrix)')
+		
+dev.off()	
+
+
+		
+	#*****************************************************************
+	# Construct minimum variance portfolio using the multiple factor risk model
+	#****************************************************************** 
+	t = nperiods	
+	factor.exposures = all.data[t,,-1]	
+		nfactors = ncol(factor.exposures)
+		
+	#--------------------------------------------------------------------------
+	# Create constraints
+	#--------------------------------------------------------------------------
+	# set min/max wgts for individual stocks: 0 =< x <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+	
+	# wgts must sum to 1 (fully invested)
+	constraints = add.constraints(rep(1,n), 1, type = '=', constraints)
+		
+	# adjust prior constraints, add v.i
+	constraints = add.variables(nfactors, constraints)
+	
+	# BX - X1 = 0
+	constraints = add.constraints(rbind(factor.exposures, -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
+
+	#--------------------------------------------------------------------------
+	# Create Covariance matrix
+	# [Qu  0]
+	# [ 0 Qf]
+	#--------------------------------------------------------------------------
+	temp = diag(n)
+		diag(temp) = specific.variance[t,]^2
+	cov.temp = diag(n + nfactors)
+		cov.temp[1:n,1:n] = temp
+	cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
+	
+	#--------------------------------------------------------------------------
+	# Solve QP problem
+	#--------------------------------------------------------------------------
+	load.packages('quadprog')
+	
+	sol = solve.QP.bounds(Dmat = cov.temp, dvec = rep(0, nrow(cov.temp)) , 
+		Amat=constraints$A, bvec=constraints$b, constraints$meq,
+		lb = constraints$lb, ub = constraints$ub)
+
+	print(sqrt(sol$value))
+	#--------------------------------------------------------------------------
+	# Plot Portfolio weights
+	#--------------------------------------------------------------------------				
+	x = round(sol$solution,4)[1:n]
+		x = iif(x < 0, 0, x)
+		names(x) = colnames(next.month.ret)
+	risk.model.min.var.portfolio = x
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		
+	barplot(100*x,las = 2, 
+		main = 'Minimum variance portfolio weights (multiple factor risk model)')
+		
+dev.off()	
+
+
+	#--------------------------------------------------------------------------
+	# Comare portfolio risk under historical covariance and risk model covariance
+	#--------------------------------------------------------------------------					
+	# compute portfolio risk using sample covariance matrix
+	fm.risk.cov <- function(x, cov) { sqrt(x %*% cov %*% x) }
+	
+	# compute portfolio risk using multiple factor risk model
+	fm.risk.model <- function(x, factor.exposures, factor.covariance, specific.variance) 
+	{ 
+		portfolio = x
+		portfolio.exposure = portfolio %*% factor.exposures
+		sqrt(
+			portfolio.exposure %*% factor.covariance %*% t(portfolio.exposure) + 
+			sum(specific.variance^2 * portfolio^2, na.rm=T)
+			)
+	}
+	
+	fm.risk.cov(hist.min.var.portfolio, hist.cov)
+	fm.risk.cov(risk.model.min.var.portfolio, hist.cov)
+
+	fm.risk.model(hist.min.var.portfolio, factor.exposures, factor.covariance[t,,], specific.variance[t,])
+	fm.risk.model(risk.model.min.var.portfolio, factor.exposures, factor.covariance[t,,], specific.variance[t,])
+
+
+}
 
 
 
