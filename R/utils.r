@@ -113,6 +113,18 @@ ifna <- function
 }
 
 ###############################################################################
+# Check for NULL
+############################################################################### 
+ifnull <- function
+(
+	x,	# check x for NULL
+	y	# if found replace with y
+) { 	
+	return(iif(is.null(x), y, x))
+}
+
+
+###############################################################################
 # Count number of non NA elements
 ############################################################################### 
 count <- function(
@@ -419,8 +431,8 @@ beta.degree <- function(beta)
 ###############################################################################
 
 # must set timezone before any calls to xts
-#Sys.setenv(TZ = 'GMT')
-Sys.setenv(TZ = 'EST')
+Sys.setenv(TZ = 'GMT')
+#Sys.setenv(TZ = 'EST')
 
 
 make.xts <- function
@@ -429,7 +441,7 @@ make.xts <- function
 	order.by	# date
 )
 {
-	Sys.setenv(TZ = 'EST')
+	#Sys.setenv(TZ = 'GMT')
 	tzone = Sys.getenv('TZ')
 	
     orderBy = class(order.by)

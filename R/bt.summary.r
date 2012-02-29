@@ -80,7 +80,15 @@ plotbt.custom.report <- function
 		print( temp )
 		print( model$trade.summary$stats )
 
-		layout(1)
+		#layout(1)
+		layout(c(1,rep(2,10)))
+
+		# make dummy table with name of strategy		
+		make.table(1,1)
+		a = matrix(names(models)[1],1,1)
+		cex = plot.table.helper.auto.adjust.cex(a)
+		draw.cell(a[1],1,1, text.cex=cex,frame.cell=F)		
+		
 		plot.table( temp )
 	}	
 }	
@@ -163,8 +171,16 @@ plotbt.custom.report.part3 <- function
 		print( temp )
 		print( model$trade.summary$stats )
 
-		layout(1)
-		plot.table( temp )
+		#layout(1)
+		layout(c(1,rep(2,10)))
+
+		# make dummy table with name of strategy		
+		make.table(1,1)
+		a = matrix(names(models)[1],1,1)
+		cex = plot.table.helper.auto.adjust.cex(a)
+		draw.cell(a[1],1,1, text.cex=cex,frame.cell=F)		
+		
+		plot.table( temp )		
 	}	
 }
 

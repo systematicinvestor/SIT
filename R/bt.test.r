@@ -52,6 +52,134 @@ bt.empty.test <- function()
 
 }
 
+###############################################################################
+# How to use execution.price functionality
+###############################################################################
+bt.execution.price.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)			
+	bt.prep(data, align='keep.all', dates='1970::2011')	
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	nperiods = nrow(prices)
+	
+	models = list()
+	
+	#*****************************************************************
+	# Buy & Hold
+	#****************************************************************** 
+	data$weight[] = 0
+		data$execution.price[] = NA
+		data$weight[] = 1
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	models$buy.hold = bt.run(data, type='share', capital=capital)
+	
+
+	#*****************************************************************
+	# MA cross-over strategy
+	#****************************************************************** 
+	sma.fast = SMA(prices, 50)
+	sma.slow = SMA(prices, 200)
+	
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$weight[] = iif(sma.fast >= sma.slow, 1, -1)
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	models$ma.crossover = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+
+	#*****************************************************************
+	# MA cross-over strategy with 1 day lag between trades
+	#
+	# Please note that there is only one execution.price per day.
+	# So we cannot buy and sell at a different execution price in the same day.
+	# In the code below I add 1 day between trades
+	#****************************************************************** 
+	weight = iif(sma.fast >= sma.slow, 1, -1)
+		weight[] = bt.exrem(weight)
+		index = which(!is.na(weight))
+		trade.start = index+1		
+		trade.end = c(index[-1],nperiods)
+		trade.direction = sign(weight[index])
+		
+		
+	data$weight[] = NA
+		data$execution.price[] = NA		
+		data$weight[trade.start,] = trade.direction		
+		data$weight[trade.end,] = 0				
+		
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	models$ma.crossover.lag = bt.run(data, type='share', trade.summary=T, capital=capital)
+		
+	#*****************************************************************
+	# MA cross-over strategy, add 5c a share in commsion
+	#****************************************************************** 	
+	commsion = 0.05
+	data$weight[] = NA
+		data$execution.price[] = NA
+		index = which(trade.direction > 0)
+		data$execution.price[trade.start[index],] = prices[trade.start[index],] + commsion
+		data$execution.price[trade.end[index],] = prices[trade.end[index],] - commsion
+		
+		index = which(trade.direction < 0)
+		data$execution.price[trade.start[index],] = prices[trade.start[index],] - commsion
+		data$execution.price[trade.end[index],] = prices[trade.end[index],] + commsion
+		
+		data$weight[trade.start,] = trade.direction
+		data$weight[trade.end,] = 0		
+		
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	models$ma.crossover.lag.com = bt.run(data, type='share', trade.summary=T, capital=capital)
+	
+	#*****************************************************************
+	# MA cross-over strategy, open trade at the open, and close trade at the close
+	#****************************************************************** 
+	popen = bt.apply(data, Op)	
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$execution.price[trade.start,] = popen[trade.start,]
+		data$weight[trade.start,] = trade.direction		
+		data$weight[trade.end,] = 0				
+		
+		capital = 100000
+		data$weight[] = (capital / prices) * bt.exrem(data$weight)
+	models$ma.crossover.lag.open = bt.run(data, type='share', trade.summary=T, capital=capital)
+
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	# put all reports into one pdf file
+	pdf(file = 'report.pdf', width=8.5, height=11)
+		models = rev(models)
+	
+		plotbt.custom.report.part1(models)
+		plotbt.custom.report.part2(models)
+
+		plotbt.custom.report.part3(models$ma.crossover, trade.summary = TRUE)
+		plotbt.custom.report.part3(models$ma.crossover.lag, trade.summary = TRUE)
+		plotbt.custom.report.part3(models$ma.crossover.lag.com, trade.summary = TRUE)
+		plotbt.custom.report.part3(models$ma.crossover.lag.open, trade.summary = TRUE)
+	dev.off()	
+	
+}
+
+
 
 ###############################################################################
 # Improving Trend-Following Strategies With Counter-Trend Entries by david varadi
