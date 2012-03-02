@@ -150,7 +150,7 @@ dev.off()
 	next.month.ret = mlag(ret, -1)
 	
 	factors$EP = factors$EP[month.ends,]	
-	factors$VOMO = factors$VOOM[month.ends,]	
+	factors$VOMO = factors$VOMO[month.ends,]	
 		
 	#*****************************************************************
 	# Correlation Analysis
