@@ -75,6 +75,10 @@ add.constraints <- function
 {
 	if(is.null(constraints)) constraints = new.constraints(n = nrow(A))
 	
+	if(is.null(dim(A))) A = matrix(A)
+	
+	if(len(b) == 1) b = rep(b, ncol(A))
+	
 	if ( type[1] == '=' ) {
 		constraints$A = cbind( A, constraints$A )
 		constraints$b = c( b, constraints$b )
@@ -1203,7 +1207,7 @@ portopt <- function
 )
 {
 	# load / check required packages
-	load.packages('quadprog,corpcor,lpSolve')
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
 	
 	# set up constraints
 	if( is.null(constraints) ) {
@@ -1227,7 +1231,7 @@ portopt <- function
 		ia$cov.temp = temp
 	}
 				
-	if(!is.positive.definite(ia$cov.temp)) {
+	if(!is.positive.definite(ia$cov.temp, method = 'chol')) {
 		ia$cov.temp <- make.positive.definite(ia$cov.temp, 0.000000001)
 	}	
 	
@@ -1259,6 +1263,9 @@ portopt <- function
 			constraints$b[ len(constraints$b) ] = target[i]
 			out$weight[i, ] = match.fun(min.risk.fn)(ia, constraints)
 				constraints$x0 = out$weight[i, ]
+				
+#cat(i, '\n')
+		
 		}
 		
 		if( equally.spaced.risk ) {

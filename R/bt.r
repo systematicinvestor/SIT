@@ -184,16 +184,26 @@ bt.prep.matrix <- function
 
 
 ###############################################################################
-# Remove symbols that has less than minHistory
+# Remove symbols from enviroment
 ###############################################################################
-bt.prep.remove.symbols <- function
+bt.prep.remove.symbols.min.history <- function
 (
 	b, 					# enviroment with symbols time series
 	min.history = 1000	# minmum number of observations
 ) 
 {
-	index = which( count(b$prices, side=2) < min.history )
+	bt.prep.remove.symbols(b, which( count(b$prices, side=2) < min.history ))
+}
+
+bt.prep.remove.symbols <- function
+(
+	b, 					# enviroment with symbols time series
+	index				# index of symbols to remove
+) 
+{
 	if( len(index) > 0 ) {
+		if( is.character(index) ) index = match(index, b$symbolnames)
+		 
 		b$prices = b$prices[, -index]
 		b$weight = b$weight[, -index]
 		b$execution.price = b$execution.price[, -index]
@@ -203,6 +213,37 @@ bt.prep.remove.symbols <- function
 	}
 }
 
+
+###############################################################################
+# Helper function to backtest for type='share'
+###############################################################################
+bt.run.share <- function
+(
+	b,					# enviroment with symbols time series
+	prices = b$prices,	# prices
+	clena.signal = T,	# flag to remove excessive signal
+	
+	trade.summary = F, 	# flag to create trade summary
+	do.lag = 1, 		# lag signal
+	do.CarryLastObservationForwardIfNA = TRUE, 	
+	silent = F,
+	capital = 100000
+) 
+{
+	if(clena.signal) {
+		b$weight[] = (capital / prices) * bt.exrem(b$weight)
+	} else {
+		b$weight[] = (capital / prices) * b$weight
+	}
+	
+	bt.run(b, 
+		trade.summary = trade.summary, 
+		do.lag = do.lag, 
+		do.CarryLastObservationForwardIfNA = do.CarryLastObservationForwardIfNA,
+		type='share',
+		silent = silent,
+		capital = capital)	
+}
 
 ###############################################################################
 # Run backtest

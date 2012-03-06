@@ -1039,10 +1039,19 @@ dev.off()
 	# Stock specific return - return not captured by common factors
 	# specific.return = company.return - exposures %*% beta 
 	#****************************************************************** 		
-	load.packages('tseries,fGarch')	
+	load.packages('tseries,fGarch')
+		
 	specific.variance = next.month.ret * NA
+	
 	for(i in 1:n) specific.variance[,i] = bt.forecast.garch.volatility(specific.return[,i], 24) 
 
+	# compute historical specific.variance
+	hist.specific.variance = next.month.ret * NA
+	for(i in 1:n) hist.specific.variance[,i] = runSD(specific.return[,i], 24)	
+	
+	# if specific.variance is missing use historical specific.variance	
+	specific.variance[] = ifna(coredata(specific.variance), coredata(hist.specific.variance))	
+			
 
 	#*****************************************************************
 	# Save multiple factor risk model to be used later during portfolio construction
@@ -1191,7 +1200,7 @@ dev.off()
 	# wgts must sum to 1 (fully invested)
 	constraints = add.constraints(rep(1,n), 1, type = '=', constraints)
 		
-	# adjust prior constraints, add v.i
+	# adjust prior constraints, add factor exposures
 	constraints = add.variables(nfactors, constraints)
 	
 	# BX - X1 = 0
@@ -1237,19 +1246,6 @@ dev.off()
 	#--------------------------------------------------------------------------
 	# Comare portfolio risk under historical covariance and risk model covariance
 	#--------------------------------------------------------------------------					
-	# compute portfolio risk using sample covariance matrix
-	fm.risk.cov <- function(x, cov) { sqrt(x %*% cov %*% x) }
-	
-	# compute portfolio risk using multiple factor risk model
-	fm.risk.model <- function(x, factor.exposures, factor.covariance, specific.variance) 
-	{ 
-		portfolio = x
-		portfolio.exposure = portfolio %*% factor.exposures
-		sqrt(
-			portfolio.exposure %*% factor.covariance %*% t(portfolio.exposure) + 
-			sum(specific.variance^2 * portfolio^2, na.rm=T)
-			)
-	}
 	
 	fm.risk.cov(hist.min.var.portfolio, hist.cov)
 	fm.risk.cov(risk.model.min.var.portfolio, hist.cov)
@@ -1260,8 +1256,337 @@ dev.off()
 
 }
 
+# compute portfolio risk using sample covariance matrix
+fm.risk.cov <- function(portfolio, cov) { 
+	sqrt(portfolio %*% cov %*% portfolio) 
+}
+	
+# compute portfolio risk using multiple factor risk model
+fm.risk.model <- function
+(
+	portfolio, 
+	factor.exposures, 
+	factor.covariance, 
+	specific.variance
+) 
+{ 
+	factor.exposures = ifna(factor.exposures, 0)
+	specific.variance = ifna(specific.variance, mean(coredata(specific.variance), na.rm=T))
 
 
+	portfolio.exposure = portfolio %*% factor.exposures
+	
+	sqrt(
+		portfolio.exposure %*% factor.covariance %*% t(portfolio.exposure) + 
+		sum(specific.variance^2 * portfolio^2)
+		)[1]
+}
+
+
+
+###############################################################################
+# 130/30: The New Long-Only (2008) by A. Lo, P. Patel
+# Suggested by Nico
+###############################################################################		
+fm.long.short.test <- function()
+{	
+	#*****************************************************************
+	# Load data
+	#****************************************************************** 
+	load.packages('quantmod')	
+
+	# Load factor data that we saved at the end of the fm.all.factor.test function
+	load(file='data.factors.Rdata')
+		nperiods = nrow(next.month.ret)
+		tickers = colnames(next.month.ret)
+		n = len(tickers)
+		
+	# Load multiple factor risk model data that we saved at the end of the fm.risk.model.test function	
+	load(file='risk.model.Rdata')
+		factor.exposures = all.data[,,-1]	
+		factor.names = dimnames(factor.exposures)[[3]]
+		nfactors = len(factor.names)
+			
+	#*****************************************************************
+	# Compute Betas: b = cov(r,m) / var(m)
+	# The betas are measured on a two-year rolling window
+	# http://en.wikipedia.org/wiki/Beta_(finance)
+	#****************************************************************** 
+	ret = mlag(next.month.ret)
+	beta = ret * NA
+
+	# 1/n benchmark portfolio
+	benchmark = ntop(ret, n)	
+	benchmark.ret = rowSums(benchmark * ret, na.rm=T)
+	
+	# estimate betas
+	for(t in 24:nperiods) {
+		t.index = (t-23):t
+		benchmark.var = var( benchmark.ret[t.index], na.rm=T )
+		
+		t.count = count(ret[t.index, ])
+		t.cov = cov( ifna(ret[t.index,], 0), benchmark.ret[t.index], use='complete.obs' )
+		
+		beta[t,] = iif(t.count > 20, t.cov/benchmark.var, NA)
+	}
+		
+			
+	#*****************************************************************
+	# Construct LONG ONLY portfolio using the multiple factor risk model
+	#****************************************************************** 
+	load.packages('quadprog,corpcor,kernlab')
+	
+	weight = NA * next.month.ret
+	weights = list()
+		weights$benchmark = ntop(beta, n)		
+		weights$long.alpha = weight
+	
+	for(t in 36:nperiods) {
+	
+		#--------------------------------------------------------------------------
+		# Create constraints
+		#--------------------------------------------------------------------------
+		# set min/max wgts for individual stocks: 0 =< x <= 10/100
+		constraints = new.constraints(n, lb = 0, ub = 10/100)
+		
+		# wgts must sum to 1 (fully invested)
+		constraints = add.constraints(rep(1,n), type = '=', b = 1, constraints)
+			
+		#--------------------------------------------------------------------------
+		# beta of portfolio is the weighted average of the individual asset betas		
+		# http://www.duke.edu/~charvey/Classes/ba350/riskman/riskman.htm
+		#--------------------------------------------------------------------------
+		constraints = add.constraints(ifna(as.vector(beta[t,]),0), type = '=', b = 1, constraints)
+			
+		#--------------------------------------------------------------------------
+		# Create factor exposures constraints
+		#--------------------------------------------------------------------------	
+		# adjust prior constraints, add factor exposures
+		constraints = add.variables(nfactors, constraints)
+		
+		# BX - X1 = 0
+		constraints = add.constraints(rbind(ifna(factor.exposures[t,,], 0), -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
+	
+		#--------------------------------------------------------------------------
+		# Create Covariance matrix
+		# [Qu  0]
+		# [ 0 Qf]
+		#--------------------------------------------------------------------------
+		temp = diag(n)
+			diag(temp) = ifna(specific.variance[t,], mean(coredata(specific.variance[t,]), na.rm=T))^2
+		cov.temp = diag(n + nfactors)
+			cov.temp[1:n,1:n] = temp
+		cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
+		
+		#--------------------------------------------------------------------------
+		# create input assumptions
+		#--------------------------------------------------------------------------
+		ia = list()	
+		ia$n = nrow(cov.temp)
+		ia$annual.factor = 12
+		
+		ia$symbols = c(tickers, factor.names)
+		
+		ia$cov = cov.temp	
+		
+		#--------------------------------------------------------------------------
+		# page 9, Risk: We use the Barra default setting, risk aversion value of 0.0075, and
+		# AS-CF risk aversion ratio of 1.
+		#
+		# The Effects of Risk Aversion on Optimization (2010) by S. Liu, R. Xu
+		# page 4/5
+		#--------------------------------------------------------------------------
+		risk.aversion = 0.0075
+		ia$cov.temp = ia$cov	
+	
+		# set expected return
+		alpha = factors.avg$AVG[t,] / 5
+		ia$expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors))
+			
+		# remove companies that have no beta from optimization
+		index = which(is.na(beta[t,]))
+		if( len(index) > 0) {
+			constraints$ub[index] = 0
+			constraints$lb[index] = 0
+		}
+	
+		# find solution
+		sol = solve.QP.bounds(Dmat = 2* risk.aversion * ia$cov.temp, dvec = ia$expected.return, 
+					Amat = constraints$A, bvec = constraints$b, 
+					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub)
+					
+		weights$long.alpha[t,] = sol$solution[1:n]
+		
+		cat(t, '\n')
+	}
+	
+		
+	
+
+		
+			
+	#*****************************************************************
+	# Construct Long/Short 130:30 portfolio using the multiple factor risk model
+	# based on the examples in the aa.long.short.test functions
+	#****************************************************************** 
+	weights$long.short.alpha = weight
+		
+		
+	for(t in 36:nperiods) {
+	
+		#--------------------------------------------------------------------------
+		# Create constraints
+		#--------------------------------------------------------------------------
+		# set min/max wgts for individual stocks: -10/100 =< x <= 10/100
+		constraints = new.constraints(n, lb = -10/100, ub = 10/100)
+		
+		# wgts must sum to 1 (fully invested)
+		constraints = add.constraints(rep(1,n), type = '=', b = 1, constraints)
+			
+		#--------------------------------------------------------------------------
+		# beta of portfolio is the weighted average of the individual asset betas		
+		# http://www.duke.edu/~charvey/Classes/ba350/riskman/riskman.htm
+		#--------------------------------------------------------------------------
+		constraints = add.constraints(ifna(as.vector(beta[t,]),0), type = '=', b = 1, constraints)
+			
+		#--------------------------------------------------------------------------
+		# Create factor exposures constraints
+		#--------------------------------------------------------------------------	
+		# adjust prior constraints, add factor exposures
+		constraints = add.variables(nfactors, constraints)
+		
+		# BX - X1 = 0
+		constraints = add.constraints(rbind(ifna(factor.exposures[t,,], 0), -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
+	
+		
+		#--------------------------------------------------------------------------
+		# Create 130:30
+		# -v.i <= x.i <= v.i, v.i>0, SUM(v.i) = 1.6
+		#--------------------------------------------------------------------------
+		
+		# adjust prior constraints, add v.i
+		constraints = add.variables(n, constraints)
+	
+		# -v.i <= x.i <= v.i
+		#   x.i + v.i >= 0
+		constraints = add.constraints(rbind(diag(n), matrix(0,nfactors,n)  ,diag(n)), rep(0, n), type = '>=', constraints)
+		#   x.i - v.i <= 0
+		constraints = add.constraints(rbind(diag(n), matrix(0,nfactors,n), -diag(n)), rep(0, n), type = '<=', constraints)
+		
+		# SUM(v.i) = 1.6
+		constraints = add.constraints(c(rep(0, n), rep(0, nfactors), rep(1, n)), 1.6, type = '=', constraints)
+		
+		#--------------------------------------------------------------------------
+		# Create Covariance matrix
+		# [Qu  0]
+		# [ 0 Qf]
+		#--------------------------------------------------------------------------
+		temp = diag(n)
+			diag(temp) = ifna(specific.variance[t,], mean(coredata(specific.variance[t,]), na.rm=T))^2
+		cov.temp = 0*diag(n + nfactors + n)
+			cov.temp[1:n,1:n] = temp
+		cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
+		
+		#--------------------------------------------------------------------------
+		# create input assumptions
+		#--------------------------------------------------------------------------
+		ia = list()	
+		ia$n = nrow(cov.temp)
+		ia$annual.factor = 12
+		
+		ia$symbols = c(tickers, factor.names, tickers)
+		
+		ia$cov = cov.temp	
+	
+		#--------------------------------------------------------------------------
+		# page 9, Risk: We use the Barra default setting, risk aversion value of 0.0075, and
+		# AS-CF risk aversion ratio of 1.
+		#
+		# The Effects of Risk Aversion on Optimization (2010) by S. Liu, R. Xu
+		# page 4/5
+		#--------------------------------------------------------------------------
+		risk.aversion = 0.0075
+		ia$cov.temp = ia$cov
+	
+		# set expected return
+		alpha = factors.avg$AVG[t,] / 5
+		ia$expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors), rep(0, n))
+			
+		# remove companies that have no beta from optimization
+		index = which(is.na(beta[t,]))
+		if( len(index) > 0) {
+			constraints$ub[index] = 0
+			constraints$lb[index] = 0
+		}
+	
+		# find solution
+		sol = solve.QP.bounds(Dmat = 2* risk.aversion * ia$cov.temp, dvec = ia$expected.return, 
+					Amat = constraints$A, bvec = constraints$b, 
+					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub)
+			
+		weights$long.short.alpha[t,] = sol$solution[1:n]
+		
+		cat(t, '\n')
+	}
+		
+		
+	#*****************************************************************
+	# Plot Transition Maps
+	#****************************************************************** 	
+	
+
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	layout(1:3)
+	for(i in names(weights)) plotbt.transition.map(weights[[i]], i)
+dev.off()	
+	
+	
+	
+	#*****************************************************************
+	# Create strategies
+	#****************************************************************** 	
+	prices = data$prices
+		prices = bt.apply.matrix(prices, function(x) ifna.prev(x))
+		
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+
+	# create strategies that invest in each qutile
+	models = list()
+	
+	for(i in names(weights)) {
+		data$weight[] = NA
+			data$weight[month.ends,] = weights[[i]]
+			capital = 100000
+			data$weight[] = (capital / prices) * (data$weight)	
+		models[[i]] = bt.run(data, type='share', capital=capital)
+	}
+			
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	models = rev(models)
+	
+	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(models, dates='1998::')
+dev.off()	
+
+
+png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(models)
+dev.off()	
+	
+	
+
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	
+
+
+}
 
 
 ###############################################################################

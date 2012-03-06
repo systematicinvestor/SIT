@@ -1290,7 +1290,7 @@ aa.periodic.table.test <- function()
 	# Get Historical Data
 	#--------------------------------------------------------------------------
 	# Country IA are based on monthly data
-	ia = aa.test.create.ia.country()
+	ia = aa.test.create.ia.country('1990::')
 		hist.returns = ia$hist.returns
 		
 	# convert returns to prices
@@ -1302,7 +1302,7 @@ aa.periodic.table.test <- function()
 		
 	# compute simple returns	
 	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
-		hist.returns = hist.returns['2000::2010']
+		hist.returns = hist.returns['2000::']
 
 				
 	#--------------------------------------------------------------------------
@@ -1757,7 +1757,7 @@ get.fedfunds.rate <- function()
 
 
 
-aa.test.create.ia.country <- function()
+aa.test.create.ia.country <- function(dates = '1990::2010')
 {
 	#--------------------------------------------------------------------------
 	# Load historical prices and compute simple returns
@@ -1778,7 +1778,7 @@ aa.test.create.ia.country <- function()
 	annual.factor = 12
 	
 	# remove any missing data	
-	hist.prices = na.omit(hist.prices['1990::2010'])
+	hist.prices = na.omit(hist.prices[dates])
 	
 	# compute simple returns	
 	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )

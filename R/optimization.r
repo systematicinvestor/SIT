@@ -111,6 +111,9 @@ solve.QP.bounds <- function
 	ub = +Inf			# vector with upper bounds
 )
 {
+	Amat1 = Amat
+	bvec1 = bvec
+
 	# number variables
 	n = len(dvec)
 	
@@ -137,7 +140,60 @@ solve.QP.bounds <- function
 	
 	# main logic
 	if ( binary.vec[1] == 0 ) {	
-		sol = solve.QP(Dmat, dvec, Amat, bvec, meq, factorized)
+		# logic to check for constant variables	
+		qp.data.final = solve.QP.remove.equality.constraints(Dmat, dvec, Amat, bvec, meq)	
+			Dmat = qp.data.final$Dmat
+			dvec = qp.data.final$dvec
+			Amat = qp.data.final$Amat
+			bvec = qp.data.final$bvec
+			meq = qp.data.final$meq
+		
+			
+		# solve.QP: min(-d^T w.i + 1/2 w.i^T D w.i) subject to A^T w.i >= b_0			
+		sol = try(solve.QP(Dmat, dvec, Amat, bvec, meq, factorized),TRUE)
+		
+		
+		if(inherits(sol, 'try-error')) {
+			ok = F
+			sol = list()		
+#cat('solve.QP error\n')			
+		} else {
+			# check that solve.QP solution satisfies constraints		
+			tol = 1e-5
+			ok = T
+					
+			check = sol$solution %*% Amat - bvec
+			if(meq > 0) ok = ok & all(abs(check[1:meq]) <= tol)
+			ok = ok & all(check[-c(1:meq)] > -tol)
+#if(!ok) cat('solve.QP violates constraints\n')						
+		} 
+		
+		# try to solve problem one more time using ipop function from kernlab package
+		if(!ok) {
+			require(kernlab)
+#cat('kernlab\n')	
+			index.constant.variables = which(!is.na(qp.data.final$solution))
+			if( len(index.constant.variables) > 0 ) {
+				# Amat1 and bvec1 might be incorrect
+				Amat1 = Amat[,1:ncol(Amat1)]
+				bvec1 = bvec[1:ncol(Amat1)]
+				lb = lb[-index.constant.variables]
+				ub = ub[-index.constant.variables]
+			}
+						
+			# ipop: min(c'*x + 1/2 * x' * H * x) subject to b <= A * x <= b + r and l <= x <= u
+			sv = ipop(c = matrix(-dvec), H = Dmat, A = t(Amat1),
+					b = bvec1, l = ifna(lb,-100), u = ifna(ub,100),
+					r = c(rep(0,meq), rep(100, len(bvec1) - meq))
+				)
+			sol$solution = primal(sv)
+		}
+
+		# logic to check for constant variables	
+		x = qp.data.final$solution
+		x[qp.data.final$var.index] = sol$solution
+		sol$solution = x
+		
 	} else {
 		# use Binary Branch and Bound
 		qp_data = qp_new(binary.vec, Dmat = Dmat, dvec = dvec, 
@@ -154,15 +210,6 @@ solve.QP.bounds <- function
 	
 	return(sol)
 }
-
-		
-
-
-
-
-
-
-
 
 
 ###############################################################################
@@ -290,25 +337,8 @@ qp_solve <- function
 	
 
 	# NEW logic to remove reduandant equality constraints in QP problem
-	qp.data.temp = list();	
-		qp.data.temp$Amat = qp_data$Amat
-		qp.data.temp$bvec = bvec
-		qp.data.temp$Dmat = qp_data$Dmat
-		qp.data.temp$dvec = qp_data$dvec
-		qp.data.temp$meq = qp_data$meq	
-	
-		
-	qp.data.temp = remove.equality.constraints(qp.data.temp)
-	# if no equality constraints found go to optimization
-	if( len(qp.data.temp$var.index) == len(qp.data.temp$solution) ) {
-		qp.data.final = qp.data.temp
-	} else {
-		# test for equality constraints one more time
-		qp.data.final = remove.equality.constraints(qp.data.temp)		
-			qp.data.temp$solution[qp.data.temp$var.index] = qp.data.final$solution			
-				qp.data.final$solution = qp.data.temp$solution			
-			qp.data.final$var.index = qp.data.temp$var.index[qp.data.final$var.index]
-	}
+	qp.data.final = solve.QP.remove.equality.constraints(qp_data$Dmat, qp_data$dvec, 
+							qp_data$Amat, bvec, qp_data$meq)		
 	# end of NEW logic
 		
 	
@@ -327,6 +357,48 @@ qp_solve <- function
 		return(list( ok = FALSE )) 
 	}              	    
 }
+
+
+
+
+# Logic to remove reduandant equality constraints in QP problem, based on qp_solve
+solve.QP.remove.equality.constraints <- function
+(
+	Dmat,				# solve.QP parameters
+	dvec, 				# solve.QP parameters
+	Amat, 				# solve.QP parameters
+	bvec, 				# solve.QP parameters
+	meq=0 				# solve.QP parameters
+)
+{
+	qp.data.temp = list()	
+		qp.data.temp$Amat = Amat
+		qp.data.temp$bvec = bvec
+		qp.data.temp$Dmat = Dmat
+		qp.data.temp$dvec = dvec
+		qp.data.temp$meq = meq	
+	
+		
+	qp.data.temp = remove.equality.constraints(qp.data.temp)
+	# if no equality constraints found go to optimization
+	if( len(qp.data.temp$var.index) == len(qp.data.temp$solution) ) {
+		qp.data.final = qp.data.temp
+	} else {
+		# test for equality constraints one more time
+		qp.data.final = remove.equality.constraints(qp.data.temp)		
+			qp.data.temp$solution[qp.data.temp$var.index] = qp.data.final$solution			
+				qp.data.final$solution = qp.data.temp$solution			
+			qp.data.final$var.index = qp.data.temp$var.index[qp.data.final$var.index]
+	}
+		
+	return(qp.data.final)
+}
+
+			
+	    
+
+
+
 
 ###############################################################################
 # Test QP interface to Binary Branch and Bound algorithm
@@ -396,10 +468,18 @@ remove.equality.constraints <- function(qp.data)
 	# 1. find columns with just one non-zero element
 	one.non.zero.index = which( colSums(Amat1!=0) == 1 )
 	
-	# 2. divide these columns, and corresponding bvec by column's abs value
+	if( len(one.non.zero.index) == 0 ) {	
+		equality.constraints = rep(NA, nrow(Amat1))
+		qp.data$solution = equality.constraints		
+		qp.data$var.index = which(is.na(equality.constraints))
+		return(qp.data)
+	}
+	
+	# 2. divide these columns, and corresponding bvec by column's abs value	
 	bvec1[one.non.zero.index] = bvec1[one.non.zero.index] / abs( colSums(Amat1[,one.non.zero.index]) )
 	Amat1[,one.non.zero.index] = Amat1[,one.non.zero.index] / abs( Amat1[,one.non.zero.index] )
-	Amat1[is.na(Amat1)] = 0
+	Amat1[is.na(Amat1)] = 0	
+
 	
 	# 3. look for pairs among one.non.zero.index colums
 	# x >= value , -x>= -value => x = value
