@@ -1341,8 +1341,7 @@ fm.long.short.test <- function()
 		weights$benchmark = ntop(beta, n)		
 		weights$long.alpha = weight
 	
-	for(t in 36:nperiods) {
-	
+	for(t in 36:nperiods) {	
 		#--------------------------------------------------------------------------
 		# Create constraints
 		#--------------------------------------------------------------------------
@@ -1377,18 +1376,7 @@ fm.long.short.test <- function()
 		cov.temp = diag(n + nfactors)
 			cov.temp[1:n,1:n] = temp
 		cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
-		
-		#--------------------------------------------------------------------------
-		# create input assumptions
-		#--------------------------------------------------------------------------
-		ia = list()	
-		ia$n = nrow(cov.temp)
-		ia$annual.factor = 12
-		
-		ia$symbols = c(tickers, factor.names)
-		
-		ia$cov = cov.temp	
-		
+				
 		#--------------------------------------------------------------------------
 		# page 9, Risk: We use the Barra default setting, risk aversion value of 0.0075, and
 		# AS-CF risk aversion ratio of 1.
@@ -1397,11 +1385,10 @@ fm.long.short.test <- function()
 		# page 4/5
 		#--------------------------------------------------------------------------
 		risk.aversion = 0.0075
-		ia$cov.temp = ia$cov	
 	
 		# set expected return
 		alpha = factors.avg$AVG[t,] / 5
-		ia$expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors))
+		expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors))
 			
 		# remove companies that have no beta from optimization
 		index = which(is.na(beta[t,]))
@@ -1411,7 +1398,7 @@ fm.long.short.test <- function()
 		}
 	
 		# find solution
-		sol = solve.QP.bounds(Dmat = 2* risk.aversion * ia$cov.temp, dvec = ia$expected.return, 
+		sol = solve.QP.bounds(Dmat = 2* risk.aversion * cov.temp, dvec = expected.return, 
 					Amat = constraints$A, bvec = constraints$b, 
 					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub)
 					
@@ -1421,19 +1408,13 @@ fm.long.short.test <- function()
 	}
 	
 		
-	
-
-		
-			
 	#*****************************************************************
 	# Construct Long/Short 130:30 portfolio using the multiple factor risk model
 	# based on the examples in the aa.long.short.test functions
 	#****************************************************************** 
 	weights$long.short.alpha = weight
-		
-		
-	for(t in 36:nperiods) {
-	
+				
+	for(t in 36:nperiods) {	
 		#--------------------------------------------------------------------------
 		# Create constraints
 		#--------------------------------------------------------------------------
@@ -1457,8 +1438,7 @@ fm.long.short.test <- function()
 		
 		# BX - X1 = 0
 		constraints = add.constraints(rbind(ifna(factor.exposures[t,,], 0), -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
-	
-		
+			
 		#--------------------------------------------------------------------------
 		# Create 130:30
 		# -v.i <= x.i <= v.i, v.i>0, SUM(v.i) = 1.6
@@ -1486,18 +1466,7 @@ fm.long.short.test <- function()
 		cov.temp = 0*diag(n + nfactors + n)
 			cov.temp[1:n,1:n] = temp
 		cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
-		
-		#--------------------------------------------------------------------------
-		# create input assumptions
-		#--------------------------------------------------------------------------
-		ia = list()	
-		ia$n = nrow(cov.temp)
-		ia$annual.factor = 12
-		
-		ia$symbols = c(tickers, factor.names, tickers)
-		
-		ia$cov = cov.temp	
-	
+			
 		#--------------------------------------------------------------------------
 		# page 9, Risk: We use the Barra default setting, risk aversion value of 0.0075, and
 		# AS-CF risk aversion ratio of 1.
@@ -1506,11 +1475,10 @@ fm.long.short.test <- function()
 		# page 4/5
 		#--------------------------------------------------------------------------
 		risk.aversion = 0.0075
-		ia$cov.temp = ia$cov
 	
 		# set expected return
 		alpha = factors.avg$AVG[t,] / 5
-		ia$expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors), rep(0, n))
+		expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors), rep(0, n))
 			
 		# remove companies that have no beta from optimization
 		index = which(is.na(beta[t,]))
@@ -1520,7 +1488,7 @@ fm.long.short.test <- function()
 		}
 	
 		# find solution
-		sol = solve.QP.bounds(Dmat = 2* risk.aversion * ia$cov.temp, dvec = ia$expected.return, 
+		sol = solve.QP.bounds(Dmat = 2* risk.aversion * cov.temp, dvec = expected.return, 
 					Amat = constraints$A, bvec = constraints$b, 
 					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub)
 			
@@ -1528,20 +1496,197 @@ fm.long.short.test <- function()
 		
 		cat(t, '\n')
 	}
+
 		
+	#*****************************************************************
+	# Construct LONG ONLY minimum variance portfolio using the multiple factor risk model
+	#****************************************************************** 
+	weights$long.min.var.alpha = weight
+				
+	for(t in 36:nperiods) {	
+		#--------------------------------------------------------------------------
+		# Create constraints
+		#--------------------------------------------------------------------------
+		# set min/max wgts for individual stocks: 0 =< x <= 10/100
+		constraints = new.constraints(n, lb = 0, ub = 10/100)
+		
+		# wgts must sum to 1 (fully invested)
+		constraints = add.constraints(rep(1,n), type = '=', b = 1, constraints)
+			
+		#--------------------------------------------------------------------------
+		# Create factor exposures constraints
+		#--------------------------------------------------------------------------	
+		# adjust prior constraints, add factor exposures
+		constraints = add.variables(nfactors, constraints)
+		
+		# BX - X1 = 0
+		constraints = add.constraints(rbind(ifna(factor.exposures[t,,], 0), -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
+	
+		#--------------------------------------------------------------------------
+		# Create Covariance matrix
+		# [Qu  0]
+		# [ 0 Qf]
+		#--------------------------------------------------------------------------
+		temp = diag(n)
+			diag(temp) = ifna(specific.variance[t,], mean(coredata(specific.variance[t,]), na.rm=T))^2
+		cov.temp = diag(n + nfactors)
+			cov.temp[1:n,1:n] = temp
+		cov.temp[(n+1):(n+nfactors),(n+1):(n+nfactors)] = factor.covariance[t,,]
+				
+		#--------------------------------------------------------------------------
+		# Setup optimizations
+		#--------------------------------------------------------------------------	
+		# set expected return
+		alpha = factors.avg$AVG[t,] / 5
+		expected.return = c(ifna(coredata(alpha),0), rep(0, nfactors))
+			
+		# remove companies that have no beta from optimization
+		index = which(is.na(beta[t,]))
+		if( len(index) > 0) {
+			constraints$ub[index] = 0
+			constraints$lb[index] = 0
+		}
+	
+		# find solution
+		sol = solve.QP.bounds(Dmat = cov.temp, dvec = 0 * expected.return, 
+					Amat = constraints$A, bvec = constraints$b, 
+					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub)
+					
+		weights$long.min.var.alpha[t,] = sol$solution[1:n]
+		
+		cat(t, '\n')
+	}
+
+			
+	#*****************************************************************
+	# Construct Market-Neutral portfolio 100:100 with beta=0 using the multiple factor risk model
+	# based on the examples in the aa.long.short.test functions
+	#****************************************************************** 
+	weights$market.neutral.alpha = weight
+
+	for(t in 36:nperiods) {	
+		#--------------------------------------------------------------------------
+		# Split x into x.long and x.short, x_long and x_short >= 0
+		# SUM(x.long) - SUM(x.short) = 0
+		#--------------------------------------------------------------------------			
+		# x.long and x.short >= 0
+		# x.long <= 0.1 
+		# x.short <= 0.1 
+		constraints = new.constraints(2*n, lb = 0, ub = c(rep(0.1,n), rep(0.1,n)))
+		
+		# SUM (x.long - x.short) = 0
+		constraints = add.constraints(c(rep(1,n), -rep(1,n)), 0, type = '=', constraints)		
+	
+		# SUM (x.long + x.short) = 2
+		constraints = add.constraints(c(rep(1,n), rep(1,n)), 2, type = '=', constraints)		
+				
+		#--------------------------------------------------------------------------
+		# beta of portfolio is the weighted average of the individual asset betas		
+		# http://www.duke.edu/~charvey/Classes/ba350/riskman/riskman.htm
+		#--------------------------------------------------------------------------
+		temp = ifna(as.vector(beta[t,]),0)
+		constraints = add.constraints(c(temp, -temp), type = '=', b = 0, constraints)
+			
+		#--------------------------------------------------------------------------
+		# Create factor exposures constraints
+		#--------------------------------------------------------------------------	
+		# adjust prior constraints, add factor exposures
+		constraints = add.variables(nfactors, constraints)
+		
+		# BX - X1 = 0
+		temp = ifna(factor.exposures[t,,], 0)
+		constraints = add.constraints(rbind(temp, -temp, -diag(nfactors)), rep(0, nfactors), type = '=', constraints)
+			
+		#--------------------------------------------------------------------------
+		# Add binary constraints	
+		#--------------------------------------------------------------------------	
+		# adjust prior constraints: add b.i
+		constraints = add.variables(n, constraints)
+	
+		# index of binary variables b.i
+		constraints$binary.index = (2*n + nfactors + 1):(3*n + nfactors)
+	
+		# binary variable b.i : x.long < b, x.short < (1 - b)
+		# x.long < b
+		constraints = add.constraints(rbind(diag(n), 0*diag(n), matrix(0,nfactors,n), -diag(n)), rep(0, n), type = '<=', constraints)
+
+		# x.short < (1 - b)
+		constraints = add.constraints(rbind(0*diag(n), diag(n), matrix(0,nfactors,n), diag(n)), rep(1, n), type = '<=', constraints)
+
+		#--------------------------------------------------------------------------
+		# set expected return
+		#--------------------------------------------------------------------------	
+		# set expected return
+		alpha = factors.avg$AVG[t,] / 5
+		temp = ifna(coredata(alpha),0)
+		expected.return = c(temp, -temp, rep(0, nfactors), rep(0, n))
+
+		#--------------------------------------------------------------------------
+		# Create Covariance matrix
+		# [Qu  0]
+		# [ 0 Qf]
+		#--------------------------------------------------------------------------
+		temp = diag(n)
+			diag(temp) = ifna(specific.variance[t,], mean(coredata(specific.variance[t,]), na.rm=T))^2
+			
+		# | cov -cov |
+		# |-cov  cov |		
+		temp = cbind( rbind(temp, -temp), rbind(-temp, temp) )
+		
+		cov.temp = 0*diag(2*n + nfactors + n)
+			cov.temp[1:(2*n),1:(2*n)] = temp
+		cov.temp[(2*n+1):(2*n+nfactors),(2*n+1):(2*n+nfactors)] = factor.covariance[t,,]
+	
+		#--------------------------------------------------------------------------
+		# Adjust Covariance matrix
+		#--------------------------------------------------------------------------
+		if(!is.positive.definite(cov.temp)) {
+			cov.temp <- make.positive.definite(cov.temp, 0.000000001)
+		}	
+		
+		#--------------------------------------------------------------------------
+		# page 9, Risk: We use the Barra default setting, risk aversion value of 0.0075, and
+		# AS-CF risk aversion ratio of 1.
+		#
+		# The Effects of Risk Aversion on Optimization (2010) by S. Liu, R. Xu
+		# page 4/5
+		#--------------------------------------------------------------------------
+		risk.aversion = 0.0075
+			
+		# remove companies that have no beta from optimization
+		index = which(is.na(beta[t,]))
+		if( len(index) > 0) {
+			constraints$ub[index] = 0
+			constraints$lb[index] = 0
+			constraints$ub[2*index] = 0
+			constraints$lb[2*index] = 0			
+		}
+	
+		# find solution
+		sol = solve.QP.bounds(Dmat = 2* risk.aversion * cov.temp, dvec = expected.return, 
+					Amat = constraints$A, bvec = constraints$b, 
+					meq = constraints$meq, lb = constraints$lb, ub = constraints$ub,
+					binary.vec = constraints$binary.index)					
+					
+		if(constraints$binary.index[1] != 0) cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')		
+	
+		x = sol$solution[1:n] - sol$solution[(n+1):(2*n)]
+		weights$market.neutral.alpha[t,] = x
+		
+		cat(t, '\n')
+	}
+		
+	#save(weights, file='fm.long.short.test.Rdata')
 		
 	#*****************************************************************
 	# Plot Transition Maps
-	#****************************************************************** 	
-	
-
+	#****************************************************************** 		
 png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')										
-	layout(1:3)
-	for(i in names(weights)) plotbt.transition.map(weights[[i]], i)
+	layout(1:5)
+	for(i in names(weights)) plotbt.transition.map(weights[[i]], i)	
 dev.off()	
 	
-	
-	
+		
 	#*****************************************************************
 	# Create strategies
 	#****************************************************************** 	
@@ -1578,13 +1723,11 @@ png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize 
 dev.off()	
 	
 	
-
 png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	# Plot Portfolio Turnover for each strategy
 	layout(1)
 	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
 dev.off()	
-
 
 }
 

@@ -30,7 +30,8 @@ plotbt.custom.report <- function
 	..., 
 	dates = NULL, 
 	main = '', 
-	trade.summary = FALSE 
+	trade.summary = FALSE,
+	x.highlight = NULL
 ) 
 {	
 	# create layout	
@@ -48,19 +49,19 @@ plotbt.custom.report <- function
 	models = variable.number.arguments( ... )
 		
 	# Main plot
-	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
+	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3, x.highlight = x.highlight)	    	
 		mtext('Cumulative Performance', side = 2, line = 1)
 	
-	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
+	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3, x.highlight = x.highlight)	    	
 		mtext('12 Month Rolling', side = 2, line = 1)
 		
-	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
+	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3, x.highlight = x.highlight)
 		mtext('Drawdown', side = 2, line = 1)
 			
 	model = models[[1]]
 	
 	# Additional Info
-	plotbt.transition.map(model$weight)			
+	plotbt.transition.map(model$weight, x.highlight = x.highlight)			
 	temp = plotbt.monthly.table(model$equity)	
 	plotbt.holdings.time(model$weight)
 	
@@ -99,7 +100,8 @@ plotbt.custom.report.part1 <- function
 	..., 
 	dates = NULL, 
 	main = '', 
-	trade.summary = FALSE 
+	trade.summary = FALSE,
+	x.highlight = NULL
 ) 
 {	
 	layout(1:3)
@@ -108,13 +110,13 @@ plotbt.custom.report.part1 <- function
 	model = models[[1]]
 	
 	# Main plot
-	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3)	    	
+	plotbt(models, dates = dates, main = main, plotX = F, log = 'y', LeftMargin = 3, x.highlight = x.highlight)	    	
 		mtext('Cumulative Performance', side = 2, line = 1)
 	
-	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3)	    	
+	plotbt(models[1], plottype = '12M', dates = dates, plotX = F, LeftMargin = 3, x.highlight = x.highlight)	    	
 		mtext('12 Month Rolling', side = 2, line = 1)
 		
-	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3)
+	plotbt(models[1], dates = dates, xfun = function(x) { 100 * compute.drawdown(x$equity) }, LeftMargin = 3, x.highlight = x.highlight)
 		mtext('Drawdown', side = 2, line = 1)
 }
 
@@ -123,7 +125,8 @@ plotbt.custom.report.part2 <- function
 	..., 
 	dates = NULL, 
 	main = '', 
-	trade.summary = FALSE 
+	trade.summary = FALSE,
+	x.highlight = NULL	
 ) 
 {	
 	models = variable.number.arguments( ... )
@@ -138,7 +141,7 @@ plotbt.custom.report.part2 <- function
 	
 			
 	# Additional Info
-	plotbt.transition.map(model$weight)			
+	plotbt.transition.map(model$weight, x.highlight = x.highlight)			
 	temp = plotbt.monthly.table(model$equity)	
 	plotbt.holdings.time(model$weight)
 	
@@ -197,7 +200,7 @@ bt.detail.summary <- function
 
 	# System Section	
 	out = list()
-		out$Period = join( format( range(index(bt$equity)), '%b%Y'), ' - ')
+		out$Period = join( format( range(index.xts(bt$equity)), '%b%Y'), ' - ')
 		
 		out$Cagr = compute.cagr(bt$equity)
 		out$Sharpe = compute.sharpe(bt$ret)
@@ -296,6 +299,7 @@ plotbt <- function
 	main = NULL,
 	plotX = T,
 	log = '',
+	x.highlight = NULL,
 	LeftMargin = 0 
 ) 
 {    		
@@ -339,7 +343,7 @@ plotbt <- function
    	  	
    	# plot
 	plota(temp[[1]], main = main, plotX = plotX, type = 'l', col = 1, 
-		ylim = yrange,log = log, LeftMargin = LeftMargin)
+		ylim = yrange,log = log, LeftMargin = LeftMargin, x.highlight = x.highlight)
 		
 	if( n > 1 ) {
 		for( i in 2:n ) plota.lines(temp[[i]], col = i)
@@ -356,14 +360,15 @@ plotbt.transition.map <- function
 (
 	weight,
 	name = '',
-	col = rainbow(ncol(weight), start=0, end=.9)
+	col = rainbow(ncol(weight), start=0, end=.9),
+	x.highlight = NULL		
 ) 
 {
 	par(mar=c(2, 4, 1, 1), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
 	
 	
 	weight[is.na(weight)] = 0	
-	plota.stacked(index(weight), weight, col = col, type='s', main = iif(nchar(name) > 0, paste('Transition Map for', name), ''))	
+	plota.stacked(index.xts(weight), weight, col = col, type='s', main = iif(nchar(name) > 0, paste('Transition Map for', name), ''), x.highlight = x.highlight)	
 }
 	
 ###############################################################################
@@ -372,7 +377,7 @@ plotbt.transition.map <- function
 plotbt.holdings <- function
 (
 	weight, 
-	smain = format(index(last(weight)), '%d-%b-%Y') 
+	smain = format(index.xts(last(weight)), '%d-%b-%Y') 
 ) 
 {
 	par(mar=c(2, 2, 2, 2), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
@@ -407,7 +412,7 @@ plotbt.monthly.table <- function(equity)
 {
 	equity = map2monthly(equity)
 
-	dates = index(equity)
+	dates = index.xts(equity)
 	equity = coredata(equity)	
 	
 # just keep both versions for now	

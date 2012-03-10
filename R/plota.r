@@ -93,13 +93,15 @@ plota <- function
 		)
 	}
 	
+	temp.x = index.xts(y)
+	
 	# create plot frame, do not plot data
-	plot( index(y), y1, xlab = xlab, ylab = ylab, main = main,
+	plot( temp.x, y1, xlab = xlab, ylab = ylab, main = main,
 		type = 'n', yaxt = 'n', xaxt = 'n', ylim = ylim, log = log, ... )
 		
 		# Y axis rotation in 90 degrees increments : las=0,las=1,las=2,las=3
 		axis(4, las = las)
-		plota.control$xaxis.ticks = axis.Date(1, index(y),labels = plotX, tick = plotX)
+		plota.control$xaxis.ticks = axis.Date(1, temp.x,labels = plotX, tick = plotX)
 				
 	# highlight logic
 	if( !is.null(x.highlight) ) plota.x.highlight(y, x.highlight); 	
@@ -114,7 +116,7 @@ plota <- function
 		'hl' = plota.hl(y, ...),
 		'ohlc' = plota.ohlc(y, ...),
 		'volume' = plota.volume(y, ...),
-		{  lines(index(y), y1, type=type, ...) }
+		{  lines(temp.x, y1, type=type, ...) }
 	)
 	
 	# plot box
@@ -137,7 +139,7 @@ plota2Y <- function(
 	
 	# plot
 	par(new = TRUE)
-	plot( index(y1), y1[,1], xlim = xlim, xaxs = 'i', type = type,
+	plot( index.xts(y1), y1[,1], xlim = xlim, xaxs = 'i', type = type,
 		yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', axes = F, ... )
 		
 		# Y axis rotation
@@ -165,12 +167,14 @@ plota.lines <- function(
 {
 	if(has.Cl(y)) y1 = Cl(y) else y1 = y[,1]	
 	
+	temp.x = index.xts(y)
+	
 	if( type == 'l' & len(col) > 1 ) {
 		for( icol in unique(col) ) {
-			lines(index(y), iif(col == icol, y1, NA), type = type, col = icol, ...)
+			lines(temp.x, iif(col == icol, y1, NA), type = type, col = icol, ...)
 		}
 	} else {
-		lines(index(y), y1, type = type, col = col, ...)
+		lines(temp.x, y1, type = type, col = col, ...)
 	}
 }
 	
@@ -249,7 +253,7 @@ plota.dx <- function
 	y1 = y[paste(format(as.Date(xlim), '%Y:%m:%d'), sep = '', collapse = '::')]
 	
 	# R by default extends xrange by 1.08
-	xportion = min(1, diff(unclass(range(index(y1))))*1.08 / diff(xlim) )
+	xportion = min(1, diff(unclass(range(index.xts(y1))))*1.08 / diff(xlim) )
 	return( xportion * diff(xlim) / ( 2* nrow(y1)  ) )
 }
 
@@ -267,11 +271,15 @@ plota.x.highlight <- function
 		plota.x.highlight.helper(y, highlight, col = col)		
 	} else { # do for each color
 		for( icol in unique(col[highlight]) ) {
-			plota.x.highlight.helper(y, iif(col == icol, highlight, FALSE), col = icol)		
+			plota.x.highlight.helper(y, iif(col == icol, highlight, FALSE), col = icol)					
 		}
 	}
 }
 
+# Notes:
+# 1. replace all index(y) with index.xts(y): temp.x = index.xts(y)
+# 2. store dates = index.xts(y) if used multiple times
+#
 plota.x.highlight.helper <- function
 (
 	y,						# xts object to plot
@@ -284,15 +292,23 @@ plota.x.highlight.helper <- function
 	
 	if( is.logical(highlight) ) hl_index = which(highlight);
 	if( identical(unique(highlight) , c(0, 1)) ) hl_index = which(as.logical(highlight));
-	
+
 	# determine continuous segments to highlight
 	hl_index1 = which(diff(hl_index) > 1 )	
 	hl_index = hl_index[ sort(c(1, len(hl_index), hl_index1, (hl_index1+1))) ]
+
+	temp.x = index.xts(y)
+	
+	# see par documentation
+	temp.y = par('usr')[3:4]
+	if(par('ylog')) temp.y = 10^temp.y
+	
+	
 	for( i in seq(1,len(hl_index),2) ) {		
-		rect(index(y)[hl_index[i]] - dx/2, par('usr')[3],
-			index(y)[hl_index[(i + 1)]] + dx/2, par('usr')[4],
+		rect(temp.x[hl_index[i]] - dx/2, temp.y[1],
+			temp.x[hl_index[(i + 1)]] + dx/2, temp.y[2],
             col = col, border = col ) 		
-	}	
+	}
 	box();		
 }
 
@@ -306,12 +322,19 @@ plota.y.highlight <- function
 	col = plota.control$col.y.highlight
 )
 {
-	highlight[highlight == Inf] = par('usr')[4]
-	highlight[highlight == -Inf] = par('usr')[3]
+	# see par documentation
+	temp.y = par('usr')[3:4]
+	if(par('ylog')) temp.y = 10^temp.y
+
+	temp.x = par('usr')[1:2]
+	if(par('xlog')) temp.x = 10^temp.x
+		
+	highlight[highlight == Inf] = temp.y[2]
+	highlight[highlight == -Inf] = temp.y[1]
 	
 	for( i in seq(1,len(highlight),by=2) ) {
-		rect(par('usr')[1], highlight[i],
-			par('usr')[2], highlight[(i + 1)],
+		rect(temp.x[1], highlight[i],
+			temp.x[2], highlight[(i + 1)],
             col = col, border = col ) 			
 	}
 	box();
@@ -347,9 +370,10 @@ plota.candle <- function
 	} else if ( dxi0 < 1.75 ) {
 		plota.ohlc.lwd(y, col = col, lwd = 1)
 	} else {
-		rect(index(y) - dx/10, Lo(y), index(y) + dx/10, Hi(y), 
+		temp.x = index.xts(y)
+		rect(temp.x - dx/10, Lo(y), temp.x + dx/10, Hi(y), 
 			col = plota.control$col.border, border = plota.control$col.border)
-		rect(index(y) - dx/2, Op(y), index(y) + dx/2, Cl(y), 
+		rect(temp.x - dx/2, Op(y), temp.x + dx/2, Cl(y), 
 			col = col, border = plota.control$col.border)	
 	} 
 }
@@ -374,9 +398,10 @@ plota.ohlc <- function
 	} else if ( dxi0 < 1.75 ) {
 		plota.ohlc.lwd(y, col = col, lwd = 1)
 	} else {
-		rect(index(y) - dx/8, Lo(y), index(y) + dx/8, Hi(y), col = col, border = col)
-		segments(index(y) - dx/2, Op(y), index(y), Op(y), col = col)	
-		segments(index(y) + dx/2, Cl(y), index(y), Cl(y), col = col)	
+		temp.x = index.xts(y)
+		rect(temp.x - dx/8, Lo(y), temp.x + dx/8, Hi(y), col = col, border = col)
+		segments(temp.x - dx/2, Op(y), temp.x, Op(y), col = col)	
+		segments(temp.x + dx/2, Cl(y), temp.x, Cl(y), col = col)	
 	}
 }
 
@@ -397,7 +422,8 @@ plota.hl <- function
 	if( dxi0 < 1.75 ) {
 		plota.hl.lwd(y, col = col, lwd = 1)
 	} else {
-		rect(index(y) - dx/2, Lo(y), index(y) + dx/2, Hi(y), 
+		temp.x = index.xts(y)
+		rect(temp.x - dx/2, Lo(y), temp.x + dx/2, Hi(y), 
 			col = col, border = border)
 	}
 }
@@ -413,9 +439,10 @@ plota.ohlc.lwd <- function
 )
 {
 	dx = plota.dx(y)
-	segments(index(y), Lo(y), index(y), Hi(y), lwd = lwd, lend = 2,  ...)
-	segments(index(y) - dx/2, Op(y), index(y), Op(y), lwd = lwd, lend = 2, ...)
-	segments(index(y) + dx/2, Cl(y), index(y), Cl(y), lwd = lwd, lend = 2, ...)
+	temp.x = index.xts(y)
+	segments(temp.x, Lo(y), temp.x, Hi(y), lwd = lwd, lend = 2,  ...)
+	segments(temp.x - dx/2, Op(y), temp.x, Op(y), lwd = lwd, lend = 2, ...)
+	segments(temp.x + dx/2, Cl(y), temp.x, Cl(y), lwd = lwd, lend = 2, ...)
 }
 
 ###############################################################################
@@ -428,7 +455,8 @@ plota.hl.lwd <- function
 	...					# other parameters to segments
 )
 {
-	segments(index(y), Lo(y), index(y), Hi(y), lwd = lwd, lend = 2, ...)
+	temp.x = index.xts(y)
+	segments(temp.x, Lo(y), temp.x, Hi(y), lwd = lwd, lend = 2, ...)
 }
 
 ###############################################################################
@@ -445,10 +473,12 @@ plota.volume <- function
 	# convert dx to line width
 	dxi0 = ( dx / xinch() ) * 96
 	
+	temp.x = index.xts(y)
+	
 	if( dxi0 < 1.75 ) {
-		segments(index(y), 0, index(y), Vo(y), col = col, lwd = 1, lend = 2)	
+		segments(temp.x, 0, temp.x, Vo(y), col = col, lwd = 1, lend = 2)	
 	} else {
-		rect(index(y) - dx/2, 0, index(y) + dx/2, Vo(y), 
+		rect(temp.x - dx/2, 0, temp.x + dx/2, Vo(y), 
 			col = col, border = border)
 	}
 		
@@ -663,15 +693,21 @@ plota.stacked <- function
 		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
 		grid()
 	} else {
+		if(F) {
 		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
 			axis(2)
 			xaxis.ticks = axis.Date(1, x, labels = T, tick = T)		
 			
 			abline( h = axTicks(2), col = 'lightgray', lty = 'dotted')
 			abline( v = xaxis.ticks, col = 'lightgray', lty = 'dotted')		
+		} else {
+			plota(make.xts(y[,1], x), ylim = ylim, cex = par('cex'), LeftMargin = 4, ...)
+			axis(2, las = 1) 
+		}
+		
 	}
 		
-		mtext('Allocation %', side = 2,line = 2, cex = par('cex'))
+		mtext('Allocation %', side = 2,line = 3, cex = par('cex'))
 		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
 	
 	

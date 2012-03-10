@@ -337,7 +337,7 @@ plot.periodic.table1 <- function(hist.returns)
 	
 	# create temp matrix with data you want to plot
 	temp = t(coredata(hist.returns))
-		colnames(temp) = format(index(hist.returns), '%Y')
+		colnames(temp) = format(index.xts(hist.returns), '%Y')
 		rownames(temp) = 1:n
 			rownames(temp)[1] = ' Best '
 			rownames(temp)[n] = ' Worst '
@@ -361,7 +361,7 @@ plot.periodic.table2 <- function(hist.returns)
 {	
 	# create temp matrix with data you want to plot
 	temp = t(coredata(hist.returns))
-		colnames(temp) = format(index(hist.returns), '%Y')
+		colnames(temp) = format(index.xts(hist.returns), '%Y')
 
 	# format data as percentages
 	temp[] = plota.format(100 * temp, 0, '', '%')

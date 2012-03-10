@@ -111,7 +111,7 @@ bt.prep <- function
 		}	
 	} else {
 		if(!is.null(dates)) b[[ symbolnames[1] ]] = b[[ symbolnames[1] ]][dates,]	
-		out = list(all.dates = index(b[[ symbolnames[1] ]]) )
+		out = list(all.dates = index.xts(b[[ symbolnames[1] ]]) )
 	}
 
 	# dates
@@ -353,7 +353,7 @@ bt.summary <- function
     	bt$type = type
     	
 	if( type == 'weight') {    	    	
-    	bt$ret = make.xts(rowSums(ret * weight), index(ret))
+    	bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))
     	
     } else {
     	bt$share = weight
@@ -385,7 +385,7 @@ bt.summary <- function
 
 		
 		bt$weight[is.na(bt$weight)] = 0		
-		bt$ret = make.xts(ifna(portfolio.ret,0), index(ret))
+		bt$ret = make.xts(ifna(portfolio.ret,0), index.xts(ret))
     }
     	
     bt$best = max(bt$ret)
@@ -407,7 +407,7 @@ compute.turnover <- function
 	b 		# enviroment with symbols time series
 ) 
 { 
-	year.ends =  unique(c(endpoints(index(bt$weight), 'years'), nrow(bt$weight)))	
+	year.ends =  unique(c(endpoints(index.xts(bt$weight), 'years'), nrow(bt$weight)))	
 		year.ends = year.ends[year.ends>0]	
 		nr = len(year.ends)
 	period.index = c(1, year.ends)
@@ -527,10 +527,12 @@ bt.trade.summary <- function
 		)
 		colnames(out$stats) = spl('All,Long,Short')
 		
+		temp.x = index.xts(weight)
+		
 		trades = data.frame(coredata(trades))
 			trades$symbol = symbolnames[trades$symbol]
-			trades$entry.date = index(weight)[trades$entry.date]
-			trades$exit.date = index(weight)[trades$exit.date]
+			trades$entry.date = temp.x[trades$entry.date]
+			trades$exit.date = temp.x[trades$exit.date]
 			trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)			
 			trades$entry.price = round(trades$entry.price, 2)
 			trades$exit.price = round(trades$exit.price, 2)			
@@ -756,7 +758,7 @@ compute.cagr <- function(equity)
 
 compute.nyears <- function(x) 
 {
-	as.double(diff(as.Date(range(index(x)))))/365
+	as.double(diff(as.Date(range(index.xts(x)))))/365
 }
 
 # 252 - days, 52 - weeks, 26 - biweeks, 12-months, 6,4,3,2,1
@@ -776,7 +778,7 @@ compute.sharpe <- function(x)
 # R2 equals the square of the correlation coefficient
 compute.R2 <- function(equity) 
 {
-	x = as.double(index(equity))
+	x = as.double(index.xts(equity))
 	y = equity
 	#summary(lm(y~x))
 	return( cor(y,x)^2 )
