@@ -1889,6 +1889,43 @@ aa.test.create.ia <- function()
 	return(ia)	
 }
 
+
+###############################################################################
+# Create Historical Input Assumptions given symbols and dates
+###############################################################################
+aa.test.create.ia.custom <- function(symbols, symbol.names = symbols, dates = NULL)
+{
+	#--------------------------------------------------------------------------
+	# Load historical prices and compute simple returns
+	#--------------------------------------------------------------------------
+	load.packages('quantmod,quadprog')
+
+	data <- new.env()
+	getSymbols(symbols, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na', dates=dates)
+
+	# convert to monthly frequency 
+	hist.prices = data$prices
+		period.ends = endpoints(hist.prices, 'months')
+		hist.prices = hist.prices[period.ends, ]
+		colnames(hist.prices) = symbol.names
+	annual.factor = 12
+	
+	# compute simple returns	
+	hist.returns = na.omit( ROC(hist.prices, type = 'discrete') )
+	
+	#--------------------------------------------------------------------------
+	# Create historical input assumptions
+	#--------------------------------------------------------------------------
+	ia = create.historical.ia(hist.returns, annual.factor, symbol.names, symbol.names)
+	
+	return(ia)	
+}
+
+
+
+
 ###############################################################################
 # Create historical input assumptions
 ###############################################################################

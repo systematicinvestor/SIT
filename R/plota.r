@@ -101,7 +101,14 @@ plota <- function
 		
 		# Y axis rotation in 90 degrees increments : las=0,las=1,las=2,las=3
 		axis(4, las = las)
-		plota.control$xaxis.ticks = axis.Date(1, temp.x,labels = plotX, tick = plotX)
+		
+		if( class(temp.x)[1] == 'Date') {	
+			plota.control$xaxis.ticks = axis.Date(1, temp.x,labels = plotX, tick = plotX)
+		} else {
+			plota.control$xaxis.ticks = axis.POSIXct(1, temp.x,labels = plotX, tick = plotX)
+		}
+		
+		
 				
 	# highlight logic
 	if( !is.null(x.highlight) ) plota.x.highlight(y, x.highlight); 	
@@ -689,26 +696,23 @@ plota.stacked <- function
 	
 	# create empty plot
 	# par(mar = c(4, 4, 2, 1), cex = 0.8)
-	if( class(x) != 'Date') {
+	if( class(x)[1] != 'Date' & class(x)[1] != 'POSIXct') {
 		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
 		grid()
 	} else {
-		if(F) {
-		plot(x, rep(0, len(x)), ylim = ylim, t = 'n', yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
-			axis(2)
-			xaxis.ticks = axis.Date(1, x, labels = T, tick = T)		
-			
-			abline( h = axTicks(2), col = 'lightgray', lty = 'dotted')
-			abline( v = xaxis.ticks, col = 'lightgray', lty = 'dotted')		
-		} else {
-			plota(make.xts(y[,1], x), ylim = ylim, cex = par('cex'), LeftMargin = 4, ...)
-			axis(2, las = 1) 
-		}
+		#plot(x, rep(0, len(x)), ylim = ylim, t = 'n', yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', cex = par('cex'), ...)
+		#	axis(2)
+		#	xaxis.ticks = axis.Date(1, x, labels = T, tick = T)		
+		#	
+		#	abline( h = axTicks(2), col = 'lightgray', lty = 'dotted')
+		#	abline( v = xaxis.ticks, col = 'lightgray', lty = 'dotted')		
 		
+		plota(make.xts(y[,1], x), ylim = ylim, cex = par('cex'), LeftMargin = 4, ...)
+		axis(2, las = 1) 
 	}
 		
-		mtext('Allocation %', side = 2,line = 3, cex = par('cex'))
-		mtext(xlab, side = 1,line = 2, cex = par('cex'))		
+	mtext('Allocation %', side = 2,line = 3, cex = par('cex'))
+	mtext(xlab, side = 1,line = 2, cex = par('cex'))		
 	
 	
 	# plot stacked areas	

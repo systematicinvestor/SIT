@@ -447,6 +447,7 @@ make.xts <- function
     orderBy = class(order.by)
     index = as.numeric(as.POSIXct(order.by, tz = tzone))
     if( is.null(dim(x)) ) dim(x) = c(len(x), 1)
+    x = as.matrix(x)
 
     x = structure(.Data = x, 
     	index = structure(index, tzone = tzone, tclass = orderBy), 
@@ -476,9 +477,23 @@ index.xts <- function
 {
 	temp = attr(x, 'index')
 	class(temp)='POSIXct' 
-	return( as.Date(temp) )
+	
+	if( attr(x, '.indexCLASS')[1] == 'Date') {	
+		as.Date(temp)
+	} else {
+		as.POSIXct(temp, tz = Sys.getenv('TZ'))
+	}
 }
 
+index2date.time <- function(temp) {
+	class(temp)='POSIXct' 
+	
+	if( attr(x, '.indexCLASS')[1] == 'Date') {	
+		as.Date(temp)
+	} else {
+		as.POSIXct(temp, tz = Sys.getenv('TZ'))
+	}
+}
 
 ###############################################################################
 # Work with file names

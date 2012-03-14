@@ -43,13 +43,15 @@ bt.merge <- function
 	}
 	class(temp)='POSIXct' 
 	temp = as.Date(range(temp))
-	
+		
 	if(!is.null(dates)) { 
+		# by unclass(median(diff(temp)))
 		idate = seq(temp[1], temp[2], by=1)
 		temp = make.xts(1:len(idate),idate) 
 		
 		temp = temp[dates] 
 		temp = range( attr(temp, 'index') )
+		
 		class(temp) = 'POSIXct'
 		temp = as.Date(range(temp))
 	}
@@ -221,7 +223,7 @@ bt.run.share <- function
 (
 	b,					# enviroment with symbols time series
 	prices = b$prices,	# prices
-	clena.signal = T,	# flag to remove excessive signal
+	clean.signal = T,	# flag to remove excessive signal
 	
 	trade.summary = F, 	# flag to create trade summary
 	do.lag = 1, 		# lag signal
@@ -230,7 +232,7 @@ bt.run.share <- function
 	capital = 100000
 ) 
 {
-	if(clena.signal) {
+	if(clean.signal) {
 		b$weight[] = (capital / prices) * bt.exrem(b$weight)
 	} else {
 		b$weight[] = (capital / prices) * b$weight
@@ -371,6 +373,9 @@ bt.summary <- function
 			# find trade dates
 			share.nextday = mlag(bt$share, -1)
 			tstart = bt$share != share.nextday & share.nextday != 0
+			tend = bt$share != 0 & bt$share != share.nextday
+				trade = ifna(tstart | tend, FALSE)
+				tstart = trade
 			
 			index = mlag(apply(tstart, 1, any))
 				index = ifna(index, FALSE)
