@@ -361,41 +361,6 @@ qp_solve <- function
 
 
 
-# Logic to remove reduandant equality constraints in QP problem, based on qp_solve
-solve.QP.remove.equality.constraints <- function
-(
-	Dmat,				# solve.QP parameters
-	dvec, 				# solve.QP parameters
-	Amat, 				# solve.QP parameters
-	bvec, 				# solve.QP parameters
-	meq=0 				# solve.QP parameters
-)
-{
-	qp.data.temp = list()	
-		qp.data.temp$Amat = Amat
-		qp.data.temp$bvec = bvec
-		qp.data.temp$Dmat = Dmat
-		qp.data.temp$dvec = dvec
-		qp.data.temp$meq = meq	
-	
-		
-	qp.data.temp = remove.equality.constraints(qp.data.temp)
-	# if no equality constraints found go to optimization
-	if( len(qp.data.temp$var.index) == len(qp.data.temp$solution) ) {
-		qp.data.final = qp.data.temp
-	} else {
-		# test for equality constraints one more time
-		qp.data.final = remove.equality.constraints(qp.data.temp)		
-			qp.data.temp$solution[qp.data.temp$var.index] = qp.data.final$solution			
-				qp.data.final$solution = qp.data.temp$solution			
-			qp.data.final$var.index = qp.data.temp$var.index[qp.data.final$var.index]
-	}
-		
-	return(qp.data.final)
-}
-
-			
-	    
 
 
 
@@ -452,11 +417,176 @@ mbqp.test <- function()
 
 }
 
+###############################################################################
+# Oriingal version is too slow working on a new faster version
+###############################################################################
+# Logic to remove reduandant equality constraints in QP problem, based on qp_solve
+solve.QP.remove.equality.constraints <- function
+(
+	Dmat,				# solve.QP parameters
+	dvec, 				# solve.QP parameters
+	Amat, 				# solve.QP parameters
+	bvec, 				# solve.QP parameters
+	meq=0 				# solve.QP parameters
+)
+{
+	qp.data = list()	
+		qp.data$Amat = Amat
+		qp.data$bvec = bvec
+		qp.data$Dmat = Dmat
+		qp.data$dvec = dvec
+		qp.data$meq = meq	
+	
+		
+	Amat1 = t(qp.data$Amat)
+	bvec1 = qp.data$bvec
+	Dmat1 = qp.data$Dmat
+	dvec1 = qp.data$dvec
+	meq1 = qp.data$meq
+		
+	
+#Amat - var are rows, constr are columns	
+#Amat1 - constr are rows, var are columns
+# 	Amat = matrix(1:20,nr=4) 
+#	Amat1 = t(Amat)
+#	(1+0*Amat1[2:4,])/ c(1,2,3)
 
+	# default
+	qp.data$solution = rep(NA, ncol(Amat1))
+	qp.data$var.index = 1:ncol(Amat1)
+	
+
+while(T) {
+
+
+	# 1. find columns with just one non-zero element
+	one.non.zero.index = which( rowSums(Amat1!=0) == 1 )
+
+	if( len(one.non.zero.index) == 0 ) break
+	
+	# 2. divide these columns, and corresponding bvec by column's abs value	
+	temp0 = rowSums(Amat1[one.non.zero.index,])
+	temp = abs( temp0 )
+	bvec1[one.non.zero.index] = bvec1[one.non.zero.index] / temp
+	Amat1[one.non.zero.index,] = Amat1[one.non.zero.index,] / temp
+		
+	
+	
+	temp0.index = matrix(1:ncol(Amat1), nr=ncol(Amat1), nc=len(one.non.zero.index))[t(Amat1[one.non.zero.index,]!=0)]
+	
+
+#Amat - var are rows, constr are columns	
+#Amat1 - constr are rows, var are columns	
+	
+	
+	# 3. look for pairs among one.non.zero.index colums
+	# x >= value , -x>= -value => x = value
+	equality.constraints = rep(NA, ncol(Amat1))
+	lb = ub = rep(NA, ncol(Amat1))
+	
+	
+	# Make sure if there are multiple matches only keep max for lb and min for ub
+	
+	index = temp0 > 0
+	#lb[temp0.index[index]] = bvec1[one.non.zero.index[index]]
+	##temp = tapply(bvec1[one.non.zero.index[index]], temp0.index[index], max)
+	##lb[ as.double(names(temp)) ] = temp
+	temp = order(bvec1[one.non.zero.index[index]], decreasing = FALSE)
+	lb[temp0.index[index][temp]] = bvec1[one.non.zero.index[index]][temp]
+	
+	index = temp0 < 0
+	#ub[temp0.index[index]] = -bvec1[one.non.zero.index[index]]
+	##temp = tapply(-bvec1[one.non.zero.index[index]], temp0.index[index], min)
+	##ub[ as.double(names(temp)) ] = temp	
+	temp = order(-bvec1[one.non.zero.index[index]], decreasing = TRUE)
+	ub[temp0.index[index][temp]] = -bvec1[one.non.zero.index[index]][temp]
+	
+#a = rep(0,5)
+#a[c(2,2,2)] = c(2,1,0)
+
+	
+	# 4. remove variables
+	remove.index = which(lb == ub)
+	if( len(remove.index) > 0 ) {
+		equality.constraints[remove.index] = lb[remove.index]
+		
+		# remove variables
+		Dmat1 = Dmat1[-remove.index, -remove.index,drop=F]
+		dvec1 = dvec1[-remove.index]
+		bvec1 = bvec1 - Amat1[,remove.index,drop=F] %*% equality.constraints[remove.index]
+		Amat1 = Amat1[,-remove.index,drop=F]
+		
+		qp.data$solution[ qp.data$var.index[remove.index] ] = lb[remove.index]
+		qp.data$var.index = which(is.na(qp.data$solution))				
+
+		# check if there are variables left		
+		if( ncol(Amat1) > 0 ) {
+				
+			# remove constraints
+			remove.index = which( rowSums(Amat1!=0) == 0 & bvec1 == 0 )
+			if(len(remove.index)>0) {
+				bvec1 = bvec1[-remove.index]
+				Amat1 = Amat1[-remove.index,,drop=F]
+					
+				# handle euality constraints
+				if( meq1 > 0 ) meq1 = meq1 - len(intersect((1:meq1), remove.index))
+			}
+		} else break
+				
+						
+	} else break
+	
+	}	# while(T)
+
+	# prepare return object
+	qp.data$Amat = t(Amat1)
+	qp.data$bvec = bvec1
+	qp.data$Dmat = Dmat1
+	qp.data$dvec = dvec1
+	qp.data$meq = meq1
+	
+	return(qp.data)
+}
+
+	
 ###############################################################################
-# Find and remove equality constraints in QP problem
+# Find and remove equality constraints in QP problem (slow)
 ###############################################################################
-remove.equality.constraints <- function(qp.data)
+# Logic to remove reduandant equality constraints in QP problem, based on qp_solve
+solve.QP.remove.equality.constraints12 <- function
+(
+	Dmat,				# solve.QP parameters
+	dvec, 				# solve.QP parameters
+	Amat, 				# solve.QP parameters
+	bvec, 				# solve.QP parameters
+	meq=0 				# solve.QP parameters
+)
+{
+	qp.data.temp = list()	
+		qp.data.temp$Amat = Amat
+		qp.data.temp$bvec = bvec
+		qp.data.temp$Dmat = Dmat
+		qp.data.temp$dvec = dvec
+		qp.data.temp$meq = meq	
+	
+		
+	qp.data.temp = remove.equality.constraints.old(qp.data.temp)
+	# if no equality constraints found go to optimization
+	if( len(qp.data.temp$var.index) == len(qp.data.temp$solution) ) {
+		qp.data.final = qp.data.temp
+	} else {
+		# test for equality constraints one more time
+		qp.data.final = remove.equality.constraints.old(qp.data.temp)		
+			qp.data.temp$solution[qp.data.temp$var.index] = qp.data.final$solution			
+				qp.data.final$solution = qp.data.temp$solution			
+			qp.data.final$var.index = qp.data.temp$var.index[qp.data.final$var.index]
+	}
+		
+	return(qp.data.final)
+}
+
+
+remove.equality.constraints.old <- function(qp.data)
 {
 	#qp.data1 = qp.data.temp
 	Amat1 = qp.data$Amat

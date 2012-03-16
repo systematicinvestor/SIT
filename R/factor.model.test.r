@@ -172,7 +172,7 @@ dev.off()
 
 
 ###############################################################################
-# Multiple Factor Model – Building Fundamental Factors
+# Multiple Factor Model - Building Fundamental Factors
 #http://www.accountingcoach.com/accounting-topics.html
 ###############################################################################		
 fm.fund.factor.test <- function()
@@ -402,7 +402,7 @@ dev.off()
 
 
 ###############################################################################
-# Multiple Factor Model – Building All Factors and 
+# Multiple Factor Model - Building All Factors and
 # Running Cross-Sectional Regression
 #http://www.accountingcoach.com/accounting-topics.html
 ###############################################################################		
@@ -898,7 +898,7 @@ dev.off()
 
 
 ###############################################################################
-# Multiple Factor Model – Building Risk Model
+# Multiple Factor Model - Building Risk Model
 #
 # The risk factor model: MSCI Barra United States Equity Multi-Factor Model, page 101
 # http://www.alacra.com/alacra/help/barra_handbook_US.pdf

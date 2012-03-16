@@ -722,7 +722,7 @@ dev.off()
 		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)		
 		data$weight[month.ends2,] = 0		
 
-		# Close next day if Today’s Close > Today’s Open
+		# Close next day if Today’s Close > Today's Open
 		popen = bt.apply(data, Op)
 		data$weight[month.ends1,] = iif((prices > popen)[month.ends1,], 0, NA)		
 				
@@ -2398,7 +2398,7 @@ dev.off()
 
 
 ###############################################################################      
-# Derivative Dynamic Time Warping by Eamonn J. Keogh† and Michael J. Pazzani
+# Derivative Dynamic Time Warping by Eamonn J. Keogh and Michael J. Pazzani
 # http://www.cs.rutgers.edu/~mlittman/courses/statai03/DDTW-2001.pdf
 # 
 # page 3
@@ -2470,7 +2470,7 @@ dev.off()
 		
 	
 	#*****************************************************************
-	# Derivative Dynamic Time Warping by Eamonn J. Keogh† and Michael J. Pazzani
+	# Derivative Dynamic Time Warping by Eamonn J. Keogh and Michael J. Pazzani
 	# http://www.cs.rutgers.edu/~mlittman/courses/statai03/DDTW-2001.pdf
 	#****************************************************************** 
 	derivative.est <- function(x) {

@@ -68,8 +68,34 @@ binary_branch_bound <- function
 	
 	control$proborder.selected = control$proborder
 	
+	if(F) {
+		lb = bbb_data$lb 
+		ub = bbb_data$ub
+		 
+		# presolve two default cases
+		for( i in 0:1 ) {
+			lb[] = i
+			ub[] = i
+			sol = match.fun(bbb_solve)(bbb_data, lb, ub)
+		
+			if( sol$ok ) {                 
+				x = sol$x
+				fval = sol$fval
+	            xi = x[index_binvar]	# binary variables
+				            
+				# found solution
+				if ( max(abs( round(xi,0) - xi )) < control$bineps ) {
+					fbest = fval
+				    xbest = x              
+				    flag = 1
+				    if( !control$silent ) cat('FOUND SOLUTION =', fbest, '\n');
+				} 
+			}
+		}
+	}
+	
 	# Main Loop
-	while ( length(stack$data) >0 ) {	
+	while ( length(stack$data) > 0 ) {	
 	    # Get the next subproblem from the STACK
 		subprob = bbb_pop(stack)
 		
