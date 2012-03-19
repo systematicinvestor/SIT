@@ -796,6 +796,7 @@ bt.min.var.test <- function()
 	# Create Constraints
 	#*****************************************************************
 	constraints = new.constraints(n, lb = -Inf, ub = +Inf)
+	#constraints = new.constraints(n, lb = 0, ub = 1)
 	
 	# SUM x.i = 1
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
@@ -870,6 +871,179 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 		legend('topright', legend = 'min.var.daily', bty = 'n')
 	plotbt.transition.map(min.var.weekly$weight)
 		legend('topright', legend = 'min.var.weekly', bty = 'n')
+dev.off()	
+
+}
+
+
+###############################################################################
+# Backtest various asset allocation strategies based on the idea
+# Forecast-Free Algorithms: A New Benchmark For Tactical Strategies
+# http://cssanalytics.wordpress.com/2011/08/09/forecast-free-algorithms-a-new-benchmark-for-tactical-strategies/
+#
+# Extension to http://systematicinvestor.wordpress.com/2011/12/13/backtesting-minimum-variance-portfolios/
+###############################################################################
+bt.aa.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,quadprog,corpcor,lpSolve')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='remove.na', dates='1990::2011')
+ 
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	n = ncol(prices)
+	
+	# find week ends
+	period.ends = endpoints(prices, 'weeks')
+		period.ends = period.ends[period.ends > 0]
+
+	#*****************************************************************
+	# Create Constraints
+	#*****************************************************************
+	constraints = new.constraints(n, lb = 0, ub = 1)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 		
+	ret = prices / mlag(prices) - 1
+	start.i = which(period.ends >= (63 + 1))[1]
+
+	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio')	
+			
+	weight = NA * prices[period.ends,]
+	weights = list()
+		# Equal Weight 1/N Benchmark
+		weights$equal.weight = weight
+			weights$equal.weight[] = ntop(prices[period.ends,], n)	
+			weights$equal.weight[1:start.i,] = NA
+			
+		for(f in min.risk.fns) weights[[ gsub('\\.portfolio', '', f) ]] = weight
+		
+	risk.contributions = list()	
+		for(f in names(weights)) risk.contributions[[ f ]] = weight
+			
+	# construct portfolios			
+	for( j in start.i:len(period.ends) ) {
+		i = period.ends[j]
+		
+		# one quarter = 63 days
+		hist = ret[ (i- 63 +1):i, ]
+		
+		# create historical input assumptions
+		ia = create.historical.ia(hist, 252)
+			s0 = apply(coredata(hist),2,sd)		
+			ia$correlation = cor(coredata(hist), use='complete.obs',method='pearson')
+			ia$cov = ia$correlation * (s0 %*% t(s0))
+		
+		# find optimal portfolios under different risk measures
+		for(f in min.risk.fns) {
+			# set up initial solution
+			constraints$x0 = weights[[ gsub('\\.portfolio', '', f) ]][(j-1),]
+		
+			weights[[ gsub('\\.portfolio', '', f) ]][j,] = match.fun(f)(ia, constraints)
+		}
+		
+		# compute risk contributions implied by portfolio weihgts
+		for(f in names(weights)) {
+			risk.contributions[[ f ]][j,] = portfolio.risk.contribution(weights[[ f ]][j,], ia)
+		}
+
+		if( j %% 10 == 0) cat(j, '\n')
+	}
+	
+	#*****************************************************************
+	# Create strategies
+	#****************************************************************** 		
+	models = list()
+	for(i in names(weights)) {
+		data$weight[] = NA
+			data$weight[period.ends,] = weights[[i]]	
+		models[[i]] = bt.run.share(data, clean.signal = F)
+	}
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+	models = rev(models)
+
+png(filename = 'plot1.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	# Plot perfromance
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+dev.off()	
+
+png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Strategy Statistics  Side by Side
+	plotbt.strategy.sidebyside(models)
+dev.off()	
+
+	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	
+
+	
+
+png(filename = 'plot4.png', width = 600, height = 1600, units = 'px', pointsize = 12, bg = 'white')	
+	# Plot transition maps
+	layout(1:len(models))
+	for(m in names(models)) {
+		plotbt.transition.map(models[[m]]$weight, name=m)
+			legend('topright', legend = m, bty = 'n')
+	}
+dev.off()	
+
+png(filename = 'plot5.png', width = 600, height = 1600, units = 'px', pointsize = 12, bg = 'white')	
+	# Plot risk contributions
+	layout(1:len(risk.contributions))
+	for(m in names(risk.contributions)) {
+		plotbt.transition.map(risk.contributions[[m]], name=paste('Risk Contributions',m))
+			legend('topright', legend = m, bty = 'n')
+	}
+dev.off()	
+
+	
+png(filename = 'plot6.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot portfolio concentration stats
+	layout(1:2)	
+	plota.matplot(lapply(weights, portfolio.concentration.gini.coefficient), main='Gini Coefficient')
+	plota.matplot(lapply(weights, portfolio.concentration.herfindahl.index), main='Herfindahl Index')
+	#plota.matplot(lapply(weights, portfolio.turnover), main='Turnover')
+dev.off()	
+
+
+png(filename = 'plot7.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Compute stats
+	out = compute.stats( rev(weights),
+		list(Gini=function(w) mean(portfolio.concentration.gini.coefficient(w), na.rm=T),
+			Herfindahl=function(w) mean(portfolio.concentration.herfindahl.index(w), na.rm=T),
+			Turnover=function(w) 52 * mean(portfolio.turnover(w), na.rm=T)
+			)
+		)
+	
+	out[] = plota.format(100 * out, 1, '', '%')
+	plot.table(t(out))
+dev.off()		
+
+
+png(filename = 'plot8.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(rev(weights), function(w) 52 * mean(portfolio.turnover(w), na.rm=T)), 'Average Annual Portfolio Turnover')
 dev.off()	
 
 }

@@ -275,7 +275,10 @@ optimize.portfolio.nlp <- function
 	
 	# intial guess
 	p = rep(1, nrow(constraints$A))
-	if(!is.null(constraints$x0)) p = constraints$x0
+	if(!is.null(constraints$x0)) {
+		# if no NA's in constraints$x0
+		if( sum(is.na(constraints$x0)) == 0) p = constraints$x0
+	}
 		
 	# linear constraints
 	A = t(constraints$A)
@@ -784,6 +787,8 @@ min.cor.insteadof.cov.portfolio <- function
 	constraints		# constraints
 )
 {
+	if(is.null(ia$cov.temp)) ia$cov.temp = ia$cov
+
 	sol = solve.QP.bounds(Dmat = ia$correlation, dvec = rep(0, nrow(ia$cov.temp)) , 
 		Amat=constraints$A, bvec=constraints$b, constraints$meq,
 		lb = constraints$lb, ub = constraints$ub)
@@ -1178,12 +1183,78 @@ portfolio.risk <- function
 	ia			# input assumptions
 )	
 {	
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+
 	weight = weight[, 1:ia$n, drop=F]
 	cov = ia$cov[1:ia$n, 1:ia$n]
 	
 	return( apply(weight, 1, function(x) sqrt(t(x) %*% cov %*% x)) )	
 }	
 
+
+
+	
+###############################################################################
+# Find Equal-Risk-Contribution (ERC) Portfolio
+#
+# Unproxying weight constraints by Pat Burns
+# http://www.portfolioprobe.com/2011/04/13/unproxying-weight-constraints/
+#
+# Analytical Solution for the Equal-Risk-Contribution Portfolio
+# http://www.wilmott.com/messageview.cfm?catid=34&amp;threadid=38497
+#
+# Equally-weighted risk contributions: a new method to build risk balanced diversified portfolios by S. Maillard, T. Roncalli and J. Teiletche (2008)
+# http://www.thierry-roncalli.com/download/erc-slides.pdf
+#
+# On the property of equally-weighted risk contributions portfolios by S. Maillard, T. Roncalli and J. Teiletche (2008)
+# http://www.thierry-roncalli.com/download/erc.pdf
+#
+# Matlab code for Equal Risk Contribution Portfolio by Farid Moussaoui
+# http://mfquant.net/erc_portfolio.html
+###############################################################################
+find.erc.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	# avgcor
+	fn <- function(x){
+		risk.contribution = x * (cov %*% x)
+		sum( abs(risk.contribution - mean(risk.contribution)) )
+	}
+		
+	x = optimize.portfolio.nlp(ia, constraints, fn)
+	
+	return( x )
+}	
+		
+###############################################################################
+# portfolio.risk.contribution - (w * V %*% w) / (w %*% V %*% w)
+# Unproxying weight constraints by Pat Burns
+# http://www.portfolioprobe.com/2011/04/13/unproxying-weight-constraints/
+###############################################################################
+portfolio.risk.contribution <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{	
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+
+	weight = weight[, 1:ia$n, drop=F]
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	out = weight
+	out[] = t(apply( weight, 1, function(x) (x * (cov %*% x)) / (t(x) %*% cov %*% x)[1] ))
+	return(out)	
+}	
+
+
+
+	
 
 
 
@@ -1443,4 +1514,72 @@ plot.transition.map <- function
 	par(mar = c(4,3,2,1), cex = 0.8)
 	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name),type=type[1])				
 }
+
+
+
+
+
+###############################################################################
+# Helper functions from the following paper:
+# On the property of equally-weighted risk contributions portfolios by S. Maillard, 
+# T. Roncalli and J. Teiletche (2008), page 22
+# http://www.thierry-roncalli.com/download/erc.pdf
+###############################################################################
+portfolio.turnover <- function
+(
+	weight		# weight
+)	
+{	
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+
+	out = weight[,1] * NA
+	out[] = rowSums( abs(weight - mlag(weight)) ) / 2
+	return(out)
+}	
+
+# Herfindahl Index of portfolio weights
+# http://en.wikipedia.org/wiki/Herfindahl_index
+portfolio.concentration.herfindahl.index <- function
+(
+	weight		# weight
+)	
+{	
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+
+	one.over.n = 1/ncol(weight)
+	out = weight[,1] * NA
+	out[] = (rowSums(weight^2) - one.over.n) / (1 - one.over.n)
+	return(out)
+}	
+
+# Gini Coefficient of portfolio weights
+# http://en.wikipedia.org/wiki/Gini_coefficient
+portfolio.concentration.gini.coefficient <- function
+(
+	weight		# weight
+)	
+{	
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+
+	n = ncol(weight)
+
+	# The mean difference formula
+	#(mean(outer(weight, weight, function(x,y) abs(x-y))) / mean(weight))/2
+	
+	# Gini formula by Angus Deaton, more efficient 
+	#(n+1)/(n-1) - 2 * sum(weight * rank(-weight)) /(n*(n-1)* mean(weight))
+
+	# same formula, but faster
+	#temp = sort(weight, decreasing = T)
+	#(n+1)/(n-1) - 2 * sum(temp * (1:n)) /(n*(n-1)* mean(temp))
+
+	one.to.n = 1:n
+	out = weight[,1] * NA
+	out[] = apply( weight, 1, function(x) {
+		temp = sort(x, decreasing = T)
+		sum(temp * one.to.n)
+		} )
+	out = (n+1)/(n-1) - 2 * out /(n*(n-1)* apply(weight, 1, mean))
+	return(out)
+}	
 

@@ -742,4 +742,44 @@ plota.stacked <- function
     plota.legend(colnames(y), col, cex = par('cex'))    
 }
 
-    
+
+
+###############################################################################
+# plota.matplot plot lines stored in the matrix
+###############################################################################
+plota.matplot <- function
+(
+	y,				# xts object or list of xts objects to plot
+	dates = NULL,	# dates subset
+	...				# other parameters for plot
+)
+{
+	# find ylim
+	ylim = c()
+	if( is.list(y) ) {
+		n = len(y)
+		for( i in 1:n ) {
+   			if(!is.null(dates)) y[[i]] = y[[i]][dates]
+			ylim = range(ylim, y[[i]], na.rm = T)
+		}
+		
+		plota(y[[1]], ylim = ylim, col = 1, type = 'l', ...)
+		if( n > 1 ) {
+			for( i in 2:n ) plota.lines(y[[i]], col = i)
+		}
+
+		plota.legend(names(y), paste(1:n), y)	
+				
+	} else {
+		n = ncol(y)
+		if(!is.null(dates)) y = y[dates]
+		ylim = range(y, na.rm = T)
+		
+		plota(y[,1], ylim = ylim, col = 1, type = 'l', ...)
+		if( n > 1 ) {
+			for( i in 2:n ) plota.lines(y[,i], col = i)
+		}
+		
+		plota.legend(names(y), paste(1:n), as.list(y))	
+	}	
+}

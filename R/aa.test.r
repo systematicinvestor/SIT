@@ -581,6 +581,93 @@ dev.off()
 }
 
 
+
+###############################################################################
+# Test AA functions, Equal-Risk-Contribution (ERC) Portfolio
+#
+# Unproxying weight constraints by Pat Burns
+# http://www.portfolioprobe.com/2011/04/13/unproxying-weight-constraints/
+#
+# Analytical Solution for the Equal-Risk-Contribution Portfolio
+# http://www.wilmott.com/messageview.cfm?catid=34&amp;threadid=38497
+#
+# Equally-weighted risk contributions: a new method to build risk balanced diversified portfolios by S. Maillard, T. Roncalli and J. Teiletche (2008)
+# http://www.thierry-roncalli.com/download/erc-slides.pdf
+#
+# On the property of equally-weighted risk contributions portfolios by S. Maillard, T. Roncalli and J. Teiletche (2008)
+# http://www.thierry-roncalli.com/download/erc.pdf
+#
+# Matlab code for Equal Risk Contribution Portfolio by Farid Moussaoui
+# http://mfquant.net/erc_portfolio.html
+###############################################################################
+aa.erc.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia()
+	n = ia$n		
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# create efficient frontier
+	ef.risk = portopt(ia, constraints, 50, 'Risk')
+
+	# plot	
+	layout( 1:3 )
+	plot.ef(ia, list(ef.risk), portfolio.risk, F)	
+	plot.transition.map(ef.risk)	
+	plot.transition.map(portfolio.risk.contribution(ef.risk$weight, ia), 
+			ef.risk$risk, name='Risk Contribution')
+	
+	#--------------------------------------------------------------------------
+	# Look at some portfolios
+	#--------------------------------------------------------------------------			
+	# 1/n
+	x = rep(1/ia$n,ia$n)
+	round(100*portfolio.risk.contribution(x, ia),1)
+			
+	# construct ERC Equal-Risk-Contribution Portfolio	
+	x = find.erc.portfolio(ia, constraints)
+	round(100*portfolio.risk.contribution(x, ia),1)
+	
+	#--------------------------------------------------------------------------
+	# Replicate some examples from erc-slides.pdf
+	#--------------------------------------------------------------------------			
+	s = (c(1,2,3,4)/10)
+	cor = 0.5 + 0*diag(4)
+		diag(cor) = 1
+	cov = cor * (s %*% t(s))
+		
+	weight = rep(1/4,4)
+	weight = c(100,0,0,0)/100
+	weight = c(48,24,16,12)/100	
+
+	ia$n = 4
+	ia$cov=cov
+	round(100*portfolio.risk(weight, ia),1)
+	round(100*portfolio.risk.contribution(weight, ia),1)
+	
+	
+	s = c(12,10,11,13,12)/100
+	cor = 0.6 + 0*diag(5)
+		diag(cor) = 1
+	cov = cor * (s %*% t(s))
+	
+	weight = c(23.96,6.43,16.92,28.73,23.96)/100
+	weight = c(19.2,23,20.8,17.7,19.2)/100
+
+	ia$n = 5
+	ia$cov=cov
+	round(100*portfolio.risk(weight, ia),1)
+	round(100*portfolio.risk.contribution(weight, ia),1)
+}
+
+
 ###############################################################################
 # Test AA functions, CVaR Efficient Frontier
 ###############################################################################
