@@ -904,6 +904,11 @@ bt.aa.test <- function()
 	
 	# find week ends
 	period.ends = endpoints(prices, 'weeks')
+			period.annual.factor = 52
+
+#	period.ends = endpoints(prices, 'months')
+#			period.annual.factor = 12
+
 		period.ends = period.ends[period.ends > 0]
 
 	#*****************************************************************
@@ -920,8 +925,11 @@ bt.aa.test <- function()
 	ret = prices / mlag(prices) - 1
 	start.i = which(period.ends >= (63 + 1))[1]
 
-	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio')	
-			
+	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio,min.gini.portfolio')	
+	
+	# Gini risk measure optimization takes a while, uncomment below to add Gini risk measure
+	# min.risk.fns = c(min.risk.fns, 'min.gini.portfolio')
+	
 	weight = NA * prices[period.ends,]
 	weights = list()
 		# Equal Weight 1/N Benchmark
@@ -955,6 +963,7 @@ bt.aa.test <- function()
 			weights[[ gsub('\\.portfolio', '', f) ]][j,] = match.fun(f)(ia, constraints)
 		}
 		
+		
 		# compute risk contributions implied by portfolio weihgts
 		for(f in names(weights)) {
 			risk.contributions[[ f ]][j,] = portfolio.risk.contribution(weights[[ f ]][j,], ia)
@@ -977,6 +986,8 @@ bt.aa.test <- function()
 	# Create Report
 	#****************************************************************** 
 	models = rev(models)
+		weights = rev(weights)
+		risk.contributions = rev(risk.contributions)
 
 png(filename = 'plot1.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
 	# Plot perfromance
@@ -1028,10 +1039,10 @@ dev.off()
 
 png(filename = 'plot7.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	# Compute stats
-	out = compute.stats( rev(weights),
+	out = compute.stats(weights,
 		list(Gini=function(w) mean(portfolio.concentration.gini.coefficient(w), na.rm=T),
 			Herfindahl=function(w) mean(portfolio.concentration.herfindahl.index(w), na.rm=T),
-			Turnover=function(w) 52 * mean(portfolio.turnover(w), na.rm=T)
+			Turnover=function(w) period.annual.factor * mean(portfolio.turnover(w), na.rm=T)
 			)
 		)
 	
@@ -1043,7 +1054,7 @@ dev.off()
 png(filename = 'plot8.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	# Plot Portfolio Turnover for each strategy
 	layout(1)
-	barplot.with.labels(sapply(rev(weights), function(w) 52 * mean(portfolio.turnover(w), na.rm=T)), 'Average Annual Portfolio Turnover')
+	barplot.with.labels(sapply(weights, function(w) period.annual.factor * mean(portfolio.turnover(w), na.rm=T)), 'Average Annual Portfolio Turnover')
 dev.off()	
 
 }

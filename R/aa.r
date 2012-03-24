@@ -985,6 +985,111 @@ min.risk.downside.portfolio <- function
 
 
 
+###############################################################################
+# Gini mean difference
+# The mean difference is also known as the absolute mean difference and the Gini mean difference 
+# http://en.wikipedia.org/wiki/Mean_difference
+#
+# The Generation of Mean Gini Efficient Sets by J. Okunev (1991)
+# Can be made more efficient by solving for dual
+###############################################################################
+add.constraint.gini <- function
+(
+	ia,			# input assumptions
+	value,		# b value
+	type = c('=', '>=', '<='),	# type of constraints
+	constraints	# constraints structure
+)
+{
+	n0 = ncol(ia$hist.returns)
+	n = nrow(constraints$A)	
+	nt = nrow(ia$hist.returns)
+
+	# adjust constraints, add a.long, a.short 2 * nt*(nt-1)/2
+	constraints = add.variables(nt*(nt-1), constraints, lb=0)
+	
+	# [ SUM <over i> x.i * (r.ij - r.ik) ] - a.long.jk + a.short.jk = 0
+	# for each j = 1,...,T , k>j	
+	a = matrix(0, n0 + nt*(nt-1), nt*(nt-1)/2)
+		diag(a[(n0+1) : (n0 + nt*(nt-1)/2), ]) = -1
+		diag(a[(n0+1+nt*(nt-1)/2) : (n0 + nt*(nt-1)), ]) = 1
+	#a = rbind( matrix(0, n, nt*(nt-1)/2), -diag(nt*(nt-1)/2), diag(nt*(nt-1)/2))	
+	#	a[1 : n0, ] = t(ia$hist.returns)	
+	hist.returns = as.matrix(ia$hist.returns)
+	
+	i.start = 0
+	for(t in 1:(nt-1)) {
+		index = (i.start+1) : (i.start + nt -t)
+		for(i in 1:n0) {
+			a[i, index] = ( hist.returns[t,i] - hist.returns[,i] ) [ (t+1) : nt ] 
+		}
+		i.start = i.start + nt -t
+		
+	}
+	
+	constraints = add.constraints(a, 0, '=', constraints)
+
+	# objective : maximum loss, w
+	constraints = add.constraints(c(rep(0, n), rep(1, nt*(nt-1))), value, type[1], constraints)	
+		
+	return( constraints )	
+}
+
+min.gini.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	min.portfolio(ia, constraints, add.constraint.gini, portfolio.gini.coefficient)
+	
+}
+
+
+portfolio.gini.coefficient <- function
+(
+	weight,		# weight
+	ia			# input assumptions
+)	
+{
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+	
+	weight = weight[, 1:ia$n, drop=F]
+	
+	portfolio.returns = weight %*% t(ia$hist.returns)
+	
+	n = ncol(portfolio.returns)
+	
+
+#portfolio.returns = rnorm(100)
+#n = len(portfolio.returns)
+#
+# http://en.wikipedia.org/wiki/Mean_difference
+#sum(outer(portfolio.returns, portfolio.returns, function(x,y) abs(x-y))) / (n*(n-1))
+#
+# unmht:///file.5/C:/Desktop/1save/blog_entries/ERC/Gini%20Coefficient%20--%20from%20Wolfram%20MathWorld.mht/
+#temp = sort(portfolio.returns, decreasing = F)
+#2* sum( (2*(1:n) - n - 1) * temp ) / (n*(n-1) )	
+
+
+
+	one.to.n = 1:n
+	out = weight[,1] * NA
+	out[] = apply( portfolio.returns, 1, function(x) {
+		temp = sort(x, decreasing = F)
+		sum( (2*one.to.n - n - 1) * temp )
+		} )
+	out = 2 * out /(n*(n-1))
+	return(out)
+}	
+
+
+
+
+
+
+
+
 
 ###############################################################################
 # Find Maximum Return Portfolio
@@ -1025,6 +1130,8 @@ portfolio.return <- function
 	ia			# input assumptions
 )	
 {
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+	
 	weight = weight[, 1:ia$n, drop=F]
 	portfolio.return = weight %*% ia$expected.return
 	return( portfolio.return )
@@ -1231,6 +1338,7 @@ find.erc.portfolio <- function
 	return( x )
 }	
 		
+
 ###############################################################################
 # portfolio.risk.contribution - (w * V %*% w) / (w %*% V %*% w)
 # Unproxying weight constraints by Pat Burns
@@ -1582,4 +1690,5 @@ portfolio.concentration.gini.coefficient <- function
 	out = (n+1)/(n-1) - 2 * out /(n*(n-1)* apply(weight, 1, mean))
 	return(out)
 }	
+
 

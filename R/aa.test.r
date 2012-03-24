@@ -669,6 +669,70 @@ aa.erc.test <- function()
 
 
 ###############################################################################
+# Test AA functions, Gini mean difference Efficient Frontier
+#
+# Gini mean difference
+# The mean difference is also known as the absolute mean difference and the Gini mean difference 
+# http://en.wikipedia.org/wiki/Mean_difference
+#
+# The Generation of Mean Gini Efficient Sets by J. Okunev (1991)
+# Can be made more efficient by solving for dual
+###############################################################################
+aa.gini.test <- function()
+{
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia.rebal()
+	n = ia$n		
+
+	# 0 <= x.i <= 1 
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	
+	#x = min.gini.portfolio(ia, 	constraints)
+	#portfolio.gini.coefficient(x, ia)
+
+	# create efficient frontier(s)
+	ef.risk = portopt(ia, constraints, 50, 'Risk')
+	ef.gini = portopt(ia, constraints, 50, 'GINI', min.gini.portfolio)
+		
+
+	#--------------------------------------------------------------------------
+	# Create Plots
+	#--------------------------------------------------------------------------
+		
+png(filename = 'plot1g.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+
+	layout( matrix(1:4, nrow = 2) )
+	plot.ef(ia, list(ef.risk, ef.gini), portfolio.risk, F)	
+	plot.ef(ia, list(ef.risk, ef.gini), portfolio.gini.coefficient, F)	
+
+	plot.transition.map(ef.risk)
+	plot.transition.map(ef.gini)
+		
+dev.off()	
+	
+
+
+
+	ia = list()
+	ia$n = 3
+	ia$hist.returns = matrix(0,3,3)
+		ia$hist.returns[1,] = c(10,9,6)/100
+		ia$hist.returns[2,] = c(15,8,12)/100
+		ia$hist.returns[3,] = c(12,7,15)/100
+	
+}
+
+
+
+
+
+###############################################################################
 # Test AA functions, CVaR Efficient Frontier
 ###############################################################################
 aa.cvar.test <- function()
