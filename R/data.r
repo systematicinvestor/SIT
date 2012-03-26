@@ -300,4 +300,21 @@ sp500.components <- function()
 #http://en.wikipedia.org/wiki/List_of_S%26P_500_companies
 #http://en.wikipedia.org/wiki/Dow_Jones_Index
 
+
+###############################################################################
+# S&P 100 Components
+# http://www.barchart.com/stocks/sp100.php
+###############################################################################
+sp100.components <- function()
+{
+	url = 'http://www.barchart.com/stocks/sp100.php'
+	txt = join(readLines(url))
+	
+	# extract table from this page	
+	temp = extract.table.from.webpage(txt, 'Components', hasHeader = T)
+		i.start = grep('Name', temp[,2])
+		tickers = trim(temp[-c(1:i.start), 1])
+		
+	return(tickers)	
+}
  

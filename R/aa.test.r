@@ -716,6 +716,11 @@ png(filename = 'plot1g.png', width = 600, height = 600, units = 'px', pointsize 
 		
 dev.off()	
 	
+	#require(fBasics)		
+	#col = seqPalette(n, 'Greys')
+	#plot.transition.map(ef.risk, col=col)
+
+
 
 
 

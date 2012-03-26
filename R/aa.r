@@ -1607,7 +1607,8 @@ plot.transition.map <- function
 	x,				# x data
 	xlab = 'Risk',	# x label
 	name = '',		# name
-	type=c('s','l')	# type
+	type=c('s','l'),# type
+	col = NA		# colors
 
 )
 {
@@ -1620,7 +1621,8 @@ plot.transition.map <- function
 	y[is.na(y)] = 0	
 		
 	par(mar = c(4,3,2,1), cex = 0.8)
-	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name),type=type[1])				
+	plota.stacked(x, y, xlab = xlab, main = paste('Transition Map for', name),
+		type=type[1], col=ifna(col, plota.colors(ncol(y))) )
 }
 
 
