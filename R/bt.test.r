@@ -56,7 +56,7 @@ bt.empty.test <- function()
 # How to use execution.price functionality
 ###############################################################################
 bt.execution.price.test <- function() 
-{	
+{	 
 	#*****************************************************************
 	# Load historical data
 	#****************************************************************** 
@@ -66,7 +66,7 @@ bt.execution.price.test <- function()
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)			
-	bt.prep(data, align='keep.all', dates='1970::2011')	
+	bt.prep(data, align='keep.all', dates='1970::')	
 	
 	#*****************************************************************
 	# Code Strategies
@@ -82,33 +82,124 @@ bt.execution.price.test <- function()
 	data$weight[] = 0
 		data$execution.price[] = NA
 		data$weight[] = 1
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	models$buy.hold = bt.run(data, type='share', capital=capital)
-	
+	models$buy.hold = bt.run.share(data, clean.signal=T)
 
 	#*****************************************************************
 	# MA cross-over strategy
 	#****************************************************************** 
 	sma.fast = SMA(prices, 50)
 	sma.slow = SMA(prices, 200)
+		signal = iif(sma.fast >= sma.slow, 1, -1)
 	
 	data$weight[] = NA
 		data$execution.price[] = NA
-		data$weight[] = iif(sma.fast >= sma.slow, 1, -1)
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	models$ma.crossover = bt.run(data, type='share', trade.summary=T, capital=capital)
-
+		data$weight[] = signal
+	models$ma.crossover = bt.run.share(data, clean.signal=T, trade.summary = TRUE)
 
 	#*****************************************************************
-	# MA cross-over strategy with 1 day lag between trades
-	#
-	# Please note that there is only one execution.price per day.
-	# So we cannot buy and sell at a different execution price in the same day.
-	# In the code below I add 1 day between trades
+	# MA cross-over strategy, add 10c per share commission
+	#*****************************************************************	
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$weight[] = signal
+	models$ma.crossover.com = bt.run.share(data, commission = 0.1, clean.signal=T)
+	
+	#*****************************************************************
+	# MA cross-over strategy:
+	# Exit trades at the close on the day of the signal
+	# Enter trades at the open the next day after the signal	
 	#****************************************************************** 
-	weight = iif(sma.fast >= sma.slow, 1, -1)
+	popen = bt.apply(data, Op)		
+	signal.new = signal
+		trade.start	 = which(signal != mlag(signal) & signal != 0)
+		signal.new[trade.start] = 0
+		trade.start = trade.start + 1
+		
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$execution.price[trade.start,] = popen[trade.start,]
+		data$weight[] = signal.new
+	models$ma.crossover.enter.next.open = bt.run.share(data, clean.signal=T, trade.summary = TRUE)
+			
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	# put all reports into one pdf file
+	#pdf(file = 'report.pdf', width=8.5, height=11)
+		models = rev(models)
+	
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		
+		# Plot perfromance
+		plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+			mtext('Cumulative Performance', side = 2, line = 1)
+
+dev.off()				
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+			
+		# Plot trades
+		plotbt.custom.report.part3(models$ma.crossover, trade.summary = TRUE)		
+		
+dev.off()					
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+
+		plotbt.custom.report.part3(models$ma.crossover.enter.next.open, trade.summary = TRUE)		
+		
+dev.off()			
+	#dev.off()	
+
+	
+	
+		
+	
+	
+	
+		
+		
+		
+		
+		
+	#*****************************************************************
+	# Simple example showing the difference in a way commsion is integrated into returns
+	#****************************************************************** 	
+	commsion = 4
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$weight[201,] = 1
+		data$weight[316,] = 0				
+		data$execution.price[201,] = prices[201,] + commsion
+		data$execution.price[316,] = prices[316,] - commsion		
+	models$test.com = bt.run.share(data, clean.signal=T, trade.summary=T)
+
+	data$weight[] = NA
+		data$execution.price[] = NA
+		data$weight[201,] = 1
+		data$weight[316,] = 0					
+	models$test.com.new = bt.run.share(data, commision=commsion, trade.summary=T, clean.signal=T)
+
+	cbind(last(models$test.com$equity), last(models$test.com.new$equity),
+		as.double(prices[316] - commsion)/as.double(prices[201] + commsion))
+	
+	as.double(prices[202]) / as.double(prices[201] + commsion)-1
+	models$test.com$equity[202]-1
+	
+	as.double(prices[202] - commsion) / as.double(prices[201])-1
+	models$test.com.new$equity[202]-1
+	
+	
+	#plotbt.custom.report.part1(models)
+	
+	#*****************************************************************
+	# Example showing the difference in a way commsion is integrated into returns
+	#****************************************************************** 		
+	commsion = 0.1
+	sma.fast = SMA(prices, 50)
+	sma.slow = SMA(prices, 200)
+
+	weight = iif(sma.fast >= sma.slow, 1, -1)	
 		weight[] = bt.exrem(weight)
 		index = which(!is.na(weight))
 		trade.start = index+1		
@@ -117,20 +208,14 @@ bt.execution.price.test <- function()
 		
 		
 	data$weight[] = NA
-		data$execution.price[] = NA		
-		data$weight[trade.start,] = trade.direction		
-		data$weight[trade.end,] = 0				
-		
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	models$ma.crossover.lag = bt.run(data, type='share', trade.summary=T, capital=capital)
-		
-	#*****************************************************************
-	# MA cross-over strategy, add 5c a share in commsion
-	#****************************************************************** 	
-	commsion = 0.05
+		data$execution.price[] = NA
+		data$weight[] = weight
+	models$test.com.new = bt.run.share(data, commision=commsion, trade.summary=T, clean.signal=T)
+	
+	
 	data$weight[] = NA
 		data$execution.price[] = NA
+		
 		index = which(trade.direction > 0)
 		data$execution.price[trade.start[index],] = prices[trade.start[index],] + commsion
 		data$execution.price[trade.end[index],] = prices[trade.end[index],] - commsion
@@ -142,40 +227,10 @@ bt.execution.price.test <- function()
 		data$weight[trade.start,] = trade.direction
 		data$weight[trade.end,] = 0		
 		
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	models$ma.crossover.lag.com = bt.run(data, type='share', trade.summary=T, capital=capital)
-	
-	#*****************************************************************
-	# MA cross-over strategy, open trade at the open, and close trade at the close
-	#****************************************************************** 
-	popen = bt.apply(data, Op)	
-	data$weight[] = NA
-		data$execution.price[] = NA
-		data$execution.price[trade.start,] = popen[trade.start,]
-		data$weight[trade.start,] = trade.direction		
-		data$weight[trade.end,] = 0				
+	models$test.com = bt.run.share(data, clean.signal=T, trade.summary=T)
+
 		
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)
-	models$ma.crossover.lag.open = bt.run(data, type='share', trade.summary=T, capital=capital)
-
-	
-	#*****************************************************************
-	# Create Report
-	#****************************************************************** 	
-	# put all reports into one pdf file
-	pdf(file = 'report.pdf', width=8.5, height=11)
-		models = rev(models)
-	
-		plotbt.custom.report.part1(models)
-		plotbt.custom.report.part2(models)
-
-		plotbt.custom.report.part3(models$ma.crossover, trade.summary = TRUE)
-		plotbt.custom.report.part3(models$ma.crossover.lag, trade.summary = TRUE)
-		plotbt.custom.report.part3(models$ma.crossover.lag.com, trade.summary = TRUE)
-		plotbt.custom.report.part3(models$ma.crossover.lag.open, trade.summary = TRUE)
-	dev.off()	
+	#plotbt.custom.report.part1(models)
 	
 }
 
@@ -433,11 +488,10 @@ bt.rotational.trading.test <- function()
 	# Equal Weight
 	data$weight[] = NA
 		data$weight[month.ends,] = ntop(prices, n)[month.ends,]	
-		capital = 100000
-		data$weight[] = (capital / prices) * data$weight
-	equal.weight = bt.run(data, type='share', capital=capital)
+	equal.weight = bt.run.share(data, clean.signal=F)
 		
-			
+	
+	
 	# Rank on 6 month return
 	position.score = prices / mlag(prices, 126)	
 	

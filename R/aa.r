@@ -1327,9 +1327,9 @@ find.erc.portfolio <- function
 {
 	cov = ia$cov[1:ia$n, 1:ia$n]
 	
-	# avgcor
+	# obj
 	fn <- function(x){
-		risk.contribution = x * (cov %*% x)
+		risk.contribution = (x * (cov %*% x))
 		sum( abs(risk.contribution - mean(risk.contribution)) )
 	}
 		
@@ -1338,6 +1338,134 @@ find.erc.portfolio <- function
 	return( x )
 }	
 		
+find.erc.portfolio.simple <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	# obj
+	fn <- function(x){
+		# sum(x) = 1
+		if (sum(x) == 0) x = x + 1e-2
+		x  = x / sum(x)
+	
+		risk.contribution = (x * (cov %*% x))
+		var(as.double(risk.contribution))
+	}
+		
+
+	x0 = 1/sqrt(diag(cov))
+		x0 = x0 / sum(x0)
+					
+	x = nlminb(start = x0, objective = fn, lower = constraints$lb, upper = constraints$ub)
+	return(x$par)
+}	
+
+find.erc.portfolio.simple1 <- function
+(
+	ia,				# input assumptions
+	constraints		# constraints
+)
+{
+	cov = ia$cov[1:ia$n, 1:ia$n]
+	
+	# obj
+	fn <- function(x){
+		# sum(x) = 1
+		if (sum(x) == 0) x = x + 1e-2
+		x  = x / sum(x)
+	
+		risk.contribution = (x * (cov %*% x))
+		var(as.double(risk.contribution))
+	}
+		
+
+	x0 = 1/sqrt(diag(cov))
+		x0 = x0 / sum(x0)
+		
+	# http://www.ucl.ac.uk/~uctpjyy/nloptr.html
+	load.packages('nloptr', 'http://R-Forge.R-project.org')
+			
+	x = nloptr( x0=x0,eval_f=fn,lb = constraints$lb,ub = constraints$ub,
+		opts = list("algorithm"="NLOPT_LN_BOBYQA","xtol_rel"=1.0e-10))
+		
+	return(x$solution)
+}	
+
+
+find.erc.portfolio.test <- function() {
+	#--------------------------------------------------------------------------
+	# Create Efficient Frontier
+	#--------------------------------------------------------------------------
+	ia = aa.test.create.ia.rebal()				
+	n = ia$n		
+
+	
+	#--------------------------------------------------------------------------
+	# Construct ERC Equal-Risk Portfolio	
+	#--------------------------------------------------------------------------
+	x0 = 1/sqrt(diag(ia$cov))
+		temp = x0 / sum(x0)
+	rc.temp = portfolio.risk.contribution(temp, ia)		
+		rc.temp = abs(as.vector(rc.temp))
+	plot(rc.temp,ylim=c(0,0.4))
+	 
+	diff(range(rc.temp))
+	sd(rc.temp)
+ 
+	
+	
+	
+	#--------------------------------------------------------------------------
+	# Create constraints
+	#--------------------------------------------------------------------------
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	#--------------------------------------------------------------------------
+	# Construct ERC Equal-Risk-Contribution Portfolio	
+	#--------------------------------------------------------------------------
+	temp = find.erc.portfolio(ia, constraints)
+	rc.temp = portfolio.risk.contribution(temp, ia)		
+		rc.temp = abs(as.vector(rc.temp))
+	plot(rc.temp,ylim=c(0,0.4))
+	 
+	diff(range(rc.temp))
+	sd(rc.temp)
+ 
+	
+	#--------------------------------------------------------------------------
+	# Construct ERC Equal-Risk-Contribution Portfolio	
+	#--------------------------------------------------------------------------
+	temp = find.erc.portfolio.simple(ia, constraints)
+		temp = temp / sum(temp)
+	rc.temp = portfolio.risk.contribution(temp, ia)		
+		rc.temp = abs(as.vector(rc.temp))
+	plot(rc.temp,ylim=c(0,0.4))
+	 
+	diff(range(rc.temp))
+	sd(rc.temp)
+	
+	#--------------------------------------------------------------------------
+	# Construct ERC Equal-Risk-Contribution Portfolio	
+	#--------------------------------------------------------------------------
+	temp = find.erc.portfolio.simple1(ia, constraints)
+		temp = temp / sum(temp)
+	rc.temp = portfolio.risk.contribution(temp, ia)		
+		rc.temp = abs(as.vector(rc.temp))
+	plot(rc.temp,ylim=c(0,0.4))
+	 
+	diff(range(rc.temp))
+	sd(rc.temp)
+	
+}		
+
 
 ###############################################################################
 # portfolio.risk.contribution - (w * V %*% w) / (w %*% V %*% w)

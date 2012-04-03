@@ -229,13 +229,15 @@ bt.run.share <- function
 	do.lag = 1, 		# lag signal
 	do.CarryLastObservationForwardIfNA = TRUE, 	
 	silent = F,
-	capital = 100000
+	capital = 100000,
+	commission = 0,
+	weight = b$weight	
 ) 
 {
 	if(clean.signal) {
-		b$weight[] = (capital / prices) * bt.exrem(b$weight)
+		weight[] = (capital / prices) * bt.exrem(weight)
 	} else {
-		b$weight[] = (capital / prices) * b$weight
+		weight[] = (capital / prices) * weight
 	}
 	
 	bt.run(b, 
@@ -244,7 +246,9 @@ bt.run.share <- function
 		do.CarryLastObservationForwardIfNA = do.CarryLastObservationForwardIfNA,
 		type='share',
 		silent = silent,
-		capital = capital)	
+		capital = capital,
+		commission = commission,
+		weight = weight)	
 }
 
 ###############################################################################
@@ -261,7 +265,9 @@ bt.run <- function
 	do.CarryLastObservationForwardIfNA = TRUE, 
 	type = c('weight', 'share'),
 	silent = F,
-	capital = 100000
+	capital = 100000,
+	commission = 0,
+	weight = b$weight	
 ) 
 {
 	# setup
@@ -270,12 +276,11 @@ bt.run <- function
 	# print last signal / weight observation
 	if( !silent ) {
 		cat('Latest weights :\n')
-			print( last(b$weight) )
+			print( last(weight) )
 		cat('\n')
 	}
 		
     # create signal
-    weight = b$weight
     weight[] = ifna(weight, NA)
     
     # lag
@@ -321,7 +326,7 @@ bt.run <- function
 
 	# prepare output
 	bt = list()
-		bt = bt.summary(weight, ret, type, capital)
+		bt = bt.summary(weight, ret, type, b$prices, capital, commission)
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
@@ -344,7 +349,9 @@ bt.summary <- function
 	weight, 	# signal / weights matrix
 	ret, 		# returns for type='weight' and prices for type='share'
 	type = c('weight', 'share'),
-	capital = 100000
+	close.prices,
+	capital = 100000,
+	commission = 0
 ) 
 {
 	type = type[1]
@@ -354,9 +361,9 @@ bt.summary <- function
     	bt$weight = weight
     	bt$type = type
     	
-	if( type == 'weight') {    	    	
-    	bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))
-    	
+	if( type == 'weight') {    
+    	bt$ret = make.xts(rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T), index.xts(ret))
+    	#bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))    	
     } else {
     	bt$share = weight
     	bt$capital = capital
@@ -368,7 +375,8 @@ bt.summary <- function
 		prices[] = prices1
 		
 		# new logic
-		cash = capital - rowSums(bt$share * mlag(prices), na.rm=T)
+		#cash = capital - rowSums(bt$share * mlag(prices), na.rm=T)
+		cash = capital - rowSums(bt$share * mlag(close.prices), na.rm=T)
 		
 			# find trade dates
 			share.nextday = mlag(bt$share, -1)
@@ -383,8 +391,16 @@ bt.summary <- function
 			totalcash = NA * cash
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
+
 		
-		portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
+		# We can introduce transaction cost to portfolio returns as
+		# abs(bt$share - mlag(bt$share)) * 0.01
+		portfolio.ret = (totalcash  + rowSums(bt$share * prices, na.rm=T) -
+							rowSums(abs(bt$share - mlag(bt$share)) * commission, na.rm=T)
+		 				) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
+				
+		#portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1				
+		
 		bt$weight = bt$share * mlag(prices) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) )
 		
 

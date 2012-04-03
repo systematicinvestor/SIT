@@ -683,7 +683,12 @@ aa.gini.test <- function()
 	#--------------------------------------------------------------------------
 	# Create Efficient Frontier
 	#--------------------------------------------------------------------------
-	ia = aa.test.create.ia.rebal()
+	ia = aa.test.create.ia.rebal()	
+		ia$risk = apply(coredata(ia$hist.returns),2,sd)		
+		ia$correlation = cor(coredata(ia$hist.returns), use='complete.obs',method='pearson')
+		ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+					
+	
 	n = ia$n		
 
 	# 0 <= x.i <= 1 
@@ -715,7 +720,9 @@ png(filename = 'plot1g.png', width = 600, height = 600, units = 'px', pointsize 
 	plot.transition.map(ef.gini)
 		
 dev.off()	
-	
+		
+		
+
 	#require(fBasics)		
 	#col = seqPalette(n, 'Greys')
 	#plot.transition.map(ef.risk, col=col)
@@ -1958,6 +1965,7 @@ aa.test.create.ia.country <- function(dates = '1990::2010')
 aa.test.create.ia.rebal <- function()
 {
 	symbols = spl('SP500	SmallUS   	Europe	Pacific	Japan  	Gold   	20Y_Treas	5Y_Treas	TBills', '\t')
+		symbols = trim(symbols)
 	
 	data = 
 '1970	0.0403	-0.1743	-0.0935	-0.13	-0.156	0.0871	0.121	0.1685	0.0652

@@ -411,7 +411,7 @@ compute.cor <- function
 lookup.index <- function(data, i) {
 	irow = i %% nrow(data)
 	icol = (i %/% nrow(data)) +1
-	list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[(irow-5):(irow+5),icol])
+	list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[max(0,irow-5):min(nrow(data),irow+5),icol])
 }	
 
 ###############################################################################
