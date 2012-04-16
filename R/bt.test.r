@@ -237,6 +237,94 @@ dev.off()
 
 
 ###############################################################################
+# Cross Pollination from Timely Portfolio
+# http://timelyportfolio.blogspot.ca/2011/08/drawdown-visualization.html
+# http://timelyportfolio.blogspot.ca/2011/08/lm-system-on-nikkei-with-new-chart.html
+###############################################################################
+bt.timelyportfolio.visualization.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='2000::2011')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices    
+	
+	# Buy & Hold	
+	data$weight[] = 1
+	buy.hold = bt.run(data)	
+	
+	# Strategy
+	ma10 = bt.apply.matrix(prices, EMA, 10)
+	ma50 = bt.apply.matrix(prices, EMA, 50)
+	ma200 = bt.apply.matrix(prices, EMA, 200)
+	data$weight[] = NA;
+		data$weight[] = iif(ma10 > ma50 & ma50 > ma200, 1, 
+						iif(ma10 < ma50 & ma50 < ma200, -1, 0))
+	strategy = bt.run.share(data, clean.signal=F)
+	
+	
+	#*****************************************************************
+	# Visualization of system Entry and Exit based on
+	# http://timelyportfolio.blogspot.ca/2011/08/lm-system-on-nikkei-with-new-chart.html
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	layout(1)
+	plota(strategy$eq, type='l', ylim=range(buy.hold$eq,strategy$eq))
+	
+		col = iif(strategy$weight > 0, 'green', iif(strategy$weight < 0, 'red', 'gray'))
+	plota.lines(buy.hold$eq, type='l', col=col)		
+	
+		plota.legend('strategy,Long,Short,Not Invested','black,green,red,gray')
+		
+dev.off()			
+	#*****************************************************************	
+	# Drawdown Visualization 
+	# 10% drawdowns in yellow and 15% drawdowns in orange
+	# http://timelyportfolio.blogspot.ca/2011/08/drawdown-visualization.html
+	#*****************************************************************	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	layout(1:2)
+	drawdowns = compute.drawdown(strategy$eq)
+	highlight = drawdowns < -0.1
+	
+	plota.control$col.x.highlight = iif(drawdowns < -0.15, 'orange', iif(drawdowns < -0.1, 'yellow', 0))	
+	
+	plota(strategy$eq, type='l', plotX=F, x.highlight = highlight, ylim=range(buy.hold$eq,strategy$eq))
+		plota.legend('strategy,10% Drawdown,15%  Drawdown','black,yellow,orange')
+		
+	plota(100*drawdowns, type='l', x.highlight = highlight)
+		plota.legend('drawdown', 'black', x='bottomleft')
+	
+dev.off()		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 		
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	
+	plota.control$col.x.highlight = iif(drawdowns < -0.15, 'orange', iif(drawdowns < -0.1, 'yellow', 0))				
+	highlight = drawdowns < -0.1
+
+	plotbt.custom.report.part1(strategy, buy.hold, x.highlight = highlight)
+	
+dev.off()	
+		
+	
+}
+
+
+###############################################################################
 # Improving Trend-Following Strategies With Counter-Trend Entries by david varadi
 # http://cssanalytics.wordpress.com/2011/07/29/improving-trend-following-strategies-with-counter-trend-entries/
 ###############################################################################
@@ -776,7 +864,7 @@ dev.off()
 		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)		
 		data$weight[month.ends2,] = 0		
 
-		# Close next day if Today’s Close > Today's Open
+		# Close next day if Today's Close > Today's Open
 		popen = bt.apply(data, Op)
 		data$weight[month.ends1,] = iif((prices > popen)[month.ends1,], 0, NA)		
 				
@@ -950,6 +1038,7 @@ bt.aa.test <- function()
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
 	bt.prep(data, align='remove.na', dates='1990::2011')
  
+	
 	#*****************************************************************
 	# Code Strategies
 	#****************************************************************** 
@@ -1003,6 +1092,12 @@ bt.aa.test <- function()
 		# one quarter = 63 days
 		hist = ret[ (i- 63 +1):i, ]
 		
+		include.index = rep(TRUE, n)
+# new logic, require all assets to have full price history
+#include.index = count(hist)== 63       
+#hist = hist[ , include.index]
+
+		
 		# create historical input assumptions
 		ia = create.historical.ia(hist, 252)
 			s0 = apply(coredata(hist),2,sd)		
@@ -1012,15 +1107,15 @@ bt.aa.test <- function()
 		# find optimal portfolios under different risk measures
 		for(f in min.risk.fns) {
 			# set up initial solution
-			constraints$x0 = weights[[ gsub('\\.portfolio', '', f) ]][(j-1),]
+			constraints$x0 = weights[[ gsub('\\.portfolio', '', f) ]][(j-1), include.index]
 		
-			weights[[ gsub('\\.portfolio', '', f) ]][j,] = match.fun(f)(ia, constraints)
+			weights[[ gsub('\\.portfolio', '', f) ]][j, include.index] = match.fun(f)(ia, constraints)
 		}
 		
 		
 		# compute risk contributions implied by portfolio weihgts
 		for(f in names(weights)) {
-			risk.contributions[[ f ]][j,] = portfolio.risk.contribution(weights[[ f ]][j,], ia)
+			risk.contributions[[ f ]][j, include.index] = portfolio.risk.contribution(weights[[ f ]][j, include.index], ia)
 		}
 
 		if( j %% 10 == 0) cat(j, '\n')
@@ -2269,7 +2364,9 @@ bt.matching.find <- function
 	normalize.fn = normalize.mean.sd, 	# function to normalize data
 	dist.fn = dist.euclidean,	# function to compute distance
 	plot=FALSE,			# flag to create plot
-	layout = NULL		# flag to idicate if layout is already set	
+	plot.dist=FALSE,	# flag to create distance plot	
+	layout = NULL,		# flag to idicate if layout is already set	
+	main = NULL			# plot title
 )
 {
 	#*****************************************************************
@@ -2281,6 +2378,8 @@ bt.matching.find <- function
 		query = reference[(n - n.query + 1):n]	
 		reference = reference[1:(n - n.query)]
 		
+		main = paste(main, join(format(range(index(data)[(n - n.query + 1):n]), '%d%b%Y'), ' - '))
+			
 		n.query = len(query)
 		n.reference = len(reference)
 
@@ -2331,24 +2430,31 @@ bt.matching.find <- function
 	if(plot) {	
 		dates = index(data)[1:len(dist)]
 	
-		if(is.null(layout)) layout(1:2)		
+		if(is.null(layout)) {
+			if(plot.dist) layout(1:2) else layout(1)		
+		}
 		par(mar=c(2, 4, 2, 2))
-		plot(dates, dist, type='l',col='gray', main=paste('Top Matches', dist.fn.name), ylab='Distance', xlab='')
+		
+		if(plot.dist) {
+		plot(dates, dist, type='l',col='gray', main=paste('Top Historical Matches for', main, dist.fn.name), ylab='Distance', xlab='')
 			abline(h = mean(dist, na.rm=T), col='darkgray', lwd=2)
 			points(dates[min.index], dist[min.index], pch=22, col='red', bg='red')
 			text(dates[min.index], dist[min.index], 1:n.match, adj=c(1,1), col='black',xpd=TRUE)
-			
-		plota(data, type='l', col='gray')
+		}
+		
+		plota(data, type='l', col='gray', LeftMargin = 1,
+			main=iif(!plot.dist, paste('Top Historical Matches for', main), NULL)
+			)
 			plota.lines(last(data,90), col='blue')
 			for(i in 1:n.match) {
 			plota.lines(data[(min.index[i]-n.query + 1):min.index[i]], col='red')
 			}
 			text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
 				adj=c(1,-1), col='black',xpd=TRUE)
-			plota.legend('Pattern,Match #','blue,red')	
+			plota.legend(paste('Pattern: ', main, ',Match #'),'blue,red')	
 	}
 	
-	return(list(min.index=min.index, dist=dist[min.index], query=query, reference=reference, dates = index(data)))
+	return(list(min.index=min.index, dist=dist[min.index], query=query, reference=reference, dates = index(data), main = main))
 }
 		
 
@@ -2409,10 +2515,11 @@ bt.matching.overlay <- function
 		n = nrow(temp)
 		
 		if(is.null(layout)) layout(1)
-		par(mar=c(2, 4, 2, 2))
+		#par(mar=c(4, 2, 2, 2), ...)
+		par(mar=c(4, 2, 2, 2))
 		
 		matplot(temp, type='n',col='gray',lwd=2, lty='dotted', xlim=c(1, n + 0.15*n),
-			main = paste('Pattern Prediction with', n.match, 'neighbours'),ylab='Normalized', xlab='')
+			main = paste(obj$main,'Historical Pattern Prediction with', n.match, 'neighbours'),ylab='Normalized', xlab = 'Trading Days')
 			
 		col=adjustcolor('yellow', 0.5)
 		rect(0, par('usr')[3],n.query, par('usr')[4], col=col, border=col)

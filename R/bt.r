@@ -23,7 +23,7 @@
 ###############################################################################
 # Align dates, faster version of merge function
 ###############################################################################
-bt.merge <- function
+bt.merge.old <- function
 (
 	b,				# enviroment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
@@ -89,6 +89,68 @@ bt.merge <- function
 
 
 
+
+
+bt.merge <- function
+(
+	b,				# enviroment with symbols time series
+	align = c('keep.all', 'remove.na'),	# alignment type
+	dates = NULL	# subset of dates
+) 
+{
+	align = align[1]
+	symbolnames = b$symbolnames
+	nsymbols = len(symbolnames) 
+	
+	# count all series
+	ncount = sapply(symbolnames, function(i) nrow(b[[i]]))
+		all.dates = double(sum(ncount))		
+		
+	# put all dates into one large vector
+	itemp = 1
+	for( i in 1:nsymbols ) {
+		all.dates[itemp : (itemp + ncount[i] -1)] = attr(b[[ symbolnames[i] ]], 'index')
+		itemp = itemp + ncount[i]
+	}
+		
+	# find unique
+	temp = sort(all.dates)
+	unique.dates = c(temp[1], temp[-1][diff(temp)!=0])
+	
+	# trim if date is supplied	
+	if(!is.null(dates)) { 
+		class(unique.dates) = c('POSIXct', 'POSIXt')	
+		temp = make.xts(integer(len(unique.dates)), unique.dates) 		
+		unique.dates = attr(temp[dates], 'index')
+	}
+		
+	# date map
+	date.map = matrix(NA, nr = len(unique.dates), nsymbols)
+	itemp = 1
+	for( i in 1:nsymbols ) {
+		index = match(all.dates[itemp : (itemp + ncount[i] -1)], unique.dates)
+		sub.index = which(!is.na(index))
+		date.map[ index[sub.index], i] = sub.index
+		itemp = itemp + ncount[i]
+	}
+	
+	# trim logic
+	if( align == 'remove.na' ) { 
+		index = which(count(date.map, side=1) < nsymbols )
+	} else {
+		index = which(count(date.map, side=1) < max(1, 0.1 * nsymbols) )
+	}
+	
+	if(len(index) > 0) { 
+		date.map = date.map[-index,, drop = FALSE]
+		unique.dates = unique.dates[-index] 
+	}
+	
+	class(unique.dates) = c('POSIXct', 'POSIXt')	
+	return( list(all.dates = unique.dates, date.map = date.map))
+}
+
+
 ###############################################################################
 # Prepare backtest data
 ###############################################################################
@@ -107,6 +169,8 @@ bt.prep <- function
 	if( nsymbols > 1 ) {
 		# merge
 		out = bt.merge(b, align, dates)
+		
+		#out = bt.merge.old(b, align, dates)
 		for( i in 1:nsymbols ) {
 			b[[ symbolnames[i] ]] = 
 				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
@@ -120,24 +184,28 @@ bt.prep <- function
 	b$dates = out$all.dates
 		   
 	# empty matrix		
-	dummy = matrix(double(), len(out$all.dates), nsymbols)
-		colnames(dummy) = symbolnames
-		dummy = make.xts(dummy, out$all.dates)
+	dummy.mat = matrix(double(), len(out$all.dates), nsymbols)
+		colnames(dummy.mat) = symbolnames
+		dummy.mat = make.xts(dummy.mat, out$all.dates)
 		
 	# weight matrix holds signal and weight information		
-	b$weight = dummy
+	b$weight = dummy.mat
 	
 	# execution price, if null use Close	
-	b$execution.price = dummy
+	b$execution.price = dummy.mat
 		
 	# populate prices matrix
 	for( i in 1:nsymbols ) {
 		if( has.Cl( b[[ symbolnames[i] ]] ) ) {
-			dummy[,i] = Cl( b[[ symbolnames[i] ]] );
+			dummy.mat[,i] = Cl( b[[ symbolnames[i] ]] );
 		}
 	}
-	b$prices = dummy	
+	b$prices = dummy.mat	
 }
+
+
+
+
 
 # matrix form
 bt.prep.matrix <- function
@@ -174,14 +242,14 @@ bt.prep.matrix <- function
 	}
 	
 	# empty matrix		
-	dummy = make.xts(b$Cl, b$dates)
+	dummy.mat = make.xts(b$Cl, b$dates)
 		
 	# weight matrix holds signal and weight information		
-	b$weight = NA * dummy
+	b$weight = NA * dummy.mat
 	
-	b$execution.price = NA * dummy
+	b$execution.price = NA * dummy.mat
 	
-	b$prices = dummy
+	b$prices = dummy.mat
 }
 
 
@@ -662,19 +730,37 @@ bt.exrem <- function(weight)
 }	
 
 ###############################################################################
-# Timed Exit: Remove excessive signal
+# Timed Exit: exit trade after nlen bars
 ###############################################################################
-bt.exrem.time.exit <- function(signal, nlen) {
+bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
 	signal[is.na(signal)] = FALSE
-	signal.index = which(signal)			
-	nperiods = len(signal)	
 	
-	for(i in signal.index) {
-		if( signal[i] ) {
-			signal[ (i+1) : iif(i + nlen - 1 > nperiods, nperiods, i + nlen - 1) ] = FALSE
-		}
+	signal.index = which(signal)
+		nsignal.index = len(signal.index)
+		nperiods = len(signal)	
+		signal.index.exit = iif(signal.index + nlen - 1 > nperiods, nperiods, signal.index + nlen - 1)
+				
+	if(!create.weight) {
+		for(i in 1:nsignal.index) {
+			if( signal[ signal.index[i] ] ) {
+				signal[ (signal.index[i]+1) : signal.index.exit[i] ] = FALSE
+			}
+		}	
+		return(signal)
+	} else {
+		signal.index.exit1 = iif(signal.index + nlen > nperiods, nperiods, signal.index + nlen)
+		temp = signal * NA
+
+		for(i in 1:nsignal.index) {
+			if( signal[ signal.index[i] ] ) {
+				signal[ (signal.index[i]+1) : signal.index.exit[i] ] = FALSE
+				temp[ signal.index.exit1[i] ] = 0
+			}
+		}	
+				
+		temp[signal] = 1
+		return(temp)
 	}
-	return(signal)
 }
 
 
@@ -821,8 +907,9 @@ compute.risk <- function(x)
 
 compute.drawdown <- function(x) 
 { 
-	return(x / cummax(x) - 1)
+	return(x / cummax(c(1,x))[-1] - 1)
 }
+
 
 compute.max.drawdown <- function(x) 
 { 

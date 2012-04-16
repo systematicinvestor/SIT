@@ -469,6 +469,7 @@ write.xts <- function
 
 ###############################################################################
 # Fast alternative to index(x) for XTS object
+# NOTE index.xts is the same name as the index function in the XTS package
 ###############################################################################
 index.xts <- function
 (
@@ -479,10 +480,12 @@ index.xts <- function
 	class(temp)='POSIXct' 
 	
 	if( attr(x, '.indexCLASS')[1] == 'Date') {	
-		as.Date(temp)
+		out = as.Date(temp)
 	} else {
-		as.POSIXct(temp, tz = Sys.getenv('TZ'))
+		out = as.POSIXct(temp, tz = Sys.getenv('TZ'))
 	}
+	class(out) = attr(x, '.indexCLASS')
+	return(out)
 }
 
 index2date.time <- function(temp) {
@@ -494,6 +497,20 @@ index2date.time <- function(temp) {
 		as.POSIXct(temp, tz = Sys.getenv('TZ'))
 	}
 }
+
+###############################################################################
+# Work with colors
+###############################################################################
+# make color semi-transparent
+col.add.alpha <- function
+(
+	col, 		# color(s)
+	alpha=150	# alpha
+) 
+{
+	rgb(t(col2rgb(col)), alpha=alpha, maxColorValue = 255)	
+}
+
 
 ###############################################################################
 # Work with file names
@@ -514,3 +531,8 @@ get.filename <- function(x)
 	join(temp[-len(temp)])
 }
 
+
+
+
+#all possible combinations of list elements
+# expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
