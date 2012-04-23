@@ -24,25 +24,54 @@
 ###############################################################################
 # Global Plota Control Parameters & Themes
 ###############################################################################
-plota.theme.blue.red <- function() 
+plota.theme <- function
+(
+	col.border = 'black',
+	col.up = 'green',
+	col.dn = 'red',
+	col.x.highlight = 'orange',
+	col.y.highlight = 'orange',
+	alpha=NA
+) 
 {
-	plota.control$col.border = 'black'
-	plota.control$col.up = 'blue'
-	plota.control$col.dn = 'red'
+	col = c(col.border, col.up, col.dn, col.x.highlight, col.y.highlight)
+	if(!is.na(alpha)) col = col.add.alpha(col, alpha)
+	
+	plota.control$col.border = col[1]
+	plota.control$col.up = col[2]
+	plota.control$col.dn = col[3]
+	plota.control$col.x.highlight = col[4]
+	plota.control$col.y.highlight = col[5]
 }
 
-plota.theme.green.orange <- function() 
+plota.theme.blue.red <- function(alpha=NA) 
 {
-	plota.control$col.border = rgb(68,68,68, maxColorValue=255)
-	plota.control$col.up = rgb(0,204,0, maxColorValue=255)
-	plota.control$col.dn = rgb(255,119,0, maxColorValue=255)
+	plota.theme(
+		col.border = 'black',
+		col.up = 'blue',
+		col.dn = 'red',
+		alpha = alpha
+		)
 }
 
-plota.theme.gray.orange <- function() 
+plota.theme.green.orange <- function(alpha=NA) 
 {
-	plota.control$col.border = '#444444'
-	plota.control$col.up = '#BEBEBE'
-	plota.control$col.dn = '#FF7700'
+	plota.theme(
+		col.border = rgb(68,68,68, maxColorValue=255),
+		col.up = rgb(0,204,0, maxColorValue=255),
+		col.dn = rgb(255,119,0, maxColorValue=255),
+		alpha = alpha
+		)		
+}
+
+plota.theme.gray.orange <- function(alpha=NA) 
+{
+	plota.theme(
+		col.border = '#444444',
+		col.up = '#BEBEBE',
+		col.dn = '#FF7700',
+		alpha = alpha
+		)				
 }
 
 plota.control = new.env()
@@ -716,6 +745,7 @@ plota.stacked <- function
 		
 		plota(make.xts(y[,1], x), ylim = ylim, cex = par('cex'), LeftMargin = 4, ...)
 		axis(2, las = 1) 
+		x = unclass(as.POSIXct(x))
 	}
 		
 	mtext('Allocation %', side = 2,line = 3, cex = par('cex'))

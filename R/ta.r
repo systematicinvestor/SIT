@@ -85,6 +85,37 @@ DV <- function
 }
 
 ###############################################################################
+# DVI indicator
+# http://cssanalytics.wordpress.com/2010/07/29/dvi-and-spy-performance/
+# http://marketsci.wordpress.com/2010/07/29/exploring-the-dvi-indicator-extreme-readings/
+# http://marketsci.wordpress.com/2010/07/27/css-analytics%E2%80%99-dvi-indicator-revealed/
+# http://dvindicators.cssanalytics.com/community/?vasthtmlaction=viewtopic&t=47.0
+# http://quantingdutchman.wordpress.com/2010/07/28/dvi-indicator-for-amibroker/
+############################################################################### 
+DVI <- function
+(
+	x, 				# prices
+	n=250 			# window length
+)
+{
+	# Calculate return
+	ColumnC = ( x / runMean(x,3) ) - 1	
+	ColumnD = ( runMean( ColumnC , 5 ) + ( runMean( ColumnC , 100 ) / 10 ) ) / 2
+	ColumnE = runMean( ColumnD , 5 )
+
+	ColumnF = iif( x > mlag(x) , 1 , -1 )
+	ColumnG = ( runSum( ColumnF , 10 ) + ( runSum( ColumnF , 100 ) / 10 ) ) / 2
+	ColumnH = runMean( ColumnG , 2 )
+
+	DVI.magnitude = percent.rank( ColumnE , n )
+	DVI.stretch = percent.rank( ColumnH, n )
+	DVI = ( 0.8 * DVI.magnitude ) + ( 0.2 * DVI.stretch )
+
+	return(list(DVI=DVI, DVI.magnitude=DVI.magnitude, DVI.stretch=DVI.stretch))
+}
+
+
+###############################################################################
 # TSI indicator
 # http://engineering-returns.com/tsi/
 ############################################################################### 

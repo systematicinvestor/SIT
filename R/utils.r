@@ -461,10 +461,12 @@ make.xts <- function
 write.xts <- function
 (
 	x,			# XTS object
-	filename	# file name
+	filename,	# file name
+	append = FALSE
 )
 {
-	write.csv(x, row.names = index(x), filename)	
+	write.table(x, sep=',',  row.names = index(x), col.names = NA, file = filename, append = append)
+	#write.csv(x, row.names = index(x), filename)	
 }
 
 ###############################################################################

@@ -152,7 +152,6 @@ solve.QP.bounds <- function
 		# solve.QP: min(-d^T w.i + 1/2 w.i^T D w.i) subject to A^T w.i >= b_0			
 		sol = try(solve.QP(Dmat, dvec, Amat, bvec, meq, factorized),TRUE)
 		
-		
 		if(inherits(sol, 'try-error')) {
 			ok = F
 			sol = list()		

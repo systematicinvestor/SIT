@@ -23,74 +23,6 @@
 ###############################################################################
 # Align dates, faster version of merge function
 ###############################################################################
-bt.merge.old <- function
-(
-	b,				# enviroment with symbols time series
-	align = c('keep.all', 'remove.na'),	# alignment type
-	dates = NULL	# subset of dates
-) 
-{
-	align = align[1]
-	symbolnames = b$symbolnames
-	nsymbols = len(symbolnames) 
-	
-	# merge
-	temp = matrix(NA, nsymbols, 2)
-	for( i in 1:nsymbols ) {
-		idate = attr(b[[ symbolnames[i] ]], 'index')
-		temp[i,1] = idate[ 1 ]
-		temp[i,2] = idate[ len(idate) ]
-	}
-	class(temp)='POSIXct' 
-	temp = as.Date(range(temp))
-		
-	if(!is.null(dates)) { 
-		# by unclass(median(diff(temp)))
-		idate = seq(temp[1], temp[2], by=1)
-		temp = make.xts(1:len(idate),idate) 
-		
-		temp = temp[dates] 
-		temp = range( attr(temp, 'index') )
-		
-		class(temp) = 'POSIXct'
-		temp = as.Date(range(temp))
-	}
-	
-	# find business days
-	all.dates = seq(temp[1], temp[2], by=1)
-#		week.dates = date.dayofweek(all.dates)
-#		all.dates = all.dates[!(week.dates == 0 | week.dates == 6)]
-	
-	# date map
-	date.map = matrix(NA, nr = len(all.dates), nsymbols)
-	for( i in 1:nsymbols ) {
-		idate = attr(b[[ symbolnames[i] ]], 'index')
-			class(idate) = 'POSIXct'
-			idate = as.Date(idate)
-		
-		index = match(idate, all.dates)
-		sub.index = which(!is.na(index))
-		date.map[ index[sub.index], i] = sub.index
-	}
- 
-	if( align == 'remove.na' ) { 
-		index = which(count(date.map, side=1) < nsymbols )
-	} else {
-		index = which(count(date.map, side=1) < max(1, 0.1 * nsymbols) )
-	}
-	
-	if(len(index) > 0) { 
-		date.map = date.map[-index,, drop = FALSE]
-		all.dates = all.dates[-index] 
-	}
-	
-	return( list(all.dates = all.dates, date.map = date.map))
-}
-
-
-
-
-
 bt.merge <- function
 (
 	b,				# enviroment with symbols time series
@@ -170,7 +102,6 @@ bt.prep <- function
 		# merge
 		out = bt.merge(b, align, dates)
 		
-		#out = bt.merge.old(b, align, dates)
 		for( i in 1:nsymbols ) {
 			b[[ symbolnames[i] ]] = 
 				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
@@ -390,7 +321,12 @@ bt.run <- function
 		ret = prices
 	}
 	
-	weight = make.xts(weight, b$dates)
+	#weight = make.xts(weight, b$dates)
+	temp = b$weight
+		temp[] = weight
+	weight = temp
+	
+	
 
 	# prepare output
 	bt = list()
@@ -430,7 +366,10 @@ bt.summary <- function
     	bt$type = type
     	
 	if( type == 'weight') {    
-    	bt$ret = make.xts(rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T), index.xts(ret))
+		temp = ret[,1]
+			temp[] = rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T)
+		bt$ret = temp
+    	#bt$ret = make.xts(rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T), index.xts(ret))    	
     	#bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))    	
     } else {
     	bt$share = weight
@@ -474,7 +413,11 @@ bt.summary <- function
 
 		
 		bt$weight[is.na(bt$weight)] = 0		
-		bt$ret = make.xts(ifna(portfolio.ret,0), index.xts(ret))
+		#bt$ret = make.xts(ifna(portfolio.ret,0), index.xts(ret))
+		temp = ret[,1]
+			temp[] = ifna(portfolio.ret,0)
+		bt$ret = temp
+
     }
     	
     bt$best = max(bt$ret)

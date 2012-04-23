@@ -1361,6 +1361,8 @@ find.erc.portfolio.simple <- function
 		x0 = x0 / sum(x0)
 					
 	x = nlminb(start = x0, objective = fn, lower = constraints$lb, upper = constraints$ub)
+	
+	x$par = x$par / sum(x$par)
 	return(x$par)
 }	
 
@@ -1392,6 +1394,7 @@ find.erc.portfolio.simple1 <- function
 	x = nloptr( x0=x0,eval_f=fn,lb = constraints$lb,ub = constraints$ub,
 		opts = list("algorithm"="NLOPT_LN_BOBYQA","xtol_rel"=1.0e-10))
 		
+	x$solution = x$solution / sum(x$solution)
 	return(x$solution)
 }	
 
