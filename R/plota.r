@@ -85,6 +85,18 @@ plota.control = new.env()
 # set default theme	
 plota.theme.green.orange();
 
+###############################################################################
+# Work with colors
+###############################################################################
+# make color semi-transparent
+col.add.alpha <- function
+(
+	col, 		# color(s)
+	alpha=150	# alpha
+) 
+{
+	rgb(t(col2rgb(col)), alpha=alpha, maxColorValue = 255)	
+}
 
 ###############################################################################
 # plota - plot for time series

@@ -481,6 +481,8 @@ index.xts <- function
 	temp = attr(x, 'index')
 	class(temp)='POSIXct' 
 	
+	return(temp)
+	
 	if( attr(x, '.indexCLASS')[1] == 'Date') {	
 		out = as.Date(temp)
 	} else {
@@ -500,18 +502,6 @@ index2date.time <- function(temp) {
 	}
 }
 
-###############################################################################
-# Work with colors
-###############################################################################
-# make color semi-transparent
-col.add.alpha <- function
-(
-	col, 		# color(s)
-	alpha=150	# alpha
-) 
-{
-	rgb(t(col2rgb(col)), alpha=alpha, maxColorValue = 255)	
-}
 
 
 ###############################################################################

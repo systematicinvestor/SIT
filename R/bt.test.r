@@ -896,7 +896,7 @@ bt.intraday.test <- function()
 	#****************************************************************** 
 	load.packages('quantmod')	
 
-	EURUSD = getSymbols.fxhistoricaldata('EURUSD', 'hour', auto.assign = F, download=T)
+	EURUSD = getSymbols.fxhistoricaldata('EURUSD', 'hour', auto.assign = F, download=F)
 	SPY = getSymbols('SPY', src = 'yahoo', from = '1980-01-01', auto.assign = F)
 	
 	
@@ -935,7 +935,7 @@ dev.off()
 	# Daily Backtest
 	#****************************************************************** 
 	data <- new.env()
-	getSymbols.fxhistoricaldata(tickers, 'day', data, download=T)
+	getSymbols.fxhistoricaldata(tickers, 'day', data, download=F)
 	bt.prep(data, align='remove.na', dates='1990::')
 	
 	prices = data$prices   
@@ -966,7 +966,7 @@ dev.off()
 	# Intraday Backtest
 	#****************************************************************** 
 	data <- new.env()	
-	getSymbols.fxhistoricaldata(tickers, 'hour', data, download=T)	
+	getSymbols.fxhistoricaldata(tickers, 'hour', data, download=F)	
 	bt.prep(data, align='remove.na', dates='1990::')
 	
 	prices = data$prices   
@@ -2954,3 +2954,85 @@ dev.off()
 	
 }
 	
+
+
+
+
+###############################################################################
+# Position Sizing
+#
+# Money Management Position Sizing
+# http://www.trading-plan.com/money_position_sizing.html
+#
+# Position Sizing is Everything
+# http://www.leighdrogen.com/position-sizing-is-everything/
+###############################################################################
+bt.position.sizing.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)			
+	bt.prep(data, align='keep.all', dates='1970::')	
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+	nperiods = nrow(prices)
+	
+	models = list()
+	
+	#*****************************************************************
+	# Buy & Hold
+	#****************************************************************** 
+	data$weight[] = 0
+		data$weight[] = 1
+	models$buy.hold = bt.run.share(data, clean.signal=T)
+
+	#*****************************************************************
+	# Volatility Position Sizing - ATR
+	#****************************************************************** 
+	atr = bt.apply(data, function(x) ATR(HLC(x),20)[,'atr'])
+		
+	# http://www.leighdrogen.com/position-sizing-is-everything/	
+	# position size in units = ((porfolio size * % of capital to risk)/(ATR*2)) 
+	data$weight[] = NA
+		capital = 100000
+		
+		# risk 2% of capital, assuming 2 atr stop
+		data$weight[] = (capital * 2/100) / (2 * atr)
+		
+		# make sure you are not commiting more than 100%
+		# http://www.trading-plan.com/money_position_sizing.html
+		max.allocation = capital / prices
+		data$weight[] = iif(data$weight > max.allocation, max.allocation,data$weight)
+		
+	models$buy.hold.2atr = bt.run(data, type='share', capital=capital)					
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	models = rev(models)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
+	plotbt.custom.report.part1(models)
+dev.off()	
+
+
+png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+	plotbt.custom.report.part2(models)
+dev.off()	
+		
+
+}	
+
+
+
+
+
