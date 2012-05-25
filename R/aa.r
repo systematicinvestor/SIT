@@ -510,7 +510,7 @@ portfolio.cvar <- function
 	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( apply(portfolio.returns, 1, function(x) compute.cvar(x, alpha) ) )
+	return( apply(portfolio.returns, 1, function(x) -compute.cvar(x, 1-alpha) ) )
 }	
 
 min.cvar.portfolio <- function
@@ -535,30 +535,15 @@ portfolio.var <- function
 	if(is.null(ia$parameters.alpha)) alpha = 0.95 else alpha = ia$parameters.alpha
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
-	return( apply(portfolio.returns, 1, function(x) compute.var(x, alpha) ) )
+	return( apply(portfolio.returns, 1, function(x) -compute.var(x, 1-alpha) ) )
 }	
 
 ###############################################################################
 # compute.var/cvar - What is the most I can with a 95% level of confidence expect to lose
 # http://www.investopedia.com/articles/04/092904.asp
 ###############################################################################
-compute.var <- function
-(
-	x,		# observations
-	alpha	# confidence level
-)
-{
-	return( -quantile(x, probs = (1-alpha)) )
-}
-
-compute.cvar <- function
-(
-	x,		# observations
-	alpha	# confidence level
-)
-{
-	return( -mean(x[ x < quantile(x, probs = (1-alpha)) ]) )
-}
+#compute.var <- function(x, alpha){ return( -quantile(x, probs = (1-alpha)) )}
+#compute.cvar <- function(x, alpha) { return( -mean(x[ x < quantile(x, probs = (1-alpha)) ]) )}
 
 
 
@@ -642,7 +627,7 @@ portfolio.cdar <- function
 			function(x) {
 				x = cumsum(x)
 				x = x - cummax(x)
-				compute.cvar(x, alpha)
+				-compute.cvar(x, 1-alpha)
 			} 
 		))
 			
@@ -1271,10 +1256,9 @@ min.risk.portfolio <- function
 		Amat=constraints$A, bvec=constraints$b, constraints$meq,
 		lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec),TRUE) 
 	
-	if(binary.vec[1] != 0) cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')
-
-		
 	if(!inherits(sol, 'try-error')) {
+		if(binary.vec[1] != 0) cat(sol$counter,'QP calls made to solve problem with', len(constraints$binary.index), 'binary variables using Branch&Bound', '\n')
+	
 		x = sol$solution;
 	}		
 		
@@ -1619,12 +1603,16 @@ portopt <- function
 			
 		}
 	}
-	
+
+	# remove empty solutions	
+	rm.index = is.na(rowSums(out$weight))
+	if(any(rm.index)) out$weight = out$weight[!rm.index,]
 	
 	# compute risk / return
 	out$return = portfolio.return(out$weight, ia)
 	out$risk = portfolio.risk(out$weight, ia)
 	out$name = name
+	
 	
 	return(out)			
 }
