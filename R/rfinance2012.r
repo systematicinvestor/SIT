@@ -142,9 +142,24 @@ month.year.seasonality <- function
 	ret.by.month = create.monthly.table(ret)	
 	
 	#*****************************************************************
-	# Compute monthly stats
+	# Plot
 	#****************************************************************** 
-	out = compute.stats( lapply(apply(ret.by.month, 2, list), '[[', 1),
+	data_list = lapply(apply(ret.by.month, 2, list), '[[', 1)
+	group.seasonality(data_list, paste(ticker, 'Monthly'))
+			
+}	
+
+
+group.seasonality <- function
+(
+	data_list,	# data list for each group
+	smain		
+) 
+{
+	#*****************************************************************
+	# Compute group stats
+	#****************************************************************** 
+	out = compute.stats( data_list,
 		list(Sharpe=function(x) mean(x,na.rm=T)/sd(x,na.rm=T),
 			'% Positive'=function(x) sum(x > 0,na.rm=T)/sum(!is.na(x)),
 			Min=function(x) min(x,na.rm=T),
@@ -165,7 +180,7 @@ month.year.seasonality <- function
 	for(i in spl('Sharpe,% Positive,Min,Avg')) {
 		barplot(100*out[i,], names.arg = colnames(out), 
 			col=iif(out[i,] > 0, col[1], col[2]), 
-			main=paste(ticker,' ', i,' Monthly', sep=''), 
+			main=paste(smain,' ', i, sep=''), 
 			border = 'darkgray',las=2)
 		grid(NA,NULL)
 		abline(h=0, col='black')		
@@ -303,7 +318,6 @@ plot.patterns <- function
 }
 
 
-
 #############################################################################
 # Find maxima and minima using Kernel estimate
 #############################################################################
@@ -436,6 +450,204 @@ find.patterns <- function
 		rownames(out) = out.rownames
 	}
 	return(out)
+}
+
+
+#############################################################################
+# Find historical patterns in the data over a rolling window
+#############################################################################
+find.all.patterns.window <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	ticker = 'SPY'
+	
+	data = getSymbols(ticker, src = 'yahoo', from = '1970-01-01', auto.assign = F)
+		data = adjustOHLC(data, use.Adjusted=T)
+
+	data = data['2010::']
+	#*****************************************************************
+	# Search for all patterns over a rolling window
+	#****************************************************************** 
+	load.packages('sm') 
+	history = as.vector(coredata(Cl(data)))
+	window.len = 90
+	patterns = pattern.db()
+	
+	found.patterns = c()
+	
+	for(t in window.len : (len(history)-1)) {
+		sample = history[(t - window.len + 1):t]		
+		obj = find.extrema( sample )	
+		
+		if(len(obj$data.extrema.loc) > 0) {
+			out =  find.patterns(obj, patterns = patterns, silent=F, plot=F)  
+			
+			if(len(out)>0) found.patterns = rbind(found.patterns,cbind(t,out,t-window.len+out))			
+		}
+		if( t %% 10 == 0) cat(t, 'out of', len(history), '\n')
+	}
+	colnames(found.patterns) = spl('t,start,end,tstart,tend')
+	
+	#*****************************************************************
+	# Examine found patterns
+	#****************************************************************** 	
+	# check what patterns are not found
+	setdiff(unique(names(patterns)), unique(rownames(found.patterns)))
+
+	# number of matches for each pattern	
+	frequency = tapply(rep(1,nrow(found.patterns)), rownames(found.patterns), sum)
+	barplot(frequency)
+	
+	# determine starting Time for a pattern
+	index = which(rownames(found.patterns)=='HS')
+	found.patterns[ index[1:10],]			
+	
+	# plot
+	pattern.index = index[1]
+	t = found.patterns[pattern.index, 't'];	
+	plot.patterns(data[1:t,], window.len, ticker, patterns)	
+
+		
+	# plot start/end of this pattern
+	sample = data[(t - window.len + 1):t]		
+		start.pattern = found.patterns[pattern.index, 'start']
+		end.pattern = found.patterns[pattern.index, 'end']		
+	abline(v = index(sample)[start.pattern]);
+	abline(v = index(sample)[end.pattern]);
+	
+	index(sample)[start.pattern]	
+	index(data[(t - window.len + start.pattern),])
+	
+}
+
+
+#############################################################################
+# Compute conditional returns for each pattern over a rolling window
+#############################################################################
+bt.patterns.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	ticker = 'SPY'
+	
+	data = getSymbols(ticker, src = 'yahoo', from = '1970-01-01', auto.assign = F)
+		data = adjustOHLC(data, use.Adjusted=T)
+
+	#data = data['2010::']
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 
+	# page 14-15, L = 35 and d = 3, rolling the length of the window at L + d,
+	# The parameter d controls for the fact that in practice we do not observe a
+	# realization of a given pattern as soon as it has completed. Instead, we assume
+	# that there may be a lag between the pattern completion and the time
+	# of pattern detection. To account for this lag, we require that the final extremum
+	# that completes a pattern occurs on day t + L - 1; hence d is the number
+	# of days following the completion of a pattern that must pass before the pattern
+	# is detected.	
+	#In particular, we compute postpattern returns starting from the end of trading
+	#day t + L + d, that is, one day after the pattern has completed. For
+	#example, if we determine that a head-and-shoulder pattern has completed
+	# on day t + L - 1 (having used prices from time t through time t + L + d - 1),
+	#we compute the conditional one-day gross return as Z1=Yt+L+d+1/Yt+L+d.	
+	
+	#*****************************************************************
+	# Search for all patterns over a rolling window
+	#****************************************************************** 
+	load.packages('sm') 
+	history = as.vector(coredata(Cl(data)))
+	
+	window.L = 35
+	window.d = 3
+	window.len = window.L + window.d
+
+	patterns = pattern.db()
+	
+	found.patterns = c()
+	
+	for(t in window.len : (len(history)-1)) {
+		ret = history[(t+1)]/history[t]-1
+		
+		sample = history[(t - window.len + 1):t]		
+		obj = find.extrema( sample )	
+		
+		if(len(obj$data.extrema.loc) > 0) {
+			out =  find.patterns(obj, patterns = patterns, silent=F, plot=F)  
+			
+			if(len(out)>0) found.patterns = rbind(found.patterns,cbind(t,out,t-window.len+out, ret))
+		}
+		if( t %% 10 == 0) cat(t, 'out of', len(history), '\n')
+	}
+	colnames(found.patterns) = spl('t,start,end,tstart,tend,ret')
+	
+	#*****************************************************************
+	# Clean found patterns
+	#****************************************************************** 	
+	# remove patterns that finished after window.L
+	found.patterns = found.patterns[found.patterns[,'end'] <= window.L,]
+		
+	# remove the patterns found multiple times, only keep first one
+	pattern.names = unique(rownames(found.patterns))
+	all.patterns = c()
+	for(name in pattern.names) {
+		index = which(rownames(found.patterns) == name)
+		temp = NA * found.patterns[index,]
+		
+		i.count = 0
+		i.start = 1
+		while(i.start < len(index)) {
+			i.count = i.count + 1
+			temp[i.count,] = found.patterns[index[i.start],]
+			subindex = which(found.patterns[index,'tstart'] > temp[i.count,'tend'])			
+						
+			if(len(subindex) > 0) {
+				i.start = subindex[1]
+			} else break		
+		} 
+		all.patterns = rbind(all.patterns, temp[1:i.count,])		
+	}
+	
+	#*****************************************************************
+	# Plot
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	# number of matches for each pattern	
+	frequency = tapply(rep(1,nrow(all.patterns)), rownames(all.patterns), sum)
+	layout(1)
+	barplot.with.labels(frequency/100, 'Frequency for each Pattern')
+dev.off()
+	
+
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	# pattern seasonality
+	all.patterns[,'ret'] = history[(all.patterns[,'t']+20)] / history[all.patterns[,'t']] - 1
+	data_list = tapply(all.patterns[,'ret'], rownames(all.patterns), list)
+	group.seasonality(data_list, '20 days after Pattern')
+dev.off()	
+
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	# time pattern seasonality
+	layout(1)
+	name = 'BBOT'
+	index = which(rownames(all.patterns) == name)	
+	time.seasonality(data, all.patterns[index,'t'], 20, name)	
+dev.off()
+
+
+
+
+
+	#t.test(out[,'ret'])$p.value
+	#tapply(out[,'ret'], rownames(out), function(x) t.test(x)$p.value)
+	
 }
 
 
