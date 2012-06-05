@@ -439,7 +439,7 @@ compute.turnover <- function
 	b 		# enviroment with symbols time series
 ) 
 { 
-	year.ends =  unique(c(endpoints(index.xts(bt$weight), 'years'), nrow(bt$weight)))	
+	year.ends =  unique(c(endpoints(bt$weight, 'years'), nrow(bt$weight)))	
 		year.ends = year.ends[year.ends>0]	
 		nr = len(year.ends)
 	period.index = c(1, year.ends)

@@ -184,7 +184,7 @@ add.avg.factor <- function
 ###############################################################################
 # Convert factor to Z scores, normalize using market capitalization average
 ###############################################################################
-normalize <- function
+normalize.mkval <- function
 (
 	data,	# factors
 	MKVAL	# capitalization

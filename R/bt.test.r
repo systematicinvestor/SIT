@@ -3110,5 +3110,125 @@ dev.off()
 
 
 
+###############################################################################
+# Volatility Quantiles
+###############################################################################
+bt.volatility.quantiles.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = sp500.components()$tickers
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		#save(data, file='data.sp500.components.Rdata') 
+		#load(file='data.sp500.components.Rdata') 	
+		
+		# remove companies with less than 5 years of data
+		rm.index = which( sapply(ls(data), function(x) nrow(data[[x]])) < 1000 )	
+		rm(list=names(rm.index), envir=data)
+		
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+	
+	
+	
+	data.spy <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
+	bt.prep(data.spy, align='keep.all', dates='1994::')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	# setdiff(index(data.spy$prices), index(data$prices))
+	# setdiff(index(data$prices),index(data.spy$prices))
+	prices = data$prices
+		nperiods = nrow(prices)
+		n = ncol(prices)
+			
+	models = list()
+	
+	# SPY
+	data.spy$weight[] = NA
+		data.spy$weight[] = 1
+	models$spy = bt.run(data.spy)
+	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[] = ntop(prices, 500)
+	models$equal.weight = bt.run(data)
+	
+	#*****************************************************************
+	# Create Quantiles based on the historical one year volatility 
+	#****************************************************************** 
+	# setup re-balancing periods
+#	period.ends = 1:nperiods
+	period.ends = endpoints(prices, 'weeks')
+#	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]
+	
+	# compute historical one year volatility	
+	p = bt.apply.matrix(coredata(prices), ifna.prev)	
+	ret = p / mlag(p) - 1		
+	sd252 = bt.apply.matrix(ret, runSD, 252)		
+		
+	# split stocks in the S&amp;P 500 into Quantiles using one year historical Volatility	
+	n.quantiles=5
+	start.t = which(period.ends >= (252+2))[1]
+	quantiles = weights = p * NA			
+	
+	for( t in start.t:len(period.ends) ) {
+		i = period.ends[t]
+
+		factor = sd252[i,]
+		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
+	
+		quantiles[i,] = ranking
+		weights[i,] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
+	}
+
+	quantiles = ifna(quantiles,0)
+	
+	#*****************************************************************
+	# Create backtest for each Quintile
+	#****************************************************************** 
+	for( i in 1:n.quantiles) {
+		temp = weights * NA
+		temp[period.ends,] = 0
+		temp[quantiles == i] = weights[quantiles == i]
+	
+		data$weight[] = NA
+			data$weight[] = temp
+		models[[ paste('Q',i,sep='_') ]] = bt.run(data, silent = T)
+	}
+	rowSums(models$Q_2$weight,na.rm=T)	
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	# put all reports into one pdf file
+	#pdf(file = 'report.pdf', width=8.5, height=11)
+	
+	png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(models)		
+	dev.off()		
+	
+	png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.strategy.sidebyside(models)
+	dev.off()		
+
+		
+	
+
+	# save summary
+	#load.packages('abind')
+	#out = abind(lapply(models, function(m) m$equity))	
+	#	colnames(out) = names(models)
+	#write.xts(make.xts(out, index(prices)), 'report.csv')	
+}
+
+
 
 

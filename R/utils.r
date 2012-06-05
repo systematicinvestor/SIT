@@ -465,8 +465,8 @@ write.xts <- function
 	append = FALSE
 )
 {
-	write.table(x, sep=',',  row.names = index(x), col.names = NA, file = filename, append = append)
-	#write.csv(x, row.names = index(x), filename)	
+	write.table(x, sep=',',  row.names = format(index(x)), col.names = NA, file = filename, append = append)
+	#write.csv(x, row.names = format(index(x)), filename)	
 }
 
 ###############################################################################
