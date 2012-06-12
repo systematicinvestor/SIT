@@ -137,7 +137,7 @@ solve.QP.bounds <- function
 		bvec = c(bvec, lb[index])
 		Amat = cbind(Amat, diag(n)[, index])		
 	}
-	
+		
 	# main logic
 	if ( binary.vec[1] == 0 ) {	
 		# logic to check for constant variables	
@@ -147,24 +147,26 @@ solve.QP.bounds <- function
 			Amat = qp.data.final$Amat
 			bvec = qp.data.final$bvec
 			meq = qp.data.final$meq
-		
-			
+
 		# solve.QP: min(-d^T w.i + 1/2 w.i^T D w.i) subject to A^T w.i >= b_0			
 		sol = try(solve.QP(Dmat, dvec, Amat, bvec, meq, factorized),TRUE)
 		
+		# lot's of errors take place because covariance matrix is not positive defined
 		if(inherits(sol, 'try-error')) {
+#cat('solve.QP error\n')	
+#print(sol)
 			ok = F
-			sol = list()		
-#cat('solve.QP error\n')			
+			sol = list()				
 		} else {
 			# check that solve.QP solution satisfies constraints		
-			tol = 1e-5
+			tol = 1e-3
 			ok = T
 					
 			check = sol$solution %*% Amat - bvec
 			if(meq > 0) ok = ok & all(abs(check[1:meq]) <= tol)
 			ok = ok & all(check[-c(1:meq)] > -tol)
-#if(!ok) cat('solve.QP violates constraints\n')						
+#if(!ok) cat('solve.QP violates constraints\n')	
+#if(!ok) print(sol$solution)					
 		} 
 		
 		# try to solve problem one more time using ipop function from kernlab package

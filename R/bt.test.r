@@ -1331,13 +1331,18 @@ dev.off()
 # 3. Same as 2, but rebalance half-way to target
 ###############################################################################
 
+
 # helper function to create barplot with labels
-barplot.with.labels <- function(data, main, plotX = TRUE) {
+barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name','both')) {
 	par(mar=c( iif(plotX, 6, 2), 4, 2, 2))
 	x = barplot(100 * data, main = main, las = 2, names.arg = iif(plotX, names(data), ''))
-	# http://r.789695.n4.nabble.com/Highliting-a-text-in-a-plot-td828378.html
-	text(x, 100 * data, round(100 * data,1), adj=c(0.5,1), xpd = TRUE)
+	
+	if(label[1] == 'level') text(x, 100 * data, round(100 * data,1), adj=c(0.5,1), xpd = TRUE)
+	if(label[1] == 'name') text(x, 0 * data, names(data), adj=c(-0.1,1), srt=90, xpd = TRUE)	
+	if(label[1] == 'both') 
+		text(x, 0 * data, paste(round(100 * data), '% ', names(data), sep=''), adj=c(-0.1,1), srt=90, xpd = TRUE)
 }
+
 
 bt.rebalancing.test <- function() 
 {
@@ -3031,6 +3036,228 @@ dev.off()
 		
 
 }	
+
+
+
+###############################################################################
+# Trading Equity Curve with Volatility Position Sizing
+###############################################################################
+bt.volatility.position.sizing.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'SPY'
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+	
+	#*****************************************************************
+	# Buy and Hold
+	#****************************************************************** 
+	models = list()
+	prices = data$prices
+	
+	data$weight[] = 1
+	models$buy.hold = bt.run.share(data, clean.signal=T)
+
+	#*****************************************************************
+	# Buy and Hold with target 10% Volatility
+	#****************************************************************** 
+	ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+	hist.vol = sqrt(252) * bt.apply.matrix(ret.log, runSD, n = 60)
+
+	data$weight[] = 0.1 / hist.vol
+	models$buy.hold.volatility.weighted = bt.run.share(data, clean.signal=T)
+
+	#*****************************************************************
+	# Buy and Hold with target 10% Volatility and Max Total leverage 100%
+	#****************************************************************** 		
+	data$weight[] = 0.1 / hist.vol
+		rs = rowSums(data$weight)
+		data$weight[] = data$weight / iif(rs > 1, rs, 1) 			
+	models$buy.hold.volatility.weighted.100 = bt.run.share(data, clean.signal=T)
+		
+	#*****************************************************************
+	# Same, rebalanced Monthly
+	#****************************************************************** 
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]
+		
+	data$weight[] = NA
+	data$weight[period.ends,] = 0.1 / hist.vol[period.ends,]
+		rs = rowSums(data$weight[period.ends,])
+		data$weight[period.ends,] = data$weight[period.ends,] / iif(rs > 1, rs, 1) 			
+	models$buy.hold.volatility.weighted.100.monthly = bt.run.share(data, clean.signal=T)
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	# Plot performance
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+dev.off()	
+
+png(filename = 'plot2.png', width = 1600, height = 1000, units = 'px', pointsize = 12, bg = 'white')		
+	plotbt.custom.report.part2(rev(models))
+dev.off()	
+	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover', plotX = F, label='both')
+dev.off()	
+	
+	
+
+	#*****************************************************************
+	# Next let's examine other volatility measures
+	#****************************************************************** 
+	models = models[c('buy.hold' ,'buy.hold.volatility.weighted.100.monthly')]
+
+		
+	# TTR volatility calc types
+	calc = c("close", "garman.klass", "parkinson", "rogers.satchell", "gk.yz", "yang.zhang")
+	
+	ohlc = OHLC(data$SPY)
+	for(icalc in calc) {
+		vol = volatility(ohlc, calc = icalc, n = 60, N = 252)
+		
+		data$weight[] = NA
+		data$weight[period.ends,] = 0.1 / vol[period.ends,]
+			rs = rowSums(data$weight[period.ends,])
+			data$weight[period.ends,] = data$weight[period.ends,] / iif(rs > 1, rs, 1) 			
+		models[[icalc]] = bt.run.share(data, clean.signal=T)
+	}
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot4.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	# Plot performance
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+dev.off()	
+	
+png(filename = 'plot5.png', width = 1600, height = 600, units = 'px', pointsize = 12, bg = 'white')
+	plotbt.strategy.sidebyside(models)
+dev.off()	
+
+
+	#*****************************************************************
+	# Volatility Position Sizing applied to MA cross-over strategy's Equity Curve
+	#****************************************************************** 
+	models = list()	
+	
+	sma.fast = SMA(prices, 50)
+	sma.slow = SMA(prices, 200)
+	weight = iif(sma.fast >= sma.slow, 1, -1)
+	
+	data$weight[] = weight
+	models$ma.crossover = bt.run.share(data, clean.signal=T)
+		
+	#*****************************************************************
+	# Target 10% Volatility
+	#****************************************************************** 
+	ret.log = bt.apply.matrix(models$ma.crossover$equity, ROC, type='continuous')
+	hist.vol = sqrt(252) * bt.apply.matrix(ret.log, runSD, n = 60)
+		
+	data$weight[] = NA
+		data$weight[period.ends,] = (0.1 / hist.vol[period.ends,]) * weight[period.ends,]
+		# limit total leverage to 100%		
+		rs = rowSums(data$weight[period.ends,])
+		data$weight[period.ends,] = data$weight[period.ends,] / iif(abs(rs) > 1, abs(rs), 1) 			
+	models$ma.crossover.volatility.weighted.100.monthly = bt.run.share(data, clean.signal=T)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot6.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	# Plot performance
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+dev.off()	
+	
+png(filename = 'plot7.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	plotbt.custom.report.part2(rev(models))
+dev.off()	
+	
+	
+	#*****************************************************************
+	# Apply Volatility Position Sizing Timing stretegy by M. Faber
+	#****************************************************************** 
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na', dates='1994::')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices   
+		n = ncol(prices)
+	models = list()
+
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]
+		
+	#*****************************************************************
+	# Equal Weight
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[period.ends,] = ntop(prices[period.ends,], n)
+		data$weight[1:200,] = NA
+	models$equal.weight = bt.run.share(data, clean.signal=F)
+				
+	#*****************************************************************
+	# Timing by M. Faber
+	#****************************************************************** 
+	sma = bt.apply.matrix(prices, SMA, 200)
+	
+	weight = ntop(prices, n) * (prices > sma)
+	data$weight[] = NA
+		data$weight[period.ends,] = weight[period.ends,]
+	models$timing = bt.run.share(data, clean.signal=F)
+		
+	#*****************************************************************
+	# Timing with target 10% Volatility
+	#****************************************************************** 
+	ret.log = bt.apply.matrix(models$timing$equity, ROC, type='continuous')
+	hist.vol = bt.apply.matrix(ret.log, runSD, n = 60)
+		hist.vol = sqrt(252) * as.vector(hist.vol)
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = (0.1 / hist.vol[period.ends]) * weight[period.ends,]
+		rs = rowSums(data$weight)
+		data$weight[] = data$weight / iif(rs > 1, rs, 1) 				
+		data$weight[1:200,] = NA
+	models$timing.volatility.weighted.100.monthly = bt.run.share(data, clean.signal=T)
+	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot8.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')										
+	# Plot performance
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+dev.off()	
+	
+png(filename = 'plot9.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	plotbt.custom.report.part2(rev(models))
+dev.off()	
+		
+	
+}	
+	
+
+
 
 
 ###############################################################################
