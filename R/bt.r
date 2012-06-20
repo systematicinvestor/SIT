@@ -233,6 +233,10 @@ bt.run.share <- function
 	weight = b$weight	
 ) 
 {
+	# make sure that prices are available, assume that
+	# weights account for missing prices i.e. no price means no allocation
+	prices[] = bt.apply.matrix(coredata(prices), ifna.prev)	
+
 	if(clean.signal) {
 		weight[] = (capital / prices) * bt.exrem(weight)
 	} else {
@@ -377,9 +381,11 @@ bt.summary <- function
     	prices = ret
     		
     	# backfill prices
-		prices1 = coredata(prices)
-		prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
-		prices[] = prices1
+		#prices1 = coredata(prices)
+		#prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
+		#prices[] = prices1
+		prices[] = bt.apply.matrix(coredata(prices), ifna.prev)	
+		close.prices[] = bt.apply.matrix(coredata(close.prices), ifna.prev)	
 		
 		# new logic
 		#cash = capital - rowSums(bt$share * mlag(prices), na.rm=T)

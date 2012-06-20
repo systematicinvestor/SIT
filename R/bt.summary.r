@@ -203,7 +203,7 @@ bt.detail.summary <- function
 		out$Period = join( format( range(index.xts(bt$equity)), '%b%Y'), ' - ')
 		
 		out$Cagr = compute.cagr(bt$equity)
-		out$Sharpe = compute.sharpe(bt$ret)
+		out$Sharpe = compute.sharpe(bt$ret) / 100
 		out$DVR = compute.DVR(bt)
 		out$Volatility = compute.risk(bt$ret)
 				

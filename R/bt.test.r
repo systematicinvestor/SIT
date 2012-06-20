@@ -3459,3 +3459,146 @@ bt.volatility.quantiles.test <- function()
 
 
 
+###############################################################################
+# Three Factor Rolling Regression Viewer
+# http://mas.xtreemhost.com/
+############################################################################### 
+# New fund regression calculator
+# http://www.bogleheads.org/forum/viewtopic.php?t=11506&amp;highlight=regression
+#
+# Factor loadings?
+# http://www.bogleheads.org/forum/viewtopic.php?t=14629
+#
+# Efficient Frontier: Rolling Your Own: Three-Factor Analysis
+# http://www.efficientfrontier.com/ef/101/roll101.htm
+#
+# Kenneth R French: Data Library
+# http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+############################################################################### 
+three.factor.rolling.regression <- function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'VISVX'
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	for(i in ls(data)) {
+		temp = adjustOHLC(data[[i]], use.Adjusted=T)							
+		
+		period.ends = endpoints(temp, 'months')
+			period.ends = period.ends[period.ends > 0]
+
+		# reformat date to match Fama French Data
+		monthly.dates = as.Date(paste(format(index(temp)[period.ends], '%Y%m'),'01',sep=''), '%Y%m%d')
+		data[[i]] = make.xts(coredata(temp[period.ends,]), monthly.dates)
+	}
+	
+	# Fama/French factors
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = 'months',download = T, clean = F)
+	
+	# add factors and align
+	data$factors = factors$data / 100
+	bt.prep(data, align='remove.na', dates='1994::')
+
+	#*****************************************************************
+	# Facto Loadings Regression over whole period
+	#****************************************************************** 
+	prices = data$prices
+		nperiods = nrow(prices)
+		dates = index(data$prices)
+	
+	# compute simple returns	
+	hist.returns = ROC(prices[,tickers], type = 'discrete')
+		hist.returns = hist.returns - data$factors$RF
+		colnames(hist.returns) = 'fund'
+	hist.returns = cbind(hist.returns, data$factors$Mkt.RF,
+					data$factors$SMB, data$factors$HML)
+
+	fit.all = summary(lm(fund~Mkt.RF+SMB+HML, data=hist.returns))
+		estimate.all = c(fit.all$coefficients[,'Estimate'], fit.all$r.squared)
+		std.error.all = c(fit.all$coefficients[,'Std. Error'], NA)
+	
+					
+	#*****************************************************************
+	# Facto Loadings Regression over 36 Month window
+	#****************************************************************** 
+							
+	window.len = 36
+	
+    # alpha: how much 'extra' return did the fund have that could not be accounted for by the model. this is almost never large or statistically significant.
+    # B(MKT) = market factor: most 100% stock funds have a market factor near 1.0. higher values may indicate leverage. lower values may indicate cash and or bonds.
+    # B(SMB) = size factor (small minus big): positive values indicate the fund's average holding is smaller than the market
+    # B(HML) = value factor (high minus low): positive values indicate the fund's average holding is more 'value' oriented than the market (based on book to market ratio)
+    # R2: measures how well the fund returns match the model (values close to 1.0 indicate a good statistical fit)
+    colnames = spl('alpha,MKT,SMB,HML,R2')
+    estimate = make.xts(matrix(NA, nr = nperiods, len(colnames)), dates)
+    	colnames(estimate) = colnames
+    std.error = estimate
+	
+	# main loop
+	for( i in window.len:nperiods ) {
+		window.index = (i - window.len + 1) : i
+		
+		fit = summary(lm(fund~Mkt.RF+SMB+HML, data=hist.returns[window.index,]))
+		estimate[i,] = c(fit$coefficients[,'Estimate'], fit$r.squared)
+		std.error[i,] = c(fit$coefficients[,'Std. Error'], NA)
+		
+		if( i %% 10 == 0) cat(i, '\n')
+	}
+
+	#*****************************************************************
+	# Reports
+	#****************************************************************** 
+	png(filename = 'plot1.png', width = 600, height = 1200, units = 'px', pointsize = 12, bg = 'white')		
+		
+
+	layout(matrix(1:10,nc=2,byrow=T))
+	
+	for(i in 1:5) {
+	
+		#-------------------------------------------------------------------------
+		# Time plot
+		#-------------------------------------------------------------------------
+		est = estimate[,i]
+		est.std.error = ifna(std.error[,i], 0)
+		
+		plota(est, 
+			ylim = range( c(
+				range(est + est.std.error, na.rm=T),
+				range(est - est.std.error, na.rm=T)		
+				)))
+	
+		polygon(c(dates,rev(dates)), 
+			c(coredata(est + est.std.error), 
+			rev(coredata(est - est.std.error))), 
+			border=NA, col=col.add.alpha('red',50))
+	
+		est = estimate.all[i]
+		est.std.error = std.error.all[i]
+	
+		polygon(c(range(dates),rev(range(dates))), 
+			c(rep(est + est.std.error,2),
+			rep(est - est.std.error,2)),
+			border=NA, col=col.add.alpha('blue',50))
+		
+		abline(h=0, col='blue', lty='dashed')
+			
+		abline(h=est, col='blue')
+	
+		plota.lines(estimate[,i], type='l', col='red')
+		
+		#-------------------------------------------------------------------------
+		# Histogram
+		#-------------------------------------------------------------------------
+		par(mar = c(4,3,2,1))
+		hist(estimate[,i], col='red', border='gray', las=1,
+			xlab='', ylab='', main=colnames(estimate)[i])
+			abline(v=estimate.all[i], col='blue', lwd=2)
+	}
+	
+	dev.off()
+	
+}
+	

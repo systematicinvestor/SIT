@@ -372,3 +372,261 @@ cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')
 
 
  
+
+###############################################################################
+# getSymbols interface to tradingblox free futures and forex data
+# http://www.tradingblox.com/tradingblox/free-historical-data.htm
+# http://www.tradingblox.com/Data/DataOnly.zip
+# Date, Open, High, Low, Close, Volume (zero for forex cash markets), 
+# Open Interest (futures only), Delivery Month ( YYYYMM futures only), 
+# Unadjusted Close (zero for forex cash markets)
+###############################################################################			
+getSymbols.TB <- function(
+	env = .GlobalEnv, 
+	auto.assign = TRUE,
+	download = FALSE,
+	type = c('Both', 'Futures', 'Forex'),
+	rm.index =  'PB', 	# remove Pork Bellies because not traded
+	clean = FALSE
+) 
+{
+	# download zip archive
+	if(download) {
+		download.file('http://www.tradingblox.com/Data/DataOnly.zip', 'DataOnly.zip')
+	}
+
+	# setup temp folder
+	temp.folder = paste(getwd(), 'temp', sep='/')
+	dir.create(temp.folder, F)
+		
+	##*****************************************************************
+	##	Unzip
+	##****************************************************************** 
+	temp.folder = paste(getwd(), '/', 'temp', sep='')
+
+	# clean temp
+	if(clean) shell('del /F /S /Q temp\\*.*', wait = TRUE)
+	
+	# unpack
+	files = unzip('DataOnly.zip', exdir=temp.folder)	
+	
+	# read definitions, based on Financial Instrument Model Infrastructure for R package from http://r-forge.r-project.org/R/?group_id=316
+ 	def1 = try(read.csv('http://www.tradingblox.com/tradingblox/CSIUA/FuturesInfo.txt',skip=1,header=FALSE, stringsAsFactors=F),TRUE) 
+	if(inherits(def1, 'try-error')) def1 = read.csv('FuturesInfo.txt',skip=1,header=FALSE, stringsAsFactors=F)			
+ 		def1 = def1[-match(rm.index, def1[,1]),]	
+ 		def1[,3] = 'Futures'
+ 
+ 	def2 = try(read.csv('http://www.tradingblox.com/tradingblox/CSIUA/ForexInfo.txt',skip=1,header=FALSE, stringsAsFactors=F),TRUE)
+ 	if(inherits(def2, 'try-error')) def2 = read.csv('ForexInfo.txt',skip=1,header=FALSE, stringsAsFactors=F)	 		
+ 		def2[,3] = 'Forex'
+ 	
+ 	def = rbind(def1[,1:4], def2[,1:4]) 			
+ 	if(type[1] == 'Futures') def = def1[,1:4]
+ 	if(type[1] == 'Forex') def = def2[,1:4]	
+ 	
+		
+	# read all files
+	for( i in 1:nrow(def) ) {
+		symbol = def[i,1]
+		
+		filename = paste(temp.folder, '/', def[i,3], '/', def[i,4], sep='')
+		if(file.exists(filename)) {										
+			fr <- read.csv(filename, header = FALSE) 
+			fr <- make.xts(fr[,-1], as.Date(as.character(fr[,1]),'%Y%m%d'))
+			colnames(fr) <- spl('Open,High,Low,Close,Volume,OpenInterest,DeliveryMonth,Unadjusted')[1:ncol(fr)]
+			fr$Adjusted = fr$Close
+			if (auto.assign) assign(symbol, fr, env)
+cat(i, 'out of', nrow(def), 'Reading', symbol, format(index.xts(fr)[1],'%Y%m%d'), format(index.xts(fr)[nrow(fr)],'%Y%m%d'), '\n', sep='\t')		
+		} else {
+cat('\t\t\t Missing data for ', symbol, '\n');
+		}
+	}
+
+	#*****************************************************************
+	# Add symbolnames, symbol.descriptions, and symbol.groups
+	#****************************************************************** 		
+	index = match(ls(env), def[,1])	
+	
+	temp = def[index,1]
+		names(temp) = def[index,1]
+    env$symbolnames = temp
+
+	temp = def[index,2]
+		names(temp) = def[index,1]
+    env$symbol.descriptions = temp
+
+	temp = def[index,3]
+		names(temp) = def[index,1]
+    env$symbol.groups = temp    	    	
+			
+	#*****************************************************************
+	# Process symbol descriptions to be more readable
+	#****************************************************************** 	
+	names = trim(gsub(pattern = '\\(.*?\\)', replacement = '', env$symbol.descriptions, perl = TRUE))
+		names = trim(gsub('-NYMEX','',names,ignore.case =T))
+		names = trim(gsub('-COMEX','',names,ignore.case =T))
+		names = trim(gsub('-CBT','',names,ignore.case =T))
+		names = trim(gsub('-CME-','',names,ignore.case =T))
+		names = trim(gsub('-CME','',names,ignore.case =T))
+		names = trim(gsub('-NYCE','',names,ignore.case =T))
+		names = trim(gsub('-Globex','',names,ignore.case =T))
+		names = trim(gsub('-FINEX','',names,ignore.case =T))
+		names = trim(gsub('-CSCE','',names,ignore.case =T))
+		names = trim(gsub(' w/Prj A','',names,ignore.case =T))
+	 
+	env$symbol.descriptions.print = names
+	
+	#*****************************************************************
+	# Custom adjustments 
+	#****************************************************************** 			
+	data = env
+	
+	# fix DX time series
+	data$DX['::2007:04:04', 'Unadjusted'] = coredata(data$DX['::2007:04:04']$Unadjusted * 10)
+	
+	#*****************************************************************
+	# To compute returns and backtest, recreate each futures series:
+	#
+	#						(unadjusted-futures[t-1] + (back-adjusted-futures[t] - back-adjusted-futures[t-1]))	
+	# futures-return[t] =	--------------------------------------------------------------------------------------------------	- 1
+	#						unadjusted-futures[t-1]	
+	#****************************************************************** 			
+	for(i in data$symbolnames[data$symbol.groups != 'Forex']) {
+		# adjust spot for roll overs
+		spot = as.vector(data[[i]]$Unadjusted)
+			dspot = spot - mlag(spot)
+		futures = as.vector(data[[i]]$Adjusted)
+			dfutures = futures - mlag(futures)
+		index = which(round(dspot - dfutures,4) != 0 )
+	
+		spot.adjust.roll = spot
+			spot.adjust.roll[(index-1)] = spot.adjust.roll[index] - dfutures[index]
+			
+		# compute returns
+		reta = (mlag(spot.adjust.roll) + futures - mlag(futures)) / mlag(spot.adjust.roll)
+			reta[1] = 1
+			n = len(spot)
+		
+		new.series = cumprod(reta)
+		data[[i]]$Close = spot[n] * new.series / new.series[n]		
+		data[[i]]$Adjusted	= data[[i]]$Close
+	}
+	
+	
+	#*****************************************************************
+	# Done 
+	#****************************************************************** 						
+	if (!auto.assign) {
+		return(fr)
+	} else {		
+		return(env)
+	}	
+}
+
+
+
+
+
+###############################################################################
+# Kenneth R. French - Data Library
+# http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+###############################################################################
+# http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors.zip
+# http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_weekly.zip
+# http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily.zip
+#
+# data2 = get.fama.french.data('F-F_Research_Data_Factors', periodicity = 'weeks',download = F, clean = F)
+# data3 = get.fama.french.data('6_Portfolios_2x3', periodicity = 'days',download = F, clean = F)	
+###############################################################################
+get.fama.french.data <- function(
+	name = c('F-F_Research_Data_Factors', 'F-F_Research_Data_Factors'),
+	periodicity = c('days','weeks', 'months'),
+	download = FALSE,
+	clean = FALSE
+) 
+{
+	# map periodicity
+	map = c('_daily', '_weekly', '')
+		names(map) = c('days','weeks', 'months')
+	
+	# url
+	filename.zip = paste(name[1], map[periodicity[1]], '.zip', sep='')
+	filename.txt = paste(name[1], map[periodicity[1]], '.txt', sep='')
+	url = paste('http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/', filename.zip, sep='')
+				
+	# download zip archive
+	if(download) {
+		download.file(url, filename.zip)
+	}
+
+	# setup temp folder
+	temp.folder = paste(getwd(), 'temp', sep='/')
+	dir.create(temp.folder, F)
+		
+	##*****************************************************************
+	##	Unzip
+	##****************************************************************** 
+	temp.folder = paste(getwd(), '/', 'temp', sep='')
+
+	# clean temp
+	if(clean) shell('del /F /S /Q temp\\*.*', wait = TRUE)
+	
+	# unpack
+	files = unzip(filename.zip, exdir=temp.folder)	
+
+	# read data
+	filename = paste(temp.folder, '/', filename.txt, sep='')
+	out = readLines(filename)
+		index = which(nchar(out) == 0)
+	
+	data.index = grep('^[ 0-9\\.\\+-]+$', out)
+		temp.index = which(diff(data.index) > 1)
+	data.index = matrix(data.index[sort(c(1, temp.index, temp.index+1, len(data.index)))], nc=2, byrow=T)
+
+	# extract sections	
+	data = list()	
+	for(i in 1:nrow(data.index)) {
+		start.index = index[which( index > data.index[i,1] ) - 1][1] + 1
+		end.index = data.index[i,1] - 1
+		n.index = end.index - start.index + 1
+
+		# column names
+		name = 'data'
+		colnames = scan(text = out[start.index], what='', quiet=T)
+		if(n.index == 2) {
+			name = trim(out[start.index])
+			colnames = scan(text = out[end.index], what='', quiet=T)
+		} else if(n.index > 2) {
+			name = trim(out[start.index])
+			colnames0 = scan(text = out[(end.index-1)], what='', quiet=T)
+			colnames1 = scan(text = out[end.index], what='', quiet=T)
+			colnames = paste(rep(colnames0, each = len(colnames1) / len(colnames0)), colnames1, sep='.')			
+		}
+		colnames = gsub('-', '.', colnames)
+		#out[start.index:end.index]
+
+		# re-read data	
+		temp =  matrix(scan(filename, what = double(), quiet=T,
+			skip = (data.index[i,1]-1),  
+			nlines = (data.index[i,2] - data.index[i,1]+1))
+			, nc=len(colnames)+1, byrow=T)
+		
+		date.format = '%Y%m%d'	
+		date.format.add = ''
+		date.format.n = nchar(paste(temp[1,1]))
+		
+		if( date.format.n == 6 )
+			date.format.add = '01'		
+		else if( date.format.n == 4 )
+			date.format.add = '0101'		
+		
+		data[[name]] = make.xts(temp[,-1], as.Date(paste(temp[,1], date.format.add, sep=''),date.format))
+			colnames(data[[name]]) = colnames		
+	}
+	return( data )
+}
+
+
+
+
+
