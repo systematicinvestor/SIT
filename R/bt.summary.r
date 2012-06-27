@@ -204,7 +204,7 @@ bt.detail.summary <- function
 		
 		out$Cagr = compute.cagr(bt$equity)
 		out$Sharpe = compute.sharpe(bt$ret) / 100
-		out$DVR = compute.DVR(bt)
+		out$DVR = compute.DVR(bt) / 100
 		out$Volatility = compute.risk(bt$ret)
 				
 		out$MaxDD = compute.max.drawdown(bt$equity)
@@ -218,7 +218,7 @@ bt.detail.summary <- function
 		out$CVaR = compute.cvar(bt$ret)
 		
 		out$Exposure = compute.exposure(bt$weight)						
-	out.all$System = lapply(out, function(x) if(is.double(x)) round(100*x,1) else x)
+	out.all$System = lapply(out, function(x) if(is.double(x)) round(100*x,2) else x)
 			
 	
 	

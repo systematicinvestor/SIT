@@ -3475,33 +3475,20 @@ bt.volatility.quantiles.test <- function()
 # Kenneth R French: Data Library
 # http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
 ############################################################################### 
-three.factor.rolling.regression <- function() {
-	#*****************************************************************
-	# Load historical data
-	#****************************************************************** 
-	load.packages('quantmod')	
-	tickers = 'VISVX'
+# alpha: how much 'extra' return did the fund have that could not be accounted for by the model. this is almost never large or statistically significant.
+# B(MKT) = market factor: most 100% stock funds have a market factor near 1.0. higher values may indicate leverage. lower values may indicate cash and or bonds.
+# B(SMB) = size factor (small minus big): positive values indicate the fund's average holding is smaller than the market
+# B(HML) = value factor (high minus low): positive values indicate the fund's average holding is more 'value' oriented than the market (based on book to market ratio)
+# R2: measures how well the fund returns match the model (values close to 1.0 indicate a good statistical fit)
+############################################################################### 
+factor.rolling.regression <- function(
+	data, 
+	ticker = data$symbolnames[-grep('factor', data$symbolnames)], 
+	window.len = 36
+) 
+{
+	ticker = ticker[1]
 	
-	data <- new.env()
-	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
-	for(i in ls(data)) {
-		temp = adjustOHLC(data[[i]], use.Adjusted=T)							
-		
-		period.ends = endpoints(temp, 'months')
-			period.ends = period.ends[period.ends > 0]
-
-		# reformat date to match Fama French Data
-		monthly.dates = as.Date(paste(format(index(temp)[period.ends], '%Y%m'),'01',sep=''), '%Y%m%d')
-		data[[i]] = make.xts(coredata(temp[period.ends,]), monthly.dates)
-	}
-	
-	# Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = 'months',download = T, clean = F)
-	
-	# add factors and align
-	data$factors = factors$data / 100
-	bt.prep(data, align='remove.na', dates='1994::')
-
 	#*****************************************************************
 	# Facto Loadings Regression over whole period
 	#****************************************************************** 
@@ -3510,59 +3497,62 @@ three.factor.rolling.regression <- function() {
 		dates = index(data$prices)
 	
 	# compute simple returns	
-	hist.returns = ROC(prices[,tickers], type = 'discrete')
+	hist.returns = ROC(prices[,ticker], type = 'discrete')	
 		hist.returns = hist.returns - data$factors$RF
-		colnames(hist.returns) = 'fund'
-	hist.returns = cbind(hist.returns, data$factors$Mkt.RF,
-					data$factors$SMB, data$factors$HML)
+	yout = hist.returns
+	y = coredata(yout)
+	
+	xout = data$factors[, -which(names(data$factors) == 'RF')]
+	x = coredata(xout)
+			
+	fit = summary(lm(y~x))
+	
+	# Facto Loadings - fl
+	fl.all = list()
+		fl.all$estimate = c(fit$coefficients[,'Estimate'], fit$r.squared)
+		fl.all$std.error = c(fit$coefficients[,'Std. Error'], NA)
 
-	fit.all = summary(lm(fund~Mkt.RF+SMB+HML, data=hist.returns))
-		estimate.all = c(fit.all$coefficients[,'Estimate'], fit.all$r.squared)
-		std.error.all = c(fit.all$coefficients[,'Std. Error'], NA)
-	
-					
 	#*****************************************************************
-	# Facto Loadings Regression over 36 Month window
+	# Facto Loadings Regression over Month window
 	#****************************************************************** 
-							
-	window.len = 36
-	
-    # alpha: how much 'extra' return did the fund have that could not be accounted for by the model. this is almost never large or statistically significant.
-    # B(MKT) = market factor: most 100% stock funds have a market factor near 1.0. higher values may indicate leverage. lower values may indicate cash and or bonds.
-    # B(SMB) = size factor (small minus big): positive values indicate the fund's average holding is smaller than the market
-    # B(HML) = value factor (high minus low): positive values indicate the fund's average holding is more 'value' oriented than the market (based on book to market ratio)
-    # R2: measures how well the fund returns match the model (values close to 1.0 indicate a good statistical fit)
-    colnames = spl('alpha,MKT,SMB,HML,R2')
+    colnames = c('alpha', colnames(x), 'R2')
+    
     estimate = make.xts(matrix(NA, nr = nperiods, len(colnames)), dates)
     	colnames(estimate) = colnames
-    std.error = estimate
+    fl = list()
+    	fl$estimate = estimate
+    	fl$std.error = estimate
 	
 	# main loop
 	for( i in window.len:nperiods ) {
 		window.index = (i - window.len + 1) : i
 		
-		fit = summary(lm(fund~Mkt.RF+SMB+HML, data=hist.returns[window.index,]))
-		estimate[i,] = c(fit$coefficients[,'Estimate'], fit$r.squared)
-		std.error[i,] = c(fit$coefficients[,'Std. Error'], NA)
+		fit = summary(lm(y[window.index]~x[window.index,]))
+			fl$estimate[i,] = c(fit$coefficients[,'Estimate'], fit$r.squared)
+			fl$std.error[i,] = c(fit$coefficients[,'Std. Error'], NA)
 		
 		if( i %% 10 == 0) cat(i, '\n')
 	}
 
-	#*****************************************************************
-	# Reports
-	#****************************************************************** 
-	png(filename = 'plot1.png', width = 600, height = 1200, units = 'px', pointsize = 12, bg = 'white')		
-		
+	return(list(fl.all = fl.all, fl = fl, window.len=window.len,
+		y=yout, x=xout, RF=data$factors$RF))
+}
 
-	layout(matrix(1:10,nc=2,byrow=T))
+
+# detail plot for each factor and histogram
+factor.rolling.regression.detail.plot <- function(obj) {
+	#setup
+	n = ncol(obj$fl$estimate)
+	dates = index(obj$fl$estimate)
+
+	layout(matrix(1:(2*n), nc=2, byrow=T))
 	
-	for(i in 1:5) {
-	
+	for(i in 1:n) {	
 		#-------------------------------------------------------------------------
 		# Time plot
 		#-------------------------------------------------------------------------
-		est = estimate[,i]
-		est.std.error = ifna(std.error[,i], 0)
+		est = obj$fl$estimate[,i]
+		est.std.error = ifna(obj$fl$std.error[,i], 0)
 		
 		plota(est, 
 			ylim = range( c(
@@ -3575,8 +3565,8 @@ three.factor.rolling.regression <- function() {
 			rev(coredata(est - est.std.error))), 
 			border=NA, col=col.add.alpha('red',50))
 	
-		est = estimate.all[i]
-		est.std.error = std.error.all[i]
+		est = obj$fl.all$estimate[i]
+		est.std.error = obj$fl.all$std.error[i]
 	
 		polygon(c(range(dates),rev(range(dates))), 
 			c(rep(est + est.std.error,2),
@@ -3587,18 +3577,247 @@ three.factor.rolling.regression <- function() {
 			
 		abline(h=est, col='blue')
 	
-		plota.lines(estimate[,i], type='l', col='red')
+		plota.lines(obj$fl$estimate[,i], type='l', col='red')
 		
 		#-------------------------------------------------------------------------
 		# Histogram
 		#-------------------------------------------------------------------------
 		par(mar = c(4,3,2,1))
-		hist(estimate[,i], col='red', border='gray', las=1,
-			xlab='', ylab='', main=colnames(estimate)[i])
-			abline(v=estimate.all[i], col='blue', lwd=2)
+		hist(obj$fl$estimate[,i], col='red', border='gray', las=1,
+			xlab='', ylab='', main=colnames(obj$fl$estimate)[i])
+			abline(v=obj$fl.all$estimate[i], col='blue', lwd=2)
 	}
-	
-	dev.off()
-	
 }
+
+
+# style plot for 2 given factors
+factor.rolling.regression.style.plot <- function(obj, 
+	xfactor='HML', yfactor='SMB',
+	xlim = c(-1.5, 1.5), ylim = c(-0.5, 1.5)
+) {
+	# Style chart	
+	i = which(colnames(obj$fl$estimate) == xfactor)
+		x = coredata(obj$fl$estimate[,i])
+		x.e = ifna(coredata(obj$fl$std.error[,i]), 0)
 	
+		x.all = obj$fl.all$estimate[i]
+		x.all.e = obj$fl.all$std.error[i]
+		
+		xlab = colnames(obj$fl$estimate)[i]
+		
+	i = which(colnames(obj$fl$estimate) == yfactor)
+		y = coredata(obj$fl$estimate[,i])
+		y.e = ifna(coredata(obj$fl$std.error[,i]), 0)
+	
+		y.all = obj$fl.all$estimate[i]
+		y.all.e = obj$fl.all$std.error[i]
+
+		ylab = colnames(obj$fl$estimate)[i]
+		
+	# plot
+	layout(1)
+	plot(x,y, xlab=xlab, ylab = ylab, type='n', las=1,
+		xlim = range(c(x + x.e, x - x.e, xlim), na.rm=T),
+		ylim = range(c(y + y.e, y - y.e, ylim), na.rm=T),
+		main = paste('Style, last =', ylab, round(last(y),2), xlab, round(last(x),2))
+		)		
+	grid()
+	abline(h=0)
+	abline(v=0)
+	
+		
+	col = col.add.alpha('pink',250)
+	rect(x - x.e, y - y.e, x + x.e, y + y.e, col=col, border=NA)
+	
+	points(x,y, col='red', pch=20)
+		points(last(x),last(y), col='black', pch=3)	
+	points(x.all,y.all, col='blue', pch=15)
+	
+	legend('topleft', spl('Estimates,Last estimate,Overall estimate'),
+		pch = c(20,3,15),
+		col = spl('red,black,blue'),
+		pt.bg = spl('red,black,blue'),
+		bty='n'
+	) 
+}
+
+
+# re-construct historical perfromance based on factor loadings
+# compare fund perfromance to the
+# - re-constructed portfolio based on the regression over whole period
+# - re-constructed portfolio based on the rolling window regression
+factor.rolling.regression.bt.plot <- function(obj) {
+	# setup
+	ticker = colnames(obj$y)
+		n = ncol(obj$fl$estimate)-1
+		nperiods = nrow(obj$fl$estimate)
+	
+	# fund, alpha, factors, RF
+	ret = cbind(obj$RF, obj$y, 1, obj$x)
+		colnames(ret)[1:3] = spl('RF,fund,alpha')
+	prices = bt.apply.matrix(1+ifna(ret,0),cumprod)
+	
+	data <- new.env()
+		data$symbolnames = colnames(prices)		
+		
+	for(i in colnames(prices)) {
+		data[[i]] = prices[,i]
+		colnames(data[[i]]) = 'Close'
+	}
+
+	bt.prep(data, align='keep.all')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	
+	# create models
+	models = list()
+	
+	data$weight[] = NA
+		data$weight$fund = 1
+		data$weight$RF = 1
+		data$weight[1:obj$window.len,] = NA
+	models[[ticker]] = bt.run.share(data, clean.signal = F)
+
+	data$weight[] = NA
+		data$weight[,3:(n+2)] = t(repmat(obj$fl.all$estimate[1:n], 1, nperiods))
+		data$weight$RF = 1
+		data$weight[1:obj$window.len,] = NA
+	models$all.alpha = bt.run.share(data, clean.signal = F)
+
+	data$weight[] = NA
+		data$weight[,3:(n+2)] = t(repmat(obj$fl.all$estimate[1:n], 1, nperiods))
+		data$weight$RF = 1
+		data$weight$alpha = NA
+		data$weight[1:obj$window.len,] = NA
+	models$all = bt.run.share(data, clean.signal = F)
+
+	data$weight[] = NA
+		data$weight[,3:(n+2)] = obj$fl$estimate[,1:n]
+		data$weight$RF = 1
+		data$weight[1:obj$window.len,] = NA
+	models$est.alpha = bt.run.share(data, clean.signal = F)
+	
+	data$weight[] = NA
+		data$weight[,3:(n+2)] = obj$fl$estimate[,1:n]
+		data$weight$RF = 1
+		data$weight$alpha = NA	
+		data$weight[1:obj$window.len,] = NA
+	models$est = bt.run.share(data, clean.signal = F)
+				
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+	# Plot perfromance
+	layout(1)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+
+	
+	# obj$fl.all$estimate[1]*52
+	# mean(obj$fl$estimate$alpha,na.rm=T)	
+}
+
+
+
+three.factor.rolling.regression <- function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'VISVX'
+	#tickers = 'IBM'
+
+	periodicity = 'weeks'
+	periodicity = 'months'
+		
+	data <- new.env()
+	quantmod::getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	for(i in ls(data)) {
+		temp = adjustOHLC(data[[i]], use.Adjusted=T)							
+		
+		period.ends = endpoints(temp, periodicity)
+			period.ends = period.ends[period.ends > 0]
+
+		if(periodicity == 'months') {
+			# reformat date to match Fama French Data
+			monthly.dates = as.Date(paste(format(index(temp)[period.ends], '%Y%m'),'01',sep=''), '%Y%m%d')
+			data[[i]] = make.xts(coredata(temp[period.ends,]), monthly.dates)
+		} else
+			data[[i]] = temp[period.ends,]
+	}
+	data.fund = data[[tickers]]
+	
+	#*****************************************************************
+	# Fama/French factors
+	#****************************************************************** 
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
+
+	# add factors and align
+	data <- new.env()
+		data[[tickers]] = data.fund
+	data$factors = factors$data / 100
+	bt.prep(data, align='remove.na', dates='1994::')
+
+	#*****************************************************************
+	# Facto Loadings Regression
+	#****************************************************************** 
+	obj = factor.rolling.regression(data, tickers, 36)
+
+	#*****************************************************************
+	# Reports
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 1200, units = 'px', pointsize = 12, bg = 'white')		
+	factor.rolling.regression.detail.plot(obj)
+dev.off()
+
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	factor.rolling.regression.style.plot(obj)
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')				
+	factor.rolling.regression.bt.plot(obj)
+dev.off()	
+	
+	#*****************************************************************
+	# Fama/French factors + Momentum
+	#****************************************************************** 
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+
+	factors.extra = get.fama.french.data('F-F_Momentum_Factor', periodicity = periodicity,download = T, clean = F)	
+		factors$data = merge(factors$data, factors.extra$data) 
+	
+	# add factors and align
+	data <- new.env()
+		data[[tickers]] = data.fund
+	data$factors = factors$data / 100
+	bt.prep(data, align='remove.na', dates='1994::')
+
+	#*****************************************************************
+	# Facto Loadings Regression
+	#****************************************************************** 
+	obj = factor.rolling.regression(data, tickers, 36)
+
+	#*****************************************************************
+	# Reports
+	#****************************************************************** 
+png(filename = 'plot4.png', width = 600, height = 1200, units = 'px', pointsize = 12, bg = 'white')		
+	factor.rolling.regression.detail.plot(obj)
+dev.off()
+
+png(filename = 'plot5.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	factor.rolling.regression.style.plot(obj)
+dev.off()	
+
+png(filename = 'plot6.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	factor.rolling.regression.style.plot(obj, xfactor='HML', yfactor='Mom')
+dev.off()	
+
+png(filename = 'plot7.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')				
+	factor.rolling.regression.bt.plot(obj)
+dev.off()	
+
+}
+
+
