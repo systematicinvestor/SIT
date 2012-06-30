@@ -1776,6 +1776,12 @@ portfolio.concentration.herfindahl.index <- function
 {	
 	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
 
+	one.over.n = 1/ rowSums(!is.na(weight))
+	out = weight[,1] * NA
+	out[] = (rowSums(weight^2, na.rm=T) - one.over.n) / (1 - one.over.n)
+	return(out)
+	
+	
 	one.over.n = 1/ncol(weight)
 	out = weight[,1] * NA
 	out[] = (rowSums(weight^2) - one.over.n) / (1 - one.over.n)
@@ -1805,6 +1811,18 @@ portfolio.concentration.gini.coefficient <- function
 
 	one.to.n = 1:n
 	out = weight[,1] * NA
+	
+	for(i in 1:nrow(weight)) {
+		x = weight[i,]
+		index = !is.na(x)
+		n1 = sum(index)
+		if( n1 > 0 ) {
+			temp = sort(x[index], decreasing = T)			
+			out[i] = (n1+1)/(n1-1) - 2 * sum(temp * one.to.n[1:n1]) /(n1*(n1-1)* sum(x[index]) / n1)
+		}
+	}
+	return(out)
+	
 	out[] = apply( weight, 1, function(x) {
 		temp = sort(x, decreasing = T)
 		sum(temp * one.to.n)
@@ -1812,5 +1830,3 @@ portfolio.concentration.gini.coefficient <- function
 	out = (n+1)/(n-1) - 2 * out /(n*(n-1)* apply(weight, 1, mean))
 	return(out)
 }	
-
-

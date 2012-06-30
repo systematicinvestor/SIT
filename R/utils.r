@@ -469,6 +469,25 @@ write.xts <- function
 	#write.csv(x, row.names = format(index(x)), filename)	
 }
 
+
+
+###############################################################################
+# Read XTS object to file
+###############################################################################
+read.xts <- function
+(
+	filename,	# file name
+	...
+)
+{
+	out = read.csv(filename, stringsAsFactors=F)
+	return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
+}
+
+
+
+	
+	
 ###############################################################################
 # Fast alternative to index(x) for XTS object
 # NOTE index.xts is the same name as the index function in the XTS package

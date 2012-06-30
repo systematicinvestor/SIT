@@ -3720,7 +3720,7 @@ factor.rolling.regression.bt.plot <- function(obj) {
 }
 
 
-
+# main function to demonstrate factor attribution
 three.factor.rolling.regression <- function() {
 	#*****************************************************************
 	# Load historical data
@@ -3820,4 +3820,108 @@ dev.off()
 
 }
 
+# exmple of using your own factors in the factor attribution
+your.own.factor.rolling.regression <- function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('EEM,SPY')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na')
+	
+	#*****************************************************************
+	# Create weekly factor
+	#****************************************************************** 
+	prices = data$prices
+	
+	periodicity = 'weeks'
+	period.ends = endpoints(prices, periodicity)
+		period.ends = period.ends[period.ends > 0]
+	
+	hist.returns = ROC(prices[period.ends,], type = 'discrete')	
+		hist.returns = na.omit(hist.returns)
+	
+	#Emerging Market over US Market i.e. MSCI EM vs S&P 500 = EEM - SPY	
+	EEM_SPY = hist.returns$EEM - hist.returns$SPY
+		colnames(EEM_SPY) = 'EEM_SPY'
+	
+	write.xts(EEM_SPY, 'EEM_SPY.csv')
+	
+	
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = 'VISVX'
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	for(i in ls(data)) {
+		temp = adjustOHLC(data[[i]], use.Adjusted=T)							
+		
+		period.ends = endpoints(temp, periodicity)
+			period.ends = period.ends[period.ends > 0]
+
+		data[[i]] = temp[period.ends,]
+	}
+	data.fund = data[[tickers]]
+	
+	
+	#*****************************************************************
+	# Fama/French factors
+	#****************************************************************** 
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+
+	factors.extra = 100 * read.xts('EEM_SPY.csv')
+		factors$data = merge(factors$data, factors.extra, join='inner')
+	# add factors and align
+	data <- new.env()
+		data[[tickers]] = data.fund
+	data$factors = factors$data / 100
+	bt.prep(data, align='remove.na')
+	
+	#*****************************************************************
+	# Check Correlations, make sure the new factor is NOT highly correlated 
+	#****************************************************************** 	
+	load.packages('psych')
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+	pairs.panels(coredata(data$factors))	
+dev.off()
+	
+
+
+
+	
+	#*****************************************************************
+	# Facto Loadings Regression
+	#****************************************************************** 
+	obj = factor.rolling.regression(data, tickers, 36)
+
+	#*****************************************************************
+	# Reports
+	#****************************************************************** 
+png(filename = 'plot2.png', width = 600, height = 1200, units = 'px', pointsize = 12, bg = 'white')		
+	factor.rolling.regression.detail.plot(obj)
+dev.off()
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	factor.rolling.regression.style.plot(obj)
+dev.off()	
+
+png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	factor.rolling.regression.style.plot(obj, xfactor='HML', yfactor='EEM_SPY')
+dev.off()	
+
+png(filename = 'plot5.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')				
+	factor.rolling.regression.bt.plot(obj)
+dev.off()	
+
+
+}
+	
 
