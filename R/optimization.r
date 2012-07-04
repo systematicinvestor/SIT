@@ -801,4 +801,5 @@ inv.test <- function() {
 	inv3(m) %*% m
 	m %*% inv3(m)
 	inv(m) %*% m
+		
 }

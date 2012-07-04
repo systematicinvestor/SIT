@@ -3459,6 +3459,137 @@ bt.volatility.quantiles.test <- function()
 
 
 
+
+###############################################################################
+# Factor Attribution & Value Quantiles
+###############################################################################
+bt.fa.value.quantiles.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = sp500.components()$tickers
+	#tickers = dow.jones.components()
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		#save(data, file='data.sp500.components.Rdata') 
+		#load(file='data.sp500.components.Rdata') 	
+		
+		# remove companies with less than 5 years of data
+		rm.index = which( sapply(ls(data), function(x) nrow(data[[x]])) < 1000 )	
+		rm(list=names(rm.index), envir=data)
+		
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+		tickers = data$symbolnames
+	
+	
+	data.spy <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
+	bt.prep(data.spy, align='keep.all', dates='1994::')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	# setdiff(index(data.spy$prices), index(data$prices))
+	# setdiff(index(data$prices),index(data.spy$prices))
+	prices = data$prices
+		nperiods = nrow(prices)
+		n = ncol(prices)
+			
+	models = list()
+	
+	# SPY
+	data.spy$weight[] = NA
+		data.spy$weight[] = 1
+	models$spy = bt.run(data.spy)
+	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[] = ntop(prices, n)
+	models$equal.weight = bt.run(data)
+	
+	#*****************************************************************
+	# Compute Factor Attribution for each ticker
+	#****************************************************************** 
+	periodicity = 'weeks'
+	
+	# load Fama/French factors
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	
+	period.ends = endpoints(data$prices, periodicity)
+		period.ends = period.ends[period.ends > 0]
+	
+	# add factors and align
+	data.fa <- new.env()
+		for(i in tickers) data.fa[[i]] = data[[i]][period.ends,]
+	data.fa$factors = factors$data / 100
+	bt.prep(data.fa, align='remove.na')
+
+	
+	index = match( index(data.fa$prices), index(data$prices) )
+	measure = data$prices[ index, ]
+		
+	for(i in tickers) {
+		cat(i, '\n')
+		
+		# Facto Loadings Regression
+		obj = factor.rolling.regression(data.fa, i, 36, silent=T)
+		
+		measure[,i] = coredata(obj$fl$estimate$HML)
+	}
+		
+	
+	#*****************************************************************
+	# Create Value Quantiles
+	#****************************************************************** 
+	n.quantiles=5
+	start.t = 1+36
+	quantiles = weights = coredata(measure) * NA			
+	
+	for( t in start.t:nrow(weights) ) {
+		factor = as.vector(coredata(measure[t,]))
+		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
+		#tapply(factor,ranking,sum)
+		
+		quantiles[t,] = ranking
+		weights[t,] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
+	}
+
+	quantiles = ifna(quantiles,0)
+	
+	#*****************************************************************
+	# Create backtest for each Quintile
+	#****************************************************************** 
+	for( i in 1:n.quantiles) {
+		temp = weights * NA
+			temp[] = 0
+		temp[quantiles == i] = weights[quantiles == i]
+	
+		data$weight[] = NA
+			data$weight[index,] = temp
+		models[[ paste('Q',i,sep='_') ]] = bt.run(data, silent = T)
+	}
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	# put all reports into one pdf file
+	#pdf(file = 'report.pdf', width=8.5, height=11)
+	
+	png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(models)		
+	dev.off()		
+	
+	png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.strategy.sidebyside(models)
+	dev.off()	
+
+}
+	
+	
 ###############################################################################
 # Three Factor Rolling Regression Viewer
 # http://mas.xtreemhost.com/
@@ -3484,7 +3615,8 @@ bt.volatility.quantiles.test <- function()
 factor.rolling.regression <- function(
 	data, 
 	ticker = data$symbolnames[-grep('factor', data$symbolnames)], 
-	window.len = 36
+	window.len = 36,
+	silent = F
 ) 
 {
 	ticker = ticker[1]
@@ -3504,13 +3636,23 @@ factor.rolling.regression <- function(
 	
 	xout = data$factors[, -which(names(data$factors) == 'RF')]
 	x = coredata(xout)
-			
-	fit = summary(lm(y~x))
-	
+		
+#	fit = summary(lm(y~x))
+#		est = fit$coefficients[,'Estimate']
+#		std.err = fit$coefficients[,'Std. Error']
+#		r2 = fit$r.squared
+
+	ok.index = !(is.na(y) | (rowSums(is.na(x)) > 0))
+	fit = ols(cbind(1,x[ok.index,]),y[ok.index], T)
+		est = fit$coefficients
+		std.err = fit$seb
+	 	r2 = fit$r.squared
+
+	 		
 	# Facto Loadings - fl
 	fl.all = list()
-		fl.all$estimate = c(fit$coefficients[,'Estimate'], fit$r.squared)
-		fl.all$std.error = c(fit$coefficients[,'Std. Error'], NA)
+		fl.all$estimate = c(est, r2)
+		fl.all$std.error = c(std.err, NA)
 
 	#*****************************************************************
 	# Facto Loadings Regression over Month window
@@ -3527,11 +3669,16 @@ factor.rolling.regression <- function(
 	for( i in window.len:nperiods ) {
 		window.index = (i - window.len + 1) : i
 		
-		fit = summary(lm(y[window.index]~x[window.index,]))
-			fl$estimate[i,] = c(fit$coefficients[,'Estimate'], fit$r.squared)
-			fl$std.error[i,] = c(fit$coefficients[,'Std. Error'], NA)
+		if(all(!is.na(y[window.index]))) {
+		fit = ols(cbind(1,x[window.index,]),y[window.index], T)
+			est = fit$coefficients
+			std.err = fit$seb
+		 	r2 = fit$r.squared		
+		fl$estimate[i,] = c(est, r2)
+		fl$std.error[i,] = c(std.err, NA)
+		}
 		
-		if( i %% 10 == 0) cat(i, '\n')
+		if( i %% 10 == 0) if(!silent) cat(i, '\n')
 	}
 
 	return(list(fl.all = fl.all, fl = fl, window.len=window.len,
