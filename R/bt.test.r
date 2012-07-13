@@ -1184,6 +1184,7 @@ bt.aa.test <- function()
 	start.i = which(period.ends >= (63 + 1))[1]
 
 	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio,min.gini.portfolio')	
+	#min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio')
 	
 	# Gini risk measure optimization takes a while, uncomment below to add Gini risk measure
 	# min.risk.fns = c(min.risk.fns, 'min.gini.portfolio')
@@ -3616,7 +3617,8 @@ factor.rolling.regression <- function(
 	data, 
 	ticker = data$symbolnames[-grep('factor', data$symbolnames)], 
 	window.len = 36,
-	silent = F
+	silent = F,
+	custom.stats.fn = NULL
 ) 
 {
 	ticker = ticker[1]
@@ -3664,18 +3666,27 @@ factor.rolling.regression <- function(
     fl = list()
     	fl$estimate = estimate
     	fl$std.error = estimate
+   		if( !is.null(custom.stats.fn) ) {
+   			temp = match.fun(custom.stats.fn)(x, y, fit)
+   			fl$custom = make.xts(matrix(NA, nr = nperiods, len(temp)), dates)	
+   		} 	
 	
 	# main loop
 	for( i in window.len:nperiods ) {
 		window.index = (i - window.len + 1) : i
 		
 		if(all(!is.na(y[window.index]))) {
-		fit = ols(cbind(1,x[window.index,]),y[window.index], T)
+		xtemp = cbind(1,x[window.index,])
+		ytemp = y[window.index]
+		fit = ols(xtemp, ytemp, T)
 			est = fit$coefficients
 			std.err = fit$seb
 		 	r2 = fit$r.squared		
 		fl$estimate[i,] = c(est, r2)
 		fl$std.error[i,] = c(std.err, NA)
+		
+		if( !is.null(custom.stats.fn) )
+			fl$custom[i,] = match.fun(custom.stats.fn)(xtemp, ytemp, fit)
 		}
 		
 		if( i %% 10 == 0) if(!silent) cat(i, '\n')
@@ -3683,6 +3694,14 @@ factor.rolling.regression <- function(
 
 	return(list(fl.all = fl.all, fl = fl, window.len=window.len,
 		y=yout, x=xout, RF=data$factors$RF))
+}
+
+# compute various additional stats
+factor.rolling.regression.custom.stats <- function(x,y,fit) {
+	n = len(y)
+	e = y - fit$coefficients %*% x
+	se = sd(e)
+	return(c(e[n], e[n]/se, sum(e)/(n*se)))
 }
 
 
@@ -4072,3 +4091,137 @@ dev.off()
 }
 	
 
+
+
+
+###############################################################################
+# One month reversals
+###############################################################################
+bt.one.month.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = sp500.components()$tickers
+	#tickers = dow.jones.components()
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		#save(data, file='data.sp500.components.Rdata') 
+		#load(file='data.sp500.components.Rdata') 	
+		
+		# remove companies with less than 5 years of data
+		rm.index = which( sapply(ls(data), function(x) nrow(data[[x]])) < 1000 )	
+		rm(list=names(rm.index), envir=data)
+		
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+		tickers = data$symbolnames
+	
+	
+	data.spy <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
+	bt.prep(data.spy, align='keep.all', dates='1994::')
+	
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+#save(data, data.spy, tickers, file='data.sp500.components.Rdata') 	
+#load(file='data.sp500.components.Rdata') 	
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices
+		n = ncol(prices)
+					
+	#*****************************************************************
+	# Setup monthly periods
+	#****************************************************************** 
+	periodicity = 'months'
+	
+	period.ends = endpoints(data$prices, periodicity)
+		period.ends = period.ends[period.ends > 0]
+	
+	prices = prices[period.ends, ]		
+		
+	#*****************************************************************
+	# Create Benchmarks
+	#****************************************************************** 	
+	models = list()
+	
+	# SPY
+	data.spy$weight[] = NA
+		data.spy$weight[] = 1
+		data.spy$weight[1:period.ends[36],] = NA
+	models$spy = bt.run(data.spy)
+	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[period.ends,] = ntop(prices, n)
+		data$weight[1:period.ends[36],] = NA		
+	models$equal.weight = bt.run(data)
+	
+	#*****************************************************************
+	# Create Reversal Quantiles
+	#****************************************************************** 
+	n.quantiles = 5
+	start.t = 1 + 36
+	quantiles = weights = coredata(prices) * NA			
+	
+	one.month = coredata(prices / mlag(prices))
+	
+	for( t in start.t:nrow(weights) ) {
+		factor = as.vector(one.month[t,])
+		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
+		
+		quantiles[t,] = ranking
+		weights[t,] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
+	}
+	
+	quantiles = ifna(quantiles,0)
+	
+	#*****************************************************************
+	# Create backtest for each Quintile
+	#****************************************************************** 
+	temp = weights * NA
+
+	for( i in 1:n.quantiles) {
+		temp[] = 0
+		temp[quantiles == i] = weights[quantiles == i]
+	
+		data$weight[] = NA
+			data$weight[period.ends,] = temp
+		models[[ paste('M1_Q',i,sep='') ]] = bt.run(data, silent = T)
+	}
+	
+	# rowSums(models$M1_Q2$weight,na.rm=T)	
+
+	#*****************************************************************
+	# Create Q1-Q5 spread
+	#****************************************************************** 
+	temp[] = 0
+	temp[quantiles == 1] = weights[quantiles == 1]
+	temp[quantiles == n.quantiles] = -weights[quantiles == n.quantiles]
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = temp
+	models$spread = bt.run(data, silent = T)	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')					
+	plotbt.custom.report.part1(models)
+dev.off()	
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')					
+	plotbt.custom.report.part1(models[spl('spy,equal.weight,spread')])
+dev.off()		
+
+}	
+
+
+			

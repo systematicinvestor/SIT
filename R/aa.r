@@ -1789,7 +1789,9 @@ portfolio.concentration.herfindahl.index <- function
 }	
 
 # Gini Coefficient of portfolio weights
+# Gini is designed to work with positive numbers!!!
 # http://en.wikipedia.org/wiki/Gini_coefficient
+# http://en.wikipedia.org/wiki/Mean_difference
 portfolio.concentration.gini.coefficient <- function
 (
 	weight		# weight
@@ -1799,30 +1801,39 @@ portfolio.concentration.gini.coefficient <- function
 
 	n = ncol(weight)
 
-	# The mean difference formula
-	#(mean(outer(weight, weight, function(x,y) abs(x-y))) / mean(weight))/2
 	
+	# The mean difference formula
+	# weight = rep(1/n,n)	
+	# 1/2 * (sum(outer(weight, weight, function(x,y) abs(x-y))) / (n*(n-1))) / sum(abs(weight)/n)
+		
 	# Gini formula by Angus Deaton, more efficient 
 	#(n+1)/(n-1) - 2 * sum(weight * rank(-weight)) /(n*(n-1)* mean(weight))
+	#(n+1)/(n-1) - 2 * sum(abs(weight) * rank(-abs(weight))) /(n*(n-1)* sum(abs(weight)/n))
 
 	# same formula, but faster
 	#temp = sort(weight, decreasing = T)
 	#(n+1)/(n-1) - 2 * sum(temp * (1:n)) /(n*(n-1)* mean(temp))
 
-	one.to.n = 1:n
+	one.to.n = 1:n	
 	out = weight[,1] * NA
 	
+	
 	for(i in 1:nrow(weight)) {
-		x = weight[i,]
+		x = coredata(weight[i,])
 		index = !is.na(x)
 		n1 = sum(index)
 		if( n1 > 0 ) {
 			temp = sort(x[index], decreasing = T)			
-			out[i] = (n1+1)/(n1-1) - 2 * sum(temp * one.to.n[1:n1]) /(n1*(n1-1)* sum(x[index]) / n1)
+			
+			# make sure all weights are positive
+			if(temp[n1] < 0) temp = temp - temp[n1]
+			
+			out[i] = (n1+1)/(n1-1) - 2 * sum(temp * one.to.n[1:n1]) /(n1*(n1-1)* sum(temp) / n1)
 		}
 	}
 	return(out)
-	
+
+		
 	out[] = apply( weight, 1, function(x) {
 		temp = sort(x, decreasing = T)
 		sum(temp * one.to.n)
@@ -1830,3 +1841,4 @@ portfolio.concentration.gini.coefficient <- function
 	out = (n+1)/(n-1) - 2 * out /(n*(n-1)* apply(weight, 1, mean))
 	return(out)
 }	
+
