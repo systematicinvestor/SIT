@@ -3667,7 +3667,7 @@ factor.rolling.regression <- function(
     	fl$estimate = estimate
     	fl$std.error = estimate
    		if( !is.null(custom.stats.fn) ) {
-   			temp = match.fun(custom.stats.fn)(x, y, fit)
+   			temp = match.fun(custom.stats.fn)(cbind(1,x), y, fit)
    			fl$custom = make.xts(matrix(NA, nr = nperiods, len(temp)), dates)	
    		} 	
 	
@@ -3696,13 +3696,6 @@ factor.rolling.regression <- function(
 		y=yout, x=xout, RF=data$factors$RF))
 }
 
-# compute various additional stats
-factor.rolling.regression.custom.stats <- function(x,y,fit) {
-	n = len(y)
-	e = y - fit$coefficients %*% x
-	se = sd(e)
-	return(c(e[n], e[n]/se, sum(e)/(n*se)))
-}
 
 
 # detail plot for each factor and histogram
@@ -4151,65 +4144,30 @@ bt.one.month.test <- function()
 	# Create Benchmarks
 	#****************************************************************** 	
 	models = list()
+	n.skip = 36
+	n.skip = 2
 	
 	# SPY
 	data.spy$weight[] = NA
 		data.spy$weight[] = 1
-		data.spy$weight[1:period.ends[36],] = NA
+		data.spy$weight[1:period.ends[n.skip],] = NA
 	models$spy = bt.run(data.spy)
 	
 	# Equal Weight
 	data$weight[] = NA
 		data$weight[period.ends,] = ntop(prices, n)
-		data$weight[1:period.ends[36],] = NA		
+		data$weight[1:period.ends[n.skip],] = NA		
 	models$equal.weight = bt.run(data)
 	
 	#*****************************************************************
 	# Create Reversal Quantiles
 	#****************************************************************** 
-	n.quantiles = 5
-	start.t = 1 + 36
-	quantiles = weights = coredata(prices) * NA			
-	
 	one.month = coredata(prices / mlag(prices))
-	
-	for( t in start.t:nrow(weights) ) {
-		factor = as.vector(one.month[t,])
-		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
-		
-		quantiles[t,] = ranking
-		weights[t,] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
-	}
-	
-	quantiles = ifna(quantiles,0)
-	
-	#*****************************************************************
-	# Create backtest for each Quintile
-	#****************************************************************** 
-	temp = weights * NA
 
-	for( i in 1:n.quantiles) {
-		temp[] = 0
-		temp[quantiles == i] = weights[quantiles == i]
-	
-		data$weight[] = NA
-			data$weight[period.ends,] = temp
-		models[[ paste('M1_Q',i,sep='') ]] = bt.run(data, silent = T)
-	}
-	
-	# rowSums(models$M1_Q2$weight,na.rm=T)	
+	models = c(models, 
+		bt.make.quintiles(one.month, data, period.ends, start.t=1 + n.skip, prefix='M1_'))
 
-	#*****************************************************************
-	# Create Q1-Q5 spread
-	#****************************************************************** 
-	temp[] = 0
-	temp[quantiles == 1] = weights[quantiles == 1]
-	temp[quantiles == n.quantiles] = -weights[quantiles == n.quantiles]
 	
-	data$weight[] = NA
-		data$weight[period.ends,] = temp
-	models$spread = bt.run(data, silent = T)	
-
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 	
@@ -4222,6 +4180,234 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()		
 
 }	
+
+
+
+###############################################################################
+# Better one-month reversal
+###############################################################################
+# compute various additional stats
+factor.rolling.regression.custom.stats <- function(x,y,fit) {
+	n = len(y)
+	e = y - x %*% fit$coefficients
+	se = sd(e)
+	return(c(e[n], e[n]/se))
+}
+
+bt.make.quintiles <- function(
+	position.score,	# position.score is a factor to form Quintiles sampled at the period.ends
+	data,			# back-test object
+	period.ends,	
+	n.quantiles = 5,
+	start.t = 2,	# first index at which to form Quintiles
+	prefix = ''
+) 
+{
+	#*****************************************************************
+	# Create Quantiles
+	#****************************************************************** 
+	position.score = coredata(position.score)
+	quantiles = weights = position.score * NA			
+	
+	for( t in start.t:nrow(weights) ) {
+		factor = as.vector(position.score[t,])
+		ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
+		
+		quantiles[t,] = ranking
+		weights[t,] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
+	}
+	
+	quantiles = ifna(quantiles,0)
+	
+	#*****************************************************************
+	# Create backtest for each Quintile
+	#****************************************************************** 
+	temp = weights * NA
+	models = list()
+	for( i in 1:n.quantiles) {
+		temp[] = 0
+		temp[quantiles == i] = weights[quantiles == i]
+	
+		data$weight[] = NA
+			data$weight[period.ends,] = temp
+		models[[ paste(prefix,'Q',i,sep='') ]] = bt.run(data, silent = T)
+	}
+	
+	# rowSums(models$M1_Q2$weight,na.rm=T)	
+
+	#*****************************************************************
+	# Create Q1-QN spread
+	#****************************************************************** 
+	temp[] = 0
+	temp[quantiles == 1] = weights[quantiles == 1]
+	temp[quantiles == n.quantiles] = -weights[quantiles == n.quantiles]
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = temp
+	models$spread = bt.run(data, silent = T)	
+
+	return(models)
+}
+
+
+
+bt.fa.one.month.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = sp500.components()$tickers
+	#tickers = dow.jones.components()
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		#save(data, file='data.sp500.components.Rdata') 
+		#load(file='data.sp500.components.Rdata') 	
+		
+		# remove companies with less than 5 years of data
+		rm.index = which( sapply(ls(data), function(x) nrow(data[[x]])) < 1000 )	
+		rm(list=names(rm.index), envir=data)
+		
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+		tickers = data$symbolnames
+	
+	
+	data.spy <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
+	bt.prep(data.spy, align='keep.all', dates='1994::')
+	
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+#save(data, data.spy, tickers, file='data.sp500.components.Rdata') 	
+#load(file='data.sp500.components.Rdata') 	
+
+	prices = data$prices
+		n = ncol(prices)
+					
+	#*****************************************************************
+	# Setup monthly periods
+	#****************************************************************** 
+	periodicity = 'months'
+	
+	period.ends = endpoints(data$prices, periodicity)
+		period.ends = period.ends[period.ends > 0]
+	
+	prices = prices[period.ends, ]		
+		
+	#*****************************************************************
+	# Create Benchmarks
+	#****************************************************************** 	
+	models = list()
+	n.skip = 36
+	
+	# SPY
+	data.spy$weight[] = NA
+		data.spy$weight[] = 1
+		data.spy$weight[1:period.ends[n.skip],] = NA
+	models$spy = bt.run(data.spy)
+	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[period.ends,] = ntop(prices, n)
+		data$weight[1:period.ends[n.skip],] = NA		
+	models$equal.weight = bt.run(data)
+			
+	#*****************************************************************
+	# Load factors and align them with prices
+	#****************************************************************** 	
+	# load Fama/French factors
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
+	
+	# align monthly dates
+	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
+		dates = index(factors$data)
+		dates[!is.na(map)] = index(prices)[na.omit(map)]
+	index(factors$data) = as.Date(dates)
+		
+	
+	# add factors and align
+	data.fa <- new.env()
+		for(i in tickers) data.fa[[i]] = data[[i]][period.ends, ]
+		data.fa$factors = factors$data / 100
+	bt.prep(data.fa, align='remove.na')
+
+	
+	index = match( index(data.fa$prices), index(data$prices) )
+		prices = data$prices[index, ]
+		
+	#*****************************************************************
+	# Compute Factor Attribution for each ticker
+	#****************************************************************** 	
+
+	temp = NA * prices
+	factors	= list()
+		factors$last.e = temp
+		factors$last.e_s = temp
+		factors$one.month = coredata(prices / mlag(prices))
+	
+	for(i in tickers) {
+		cat(i, '\n')
+		
+		# Facto Loadings Regression
+		obj = factor.rolling.regression(data.fa, i, 36, silent=T,
+			factor.rolling.regression.custom.stats)
+
+		for(j in 1:len(factors))		
+			factors[[j]][,i] = obj$fl$custom[,j]
+			
+	}
+	
+	#save(factors, file='data.ff.factors.Rdata') 	
+	#load(file='data.ff.factors.Rdata') 	
+
+	
+	#*****************************************************************
+	# Create Quantiles
+	#****************************************************************** 
+	quantiles = list()
+	
+	for(name in names(factors)) {
+		cat(name, '\n')
+		quantiles[[name]] = bt.make.quintiles(factors[[name]], data, index, start.t =  1+36, prefix=paste(name,'_',sep=''))
+	}
+	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	# put all reports into one pdf file
+	#pdf(file = 'report.pdf', width=8.5, height=11)
+	
+	png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(quantiles$one.month$spread,quantiles$last.e$spread,quantiles$last.e_s$spread)
+	dev.off()		
+	
+	png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.strategy.sidebyside(quantiles$one.month$spread,quantiles$last.e$spread,quantiles$last.e_s$spread)
+	dev.off()	
+
+
+	png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles$last.e )
+	dev.off()		
+		
+	png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles$last.e_s )
+	dev.off()		
+
+	
+}
+	
+
+
+
+
+
+
 
 
 			

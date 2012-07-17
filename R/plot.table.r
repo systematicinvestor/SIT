@@ -97,7 +97,7 @@ plot.table.param <- function
 		par(mar = c(0, 0, 0, 0), cex = 0.5) 
 		oldpar = make.table(nr, nc)
 
-		text.cex = plot.matrix.cex[c(1, 1 + rindex), ]
+		text.cex = plot.matrix.cex[c(1, 1 + rindex), ]		
 			text.cex = plot.table.helper.auto.adjust.cex(temp.table, keep.all.same.cex)
 		bg.col = plot.matrix_bg.col[c(1, 1 + rindex), ]
 
@@ -143,6 +143,14 @@ plot.table.helper.auto.adjust.cex <- function
 		plot.matrix.cex[-1,1] = min(c(header.col.cex, header.row.cex))
 		plot.matrix.cex[-1,-1]= min(c(header.col.cex, header.row.cex, data.cex))
 		plot.matrix.cex[1,1]= min(c(header.col.cex, header.row.cex, data.cex, title.cex))
+
+		plot.matrix.cex[1,-1] = min(c(header.col.cex))
+		plot.matrix.cex[-1,1] = min(c(header.row.cex))
+		plot.matrix.cex[-1,-1]= min(c(data.cex))
+		plot.matrix.cex[1,1]= min(c(title.cex))
+		
+			
+
 	}
 	return(plot.matrix.cex)
 }
