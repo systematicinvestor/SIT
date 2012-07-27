@@ -266,7 +266,7 @@ load.packages <- function
 (
 	packages, 							# names of the packages separated by comma
 	repos = "http://cran.r-project.org",# default repository
-	dependencies = "Depends",				# install dependencies
+	dependencies = c("Depends", "Imports"),	# install dependencies
 	...									# other parameters to install.packages
 )
 {

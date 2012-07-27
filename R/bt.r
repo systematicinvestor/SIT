@@ -918,7 +918,7 @@ bt.simple <- function(data, signal)
 	signal[is.na(signal)] = 0
 
 	# calculate Close-to-Close returns
-	ret = ROC(Cl(data))
+	ret = ROC(Cl(data), type='discrete')
 	ret[1] = 0
 	
 	# compute stats	

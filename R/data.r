@@ -66,7 +66,7 @@ extract.table.from.webpage <- function
 		
 		if(hasHeader) {
 			colnames(temp) = temp[(hasHeader + 0), ]
-			temp = temp[-c(1:(hasHeader + 0)), ]
+			temp = temp[-c(1:(hasHeader + 0)), ,drop=F]
 		}
 
 	}, error = function(ex) {
@@ -316,6 +316,71 @@ sp100.components <- function()
 		tickers = trim(temp[-c(1:i.start), 1])
 		
 	return(tickers)	
+}
+
+
+###############################################################################
+# iShares FTSE 100 (ISF)
+# http://uk.ishares.com/en/rc/products/ISF/all-holdings/
+# http://www.londonstockexchange.com/exchange/prices-and-markets/stocks/indices/constituents-indices.html?index=UKX
+# Yahoo ticker for UK stocks ABF.L
+###############################################################################
+ftse100.components <- function()
+{
+	# get holdings from uk.ishares.com
+	url = 'http://uk.ishares.com/en/rc/products/ISF/all-holdings/'
+	txt = join(readLines(url))
+	
+	# extract table from this page		
+	txt = gsub('&#37;','%',txt)
+	temp = extract.table.from.webpage(txt, 'Security', hasHeader = T)
+	
+	temp = trim(temp)
+		colnames(temp) = temp[1,]
+		temp = temp[-1,]		
+	holdings = temp
+		
+	
+	# get ISIN to ticker map from www.londonstockexchange.com
+	page.label = ''	
+	ticker2ISIN = c()
+	for(i in 1:100) {	
+		cat(i,'\n')
+		
+		# download
+		url = paste('http://www.londonstockexchange.com/exchange/prices-and-markets/stocks/indices/constituents-indices.html?index=UKX&page=', i, sep='')
+		txt = join(readLines(url))
+	
+		# get page label	
+		pos = regexpr('Page [0-9]+ of [0-9]+', txt, ignore.case = T)
+		page.label.new = substr(txt, pos, pos + attr(pos, 'match.length')-1)
+		
+		if(page.label == page.label.new) break
+		page.label = page.label.new
+		
+		# extract table
+		temp.table = extract.table.from.webpage(txt, 'Price', hasHeader = T)
+			colnames(temp.table)[1] = 'tickers'
+
+		# extract links
+		temp = gsub(pattern = '<a', replacement = '<td>', txt, perl = TRUE)
+		temp = gsub(pattern = '</a>', replacement = '</td>', temp, perl = TRUE)	
+	
+		temp = extract.table.from.webpage(temp, 'Price', hasHeader = T)
+			pos = regexpr('fourWayKey=', temp[,2])
+		ISIN = as.vector(sapply(1:nrow(temp), function(j) 
+			substr(temp[j,2], pos[j] + attr(pos, 'match.length')[j], pos[j] + attr(pos, 'match.length')[j] + 12 - 1)
+			))
+		
+		
+		ticker2ISIN = rbind(ticker2ISIN, cbind(temp.table[,spl('ticker,Name,Price'), drop=F], ISIN))
+	}
+		
+	ISIN = intersect(holdings[,'ISIN'],ticker2ISIN[,'ISIN'])
+	holdings = cbind(holdings[match(ISIN, holdings[,'ISIN']), ],
+				ticker2ISIN[match(ISIN, ticker2ISIN[,'ISIN']), spl('ticker,Name,Price')])
+
+	return(apply(holdings, 2, list))
 }
 
 ###############################################################################

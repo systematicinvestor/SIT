@@ -4203,11 +4203,12 @@ bt.make.quintiles <- function(
 	prefix = ''
 ) 
 {
+	n = ncol(position.score)
 	#*****************************************************************
 	# Create Quantiles
 	#****************************************************************** 
 	position.score = coredata(position.score)
-	quantiles = weights = position.score * NA			
+	quantiles = weights = position.score * NA
 	
 	for( t in start.t:nrow(weights) ) {
 		factor = as.vector(position.score[t,])
@@ -4257,7 +4258,8 @@ bt.fa.one.month.test <- function()
 	# Load historical data
 	#****************************************************************** 
 	load.packages('quantmod')	
-	tickers = sp500.components()$tickers
+	info = sp500.components()
+	tickers = info$tickers
 	#tickers = dow.jones.components()
 	
 	data <- new.env()
@@ -4272,6 +4274,7 @@ bt.fa.one.month.test <- function()
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
 	bt.prep(data, align='keep.all', dates='1994::')
 		tickers = data$symbolnames
+		sector = info$sector[match(tickers, info$tickers)]
 	
 	
 	data.spy <- new.env()
@@ -4282,8 +4285,12 @@ bt.fa.one.month.test <- function()
 	#*****************************************************************
 	# Code Strategies
 	#****************************************************************** 
-#save(data, data.spy, tickers, file='data.sp500.components.Rdata') 	
+	# setdiff(index(data.spy$prices), index(data$prices))
+	# setdiff(index(data$prices),index(data.spy$prices))
+#save(data, data.spy, tickers, sector, file='data.sp500.components.Rdata') 	
 #load(file='data.sp500.components.Rdata') 	
+
+
 
 	prices = data$prices
 		n = ncol(prices)
@@ -4320,7 +4327,7 @@ bt.fa.one.month.test <- function()
 	# Load factors and align them with prices
 	#****************************************************************** 	
 	# load Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
 	
 	# align monthly dates
 	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
@@ -4347,7 +4354,6 @@ bt.fa.one.month.test <- function()
 	factors	= list()
 		factors$last.e = temp
 		factors$last.e_s = temp
-		factors$one.month = coredata(prices / mlag(prices))
 	
 	for(i in tickers) {
 		cat(i, '\n')
@@ -4361,8 +4367,11 @@ bt.fa.one.month.test <- function()
 			
 	}
 	
+	# add base strategy
+	factors$one.month = coredata(prices / mlag(prices))
+	
 	#save(factors, file='data.ff.factors.Rdata') 	
-	#load(file='data.ff.factors.Rdata') 	
+	load(file='data.ff.factors.Rdata') 	
 
 	
 	#*****************************************************************
@@ -4404,10 +4413,254 @@ bt.fa.one.month.test <- function()
 	
 
 
+bt.fa.sector.one.month.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	info = sp500.components()
+	tickers = info$tickers
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		#save(data, file='data.sp500.components.Rdata') 
+		#load(file='data.sp500.components.Rdata') 	
+		
+		# remove companies with less than 5 years of data
+		rm.index = which( sapply(ls(data), function(x) nrow(data[[x]])) < 1000 )	
+		rm(list=names(rm.index), envir=data)
+		
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all', dates='1994::')
+		tickers = data$symbolnames
+		sector = info$sector[match(tickers, info$tickers)]
+	
+	
+	data.spy <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
+	bt.prep(data.spy, align='keep.all', dates='1994::')
+	
+	#save(data, data.spy, tickers, sector, file='data.sp500.components.Rdata') 	
+	#load(file='data.sp500.components.Rdata') 	
 
-
-
-
-
-
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices
+		n = ncol(prices)
+					
+	#*****************************************************************
+	# Setup monthly periods
+	#****************************************************************** 
+	periodicity = 'months'
+	
+	period.ends = endpoints(data$prices, periodicity)
+		period.ends = period.ends[period.ends > 0]
+	
+	prices = prices[period.ends, ]		
+		
+	#*****************************************************************
+	# Create Benchmarks
+	#****************************************************************** 	
+	models = list()
+	n.skip = 36
+	
+	# SPY
+	data.spy$weight[] = NA
+		data.spy$weight[] = 1
+		data.spy$weight[1:period.ends[n.skip],] = NA
+	models$spy = bt.run(data.spy)
+	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[period.ends,] = ntop(prices, n)
+		data$weight[1:period.ends[n.skip],] = NA		
+	models$equal.weight = bt.run(data)
 			
+	#*****************************************************************
+	# Load factors and align them with prices
+	#****************************************************************** 	
+	# load Fama/French factors
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	
+	# align monthly dates
+	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
+		dates = index(factors$data)
+		dates[!is.na(map)] = index(prices)[na.omit(map)]
+	index(factors$data) = as.Date(dates)
+	
+	
+	# add factors and align
+	data.fa <- new.env()
+		for(i in tickers) data.fa[[i]] = data[[i]][period.ends, ]
+		data.fa$factors = factors$data / 100
+	bt.prep(data.fa, align='remove.na')
+
+		
+	index = match( index(data.fa$prices), index(data$prices) )
+		prices = data$prices[index, ]
+		
+	#*****************************************************************
+	# Compute Factor Attribution for each ticker
+	#****************************************************************** 	
+	temp = NA * prices
+	factors	= list()
+		factors$last.e = temp
+		factors$last.e_s = temp
+	
+	for(i in tickers) {
+		cat(i, '\n')
+		
+		# Facto Loadings Regression
+		obj = factor.rolling.regression(data.fa, i, 36, silent=T,
+			factor.rolling.regression.custom.stats)
+
+		for(j in 1:len(factors))		
+			factors[[j]][,i] = obj$fl$custom[,j]
+			
+	}
+		
+	# add base strategy
+	factors$one.month = coredata(prices / mlag(prices))
+		
+	#save(factors, file='data.ff.factors.Rdata') 	
+	#load(file='data.ff.factors.Rdata') 	
+	
+	#*****************************************************************
+	# Create Quantiles
+	#****************************************************************** 
+	quantiles = list()
+	
+	for(name in names(factors)) {
+		cat(name, '\n')
+		quantiles[[name]] = bt.make.quintiles(factors[[name]], data, index, start.t =  1+36, prefix=paste(name,'_',sep=''))
+	}
+
+	quantiles.sn = list()
+	for(name in names(factors)) {
+		cat(name, '\n')
+		quantiles.sn[[name]] = bt.make.quintiles.sector(sector, factors[[name]], data, index, start.t =  1+36, prefix=paste(name,'_',sep=''))
+	}
+
+	#save(quantiles, quantiles.sn, file='model.quantiles.Rdata') 	
+	load(file='model.quantiles.Rdata') 	 	
+	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	# put all reports into one pdf file
+	#pdf(file = 'report.pdf', width=8.5, height=11)
+	
+	png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(quantiles$one.month$spread,
+			quantiles$last.e$spread, quantiles$last.e_s$spread,
+			quantiles.sn$one.month$spread.sn,
+			quantiles.sn$last.e$spread.sn, quantiles.sn$last.e_s$spread.sn)	
+	dev.off()		
+	
+	png(filename = 'plot2.png', width = 800, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.strategy.sidebyside(quantiles$one.month$spread,
+			quantiles$last.e$spread, quantiles$last.e_s$spread,
+			quantiles.sn$one.month$spread.sn,
+			quantiles.sn$last.e$spread.sn, quantiles.sn$last.e_s$spread.sn)	
+	dev.off()	
+
+	png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles.sn$one.month )
+	dev.off()				
+	
+	png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles.sn$last.e_s )
+	dev.off()		
+	
+	
+}
+
+
+
+bt.make.quintiles.sector <- function(
+	sector,			# sector data
+	position.score,	# position.score is a factor to form Quintiles sampled at the period.ends
+	data,			# back-test object
+	period.ends,	
+	n.quantiles = 5,
+	start.t = 2,	# first index at which to form Quintiles
+	prefix = ''	
+) 
+{
+	#*****************************************************************
+	# Re-organize sectors into matrix, assume that sectors are constant in time
+	#****************************************************************** 
+	temp = factor(sector)
+	sector.names = levels(temp)	
+		n.sectors = len(sector.names)
+	sectors = matrix(unclass(temp),nr=nrow(position.score),nc=ncol(position.score),byrow=T)
+	
+	#*****************************************************************
+	# Create Quantiles
+	#****************************************************************** 
+	position.score = coredata(position.score)
+	quantiles = weights = position.score * NA			
+	
+	for( s in 1:n.sectors) {
+		for( t in start.t:nrow(weights) ) {
+			index = sectors[t,] == s
+			n = sum(index)
+			
+			# require at least 3 companies in each quantile
+			if(n > 3*n.quantiles) {			
+				factor = as.vector(position.score[t, index])
+				ranking = ceiling(n.quantiles * rank(factor, na.last = 'keep','first') / count(factor))
+			
+				quantiles[t, index] = ranking
+				weights[t, index] = 1/tapply(rep(1,n), ranking, sum)[ranking]			
+			}
+		}
+	}	
+	
+	quantiles = ifna(quantiles,0)
+	
+	#*****************************************************************
+	# Create Q1-QN spread for each Sector
+	#****************************************************************** 
+	long = weights * NA
+	short = weights * NA
+	models = list()
+	
+	for( s in 1:n.sectors) {
+		long[] = 0
+		long[quantiles == 1 & sectors == s] = weights[quantiles == 1 & sectors == s]
+		long = long / rowSums(long,na.rm=T)
+		
+		short[] = 0
+		short[quantiles == n.quantiles & sectors == s] = weights[quantiles == n.quantiles & sectors == s]
+		short = short / rowSums(short,na.rm=T)
+		
+		data$weight[] = NA
+			data$weight[period.ends,] = long - short
+		models[[ paste(prefix,'spread.',sector.names[s], sep='') ]]	= bt.run(data, silent = T)	
+	}
+
+	#*****************************************************************
+	# Create Sector - Neutral Q1-QN spread
+	#****************************************************************** 		
+	long[] = 0
+	long[quantiles == 1] = weights[quantiles == 1]
+	long = long / rowSums(long,na.rm=T)
+	
+	short[] = 0
+	short[quantiles == n.quantiles] = weights[quantiles == n.quantiles]
+	short = short / rowSums(short,na.rm=T)
+		
+	data$weight[] = NA
+		data$weight[period.ends,] = long - short
+	models$spread.sn = bt.run(data, silent = T)	
+
+	return(models)
+}
+
+
+		
