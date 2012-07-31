@@ -379,6 +379,30 @@ repmat <- function
 	kronecker( matrix(1, n, m), a )
 }
 
+
+#matrix(1:3, nr=5, nc=3, byrow=T)
+#repRow(1:3, 5)
+repRow <- function
+(
+	m, # vector (row)
+	nr # number of copies along rows
+)
+{
+	matrix(m, nr=nr, nc=len(m), byrow=T)
+}
+
+#matrix(1:5, nr=5, nc=3, byrow=F)
+#repCol(1:5, 3)
+repCol <- function
+(
+	m,	# vector (column)
+	nc	# number of copies along columns
+)
+{
+	matrix(m, nr=len(m), nc=nc, byrow=F)
+}
+
+
 ###############################################################################
 # Compute correlations
 ###############################################################################

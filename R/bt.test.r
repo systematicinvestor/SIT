@@ -4194,6 +4194,7 @@ factor.rolling.regression.custom.stats <- function(x,y,fit) {
 	return(c(e[n], e[n]/se))
 }
 
+# create quintiles
 bt.make.quintiles <- function(
 	position.score,	# position.score is a factor to form Quintiles sampled at the period.ends
 	data,			# back-test object
@@ -4423,7 +4424,8 @@ bt.fa.sector.one.month.test <- function()
 	tickers = info$tickers
 	
 	data <- new.env()
-	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	#getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	for(i in tickers) try(getSymbols(i, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T), TRUE)	
 		#save(data, file='data.sp500.components.Rdata') 
 		#load(file='data.sp500.components.Rdata') 	
 		
@@ -4441,13 +4443,16 @@ bt.fa.sector.one.month.test <- function()
 	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data.spy, auto.assign = T)
 	bt.prep(data.spy, align='keep.all', dates='1994::')
 	
-	#save(data, data.spy, tickers, sector, file='data.sp500.components.Rdata') 	
+	save(data, data.spy, tickers, sector, file='data.sp500.components.Rdata') 	
 	#load(file='data.sp500.components.Rdata') 	
 
 		
 	#*****************************************************************
 	# Code Strategies
 	#****************************************************************** 
+	# setdiff(index(data.spy$prices), index(data$prices))
+	# setdiff(index(data$prices),index(data.spy$prices))
+
 	prices = data$prices
 		n = ncol(prices)
 					
@@ -4483,7 +4488,7 @@ bt.fa.sector.one.month.test <- function()
 	# Load factors and align them with prices
 	#****************************************************************** 	
 	# load Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
 	
 	# align monthly dates
 	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
@@ -4521,12 +4526,14 @@ bt.fa.sector.one.month.test <- function()
 			factors[[j]][,i] = obj$fl$custom[,j]
 			
 	}
-		
+
 	# add base strategy
 	factors$one.month = coredata(prices / mlag(prices))
-		
-	#save(factors, file='data.ff.factors.Rdata') 	
+					
+	save(factors, file='data.ff.factors.Rdata') 	
 	#load(file='data.ff.factors.Rdata') 	
+
+	
 	
 	#*****************************************************************
 	# Create Quantiles
@@ -4544,8 +4551,8 @@ bt.fa.sector.one.month.test <- function()
 		quantiles.sn[[name]] = bt.make.quintiles.sector(sector, factors[[name]], data, index, start.t =  1+36, prefix=paste(name,'_',sep=''))
 	}
 
-	#save(quantiles, quantiles.sn, file='model.quantiles.Rdata') 	
-	load(file='model.quantiles.Rdata') 	 	
+	save(quantiles, quantiles.sn, file='model.quantiles.Rdata') 	
+	#load(file='model.quantiles.Rdata') 	 	
 	
 
 	#*****************************************************************
@@ -4581,6 +4588,14 @@ bt.fa.sector.one.month.test <- function()
 
 
 
+
+#position.score = factors[[1]]
+#period.ends	= index
+#n.quantiles = 5
+#start.t =  1+36
+#prefix = ''	
+
+# create sector quintiles		
 bt.make.quintiles.sector <- function(
 	sector,			# sector data
 	position.score,	# position.score is a factor to form Quintiles sampled at the period.ends
@@ -4644,6 +4659,47 @@ bt.make.quintiles.sector <- function(
 		models[[ paste(prefix,'spread.',sector.names[s], sep='') ]]	= bt.run(data, silent = T)	
 	}
 
+if(F) {	
+	#*****************************************************************
+	# Create Basic momentum strategy
+	#****************************************************************** 			
+	load.packages('abind')
+	model.prices = abind(lapply(models, function(m) m$equity), along=2)	
+		#model.prices = make.xts(model.prices, index(data$prices)
+		model.prices = model.prices[period.ends,]
+		model.returns = model.prices / mlag(model.prices)-1
+		model.score = bt.apply.matrix(model.returns, SMA, 6) 
+		model.vol = bt.apply.matrix(model.returns, runSD, 6) 
+
+	# select top 3 sectors based on the 6 month momentum, risk weighted	
+	top = ntop(model.score, 3)
+		top = top / model.vol
+	top = top / rowSums(top, na.rm=T)
+	top = ifna(top,0)
+	
+	n = ncol(position.score)
+	nperiods = nrow(position.score)
+
+	long[] = 0
+	short[] = 0
+	for( s in 1:n.sectors) {
+		score = matrix(top[,s], nr = nperiods, n)
+		long[quantiles == 1 & sectors == s] = (weights * score)[quantiles == 1 & sectors == s]
+		short[quantiles == n.quantiles & sectors == s] = (weights * score)[quantiles == n.quantiles & sectors == s]		
+	}
+	long = long / rowSums(long,na.rm=T)
+	short = short / rowSums(short,na.rm=T)
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = long - short
+	models$spread.sn.top3 = bt.run(data, silent = T)	
+
+	
+#plotbt.custom.report.part1(models)
+#plotbt.strategy.sidebyside(models)
+}	
+
+	
 	#*****************************************************************
 	# Create Sector - Neutral Q1-QN spread
 	#****************************************************************** 		
@@ -4663,4 +4719,124 @@ bt.make.quintiles.sector <- function(
 }
 
 
+
+###############################################################################
+# Yet Another Forecast Dashboard
+###############################################################################
+# extract forecast info
+forecast.helper <- function(fit, h=10, level = c(80,95)) {
+	out = try( forecast(fit, h=h, level=level), silent=TRUE)
+	if (class(out)[1] != 'try-error') {
+		out = data.frame(out)
+	} else {
+		temp = data.frame(predict(fit, n.ahead=h, doplot=F))
+			pred = temp[,1]
+			se = temp[,2]
+		qq = qnorm(0.5 * (1 + level/100))
+		out = matrix(NA, nr=h, nc=1+2*len(qq))
+			out[,1] = pred
+		for(i in 1:len(qq))
+			out[,(2*i):(2*i+1)] = c(pred - qq[i] * se, pred + qq[i] * se)
+		colnames(out) = c('Point.Forecast', matrix(c(paste('Lo', level, sep='.'), paste('Hi', level, sep='.')), nr=2, byrow=T))
+		out = data.frame(out)
+	}	
+	return(out)
+}
+
+# compute future dates for the forecast
+forecast2xts <- function(data, forecast) {
+	# length of the forecast
+	h = nrow(forecast)
+	dates = as.Date(index(data))
+ 		
+	new.dates = seq(last(dates)+1, last(dates) + 2*365, by='day')
+	rm.index = date.dayofweek(new.dates) == 6 | date.dayofweek(new.dates) == 0
+ 	new.dates = new.dates[!rm.index]
+ 		
+ 	new.dates = new.dates[1:h] 	
+ 	return(make.xts(forecast, new.dates))
+}
+
+# create forecast plot
+forecast.plot <- function(data, forecast, ...) {
+	out = forecast2xts(data, forecast)
+
+ 	# create plot
+ 	plota(c(data, out[,1]*NA), type='l', 
+ 			ylim = range(data,out,na.rm=T), ...) 		
+ 	
+ 	# highligh sections
+	new.dates = index(out)
+		temp = coredata(out)
+
+	n = (ncol(out) %/% 2)
+	for(i in n : 1) {
+		polygon(c(new.dates,rev(new.dates)), 
+			c(temp[,(2*i)], rev(temp[,(2*i+1)])), 
+		border=NA, col=col.add.alpha(i+2,150))
+	}
+	
+	plota.lines(out[,1], col='red')
+	
+	labels = c('Data,Forecast', paste(gsub('Lo.', '', colnames(out)[2*(n:1)]), '%', sep=''))
+	plota.legend(labels, fill = c('black,red',col.add.alpha((1:n)+2, 150)))			
+}
+
+
+bt.forecast.dashboard <- function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1990-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='remove.na')
+	
+	#*****************************************************************
+	# Create models
+	#****************************************************************** 
+	load.packages('forecast,fGarch,fArma')
+	
+	sample = last(data$prices$SPY, 200)	
+	ts.sample = ts(sample, frequency = 12)
+	
+	models = list(
+		# fGarch		
+		garch = garchFit(~arma(1,1)+garch(1,1), data=sample, trace=F),
+		# fArma
+		arima = armaFit(~ arima(1, 1, 1), data=ts.sample),	
+		
+		# forecast
+		arma = Arima(ts.sample, c(1,0,1)),
+		arfima = arfima(ts.sample),
+		auto.arima = auto.arima(ts.sample),
+	
+		bats = bats(ts.sample),
+		HoltWinters = HoltWinters(ts.sample),
+		naive = Arima(ts.sample, c(0,1,0))
+	)
+	
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 						
+	png(filename = 'plot1.png', width = 800, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+		layout(matrix(1:9,nr=3))
+		for(i in 1:len(models)) {
+			out = forecast.helper(models[[i]], 30, level = c(80,95))	 	
+			forecast.plot(sample, out, main = names(models)[i]) 	
+		}	
+	dev.off()		
+	
+	png(filename = 'plot2.png', width = 800, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+		layout(matrix(1:9,nr=3))
+		for(i in 1:len(models)) {
+			out = forecast.helper(models[[i]], 30, level = c(75,85,95,97,99))	 	
+			forecast.plot(sample, out, main = names(models)[i]) 	
+		}	
+	dev.off()		
+	
+}
 		
