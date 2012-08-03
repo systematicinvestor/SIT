@@ -4422,6 +4422,8 @@ bt.fa.sector.one.month.test <- function()
 	load.packages('quantmod')	
 	info = sp500.components()
 	tickers = info$tickers
+		#tickers = dow.jones.components()
+
 	
 	data <- new.env()
 	#getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
@@ -4460,6 +4462,7 @@ bt.fa.sector.one.month.test <- function()
 	# Setup monthly periods
 	#****************************************************************** 
 	periodicity = 'months'
+	#periodicity = 'weeks'
 	
 	period.ends = endpoints(data$prices, periodicity)
 		period.ends = period.ends[period.ends > 0]
@@ -4490,12 +4493,14 @@ bt.fa.sector.one.month.test <- function()
 	# load Fama/French factors
 	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
 	
-	# align monthly dates
-	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
-		dates = index(factors$data)
-		dates[!is.na(map)] = index(prices)[na.omit(map)]
-	index(factors$data) = as.Date(dates)
 	
+	# align monthly dates
+	if(periodicity == 'months') {
+		map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
+			dates = index(factors$data)
+			dates[!is.na(map)] = index(prices)[na.omit(map)]
+		index(factors$data) = as.Date(dates)
+	}	
 	
 	# add factors and align
 	data.fa <- new.env()
@@ -4528,7 +4533,8 @@ bt.fa.sector.one.month.test <- function()
 	}
 
 	# add base strategy
-	factors$one.month = coredata(prices / mlag(prices))
+	nlag = iif(periodicity == 'months', 1, 4)
+	factors$one.month = coredata(prices / mlag(prices, nlag))	
 					
 	save(factors, file='data.ff.factors.Rdata') 	
 	#load(file='data.ff.factors.Rdata') 	
@@ -4583,6 +4589,38 @@ bt.fa.sector.one.month.test <- function()
 		plotbt.custom.report.part1(	quantiles.sn$last.e_s )
 	dev.off()		
 	
+	
+	
+	#*****************************************************************
+	# Create Report - bt.one.month.test
+	#****************************************************************** 	
+	png(filename = 'plot1a.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')					
+		plotbt.custom.report.part1(c(models,quantiles$one.month))
+	dev.off()	
+
+	png(filename = 'plot2a.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')					
+		plotbt.custom.report.part1(c(models,quantiles$one.month$spread))
+	dev.off()	
+
+	#*****************************************************************
+	# Create Report - bt.fa.one.month.test
+	#****************************************************************** 						
+	png(filename = 'plot1b.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(quantiles$one.month$spread,quantiles$last.e$spread,quantiles$last.e_s$spread)
+	dev.off()		
+	
+	png(filename = 'plot2b.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.strategy.sidebyside(quantiles$one.month$spread,quantiles$last.e$spread,quantiles$last.e_s$spread)
+	dev.off()	
+
+
+	png(filename = 'plot3b.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles$last.e )
+	dev.off()		
+		
+	png(filename = 'plot4b.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		
+		plotbt.custom.report.part1(	quantiles$last.e_s )
+	dev.off()		
 	
 }
 
@@ -4778,7 +4816,7 @@ forecast.plot <- function(data, forecast, ...) {
 	
 	plota.lines(out[,1], col='red')
 	
-	labels = c('Data,Forecast', paste(gsub('Lo.', '', colnames(out)[2*(n:1)]), '%', sep=''))
+	labels = c('Data,Forecast', paste(gsub('Lo.', '', colnames(out)[2*(1:n)]), '%', sep=''))
 	plota.legend(labels, fill = c('black,red',col.add.alpha((1:n)+2, 150)))			
 }
 
@@ -4802,11 +4840,23 @@ bt.forecast.dashboard <- function() {
 	sample = last(data$prices$SPY, 200)	
 	ts.sample = ts(sample, frequency = 12)
 	
+	
+
+
+#garch.price = garchFit(~arma(1, 15) + garch(1, 1), data=ts.sample, trace=F)
+garch.price = armaFit(~ arima(1,1, 15), data=ts.sample)
+	out = forecast.helper(garch.price, 10, level = c(80,95))	 	
+forecast.plot(sample, out) 	
+
+	
+	
+	
+	
 	models = list(
 		# fGarch		
-		garch = garchFit(~arma(1,1)+garch(1,1), data=sample, trace=F),
+		garch = garchFit(~arma(1,15)+garch(1,1), data=sample, trace=F),
 		# fArma
-		arima = armaFit(~ arima(1, 1, 1), data=ts.sample),	
+		arima = armaFit(~ arima(1, 1, 15), data=ts.sample),	
 		
 		# forecast
 		arma = Arima(ts.sample, c(1,0,1)),
