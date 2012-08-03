@@ -4841,16 +4841,6 @@ bt.forecast.dashboard <- function() {
 	ts.sample = ts(sample, frequency = 12)
 	
 	
-
-
-#garch.price = garchFit(~arma(1, 15) + garch(1, 1), data=ts.sample, trace=F)
-garch.price = armaFit(~ arima(1,1, 15), data=ts.sample)
-	out = forecast.helper(garch.price, 10, level = c(80,95))	 	
-forecast.plot(sample, out) 	
-
-	
-	
-	
 	
 	models = list(
 		# fGarch		
