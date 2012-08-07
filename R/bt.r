@@ -82,7 +82,14 @@ bt.merge <- function
 	return( list(all.dates = unique.dates, date.map = date.map))
 }
 
-
+# find location of given names in all names
+find.names <- function(find.names, all.names) 
+{ 
+	as.list(sapply(spl(find.names), function(x) {
+			loc = grep(x, all.names, ignore.case = TRUE)
+			iif(len(loc) > 0, loc, NA)
+		}))
+}
 ###############################################################################
 # Prepare backtest data
 ###############################################################################
@@ -90,7 +97,8 @@ bt.prep <- function
 (
 	b,				# enviroment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
-	dates = NULL	# subset of dates
+	dates = NULL,	# subset of dates
+	fill.gaps = F	# fill gaps introduced by merging
 ) 
 {    
 	# setup
@@ -105,6 +113,28 @@ bt.prep <- function
 		for( i in 1:nsymbols ) {
 			b[[ symbolnames[i] ]] = 
 				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
+		
+			# fill gaps logic
+			map.col = find.names('Close,Volume', colnames(b[[ symbolnames[i] ]]))
+			if(fill.gaps & !is.na(map.col$Close)) {	
+				close = coredata(b[[ symbolnames[i] ]][,map.col$Close])
+					n = len(close)
+					last.n = max(which(!is.na(close)))
+				close = ifna.prev(close)
+				if(last.n + 5 < n) close[last.n : n] = NA
+				b[[ symbolnames[i] ]][, map.col$Close] = close
+					index = !is.na(close)	
+
+				if(!is.na(map.col$Volume)) {
+					index1 = is.na(b[[ symbolnames[i] ]][, map.col$Volume]) & index
+					b[[ symbolnames[i] ]][index1, map.col$Volume] = 0
+				}
+				
+				for(j in colnames(b[[ symbolnames[i] ]])) {
+					index1 = is.na(b[[ symbolnames[i] ]][,j]) & index
+					b[[ symbolnames[i] ]][index1, j] = close[index1]
+				}						
+			}
 		}	
 	} else {
 		if(!is.null(dates)) b[[ symbolnames[1] ]] = b[[ symbolnames[1] ]][dates,]	

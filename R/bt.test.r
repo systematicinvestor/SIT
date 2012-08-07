@@ -762,7 +762,7 @@ bt.meom.test <- function()
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1995-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
-	bt.prep(data, align='keep.all', dates='1995::2011')
+	bt.prep(data, align='keep.all', dates='1995::')
 	
 	#*****************************************************************
 	# Code Strategies
@@ -803,7 +803,7 @@ bt.meom.test <- function()
 	
 	# Rank1 = MA( C/Ref(C,-2), 5 ) * MA( C/Ref(C,-2), 40 )
 	position.score = bt.apply.matrix(ret2, SMA, 5) * bt.apply.matrix(ret2, SMA, 40)
-		position.score[!buy.rule,] = NA
+		position.score[!buy.rule] = NA
 			
 	# Strategy MEOM - top 2    
 	data$weight[] = NA;
@@ -820,7 +820,7 @@ bt.meom.test <- function()
 	
 	# Rank2 = MA( C/Ref(C,-2), 5 ) * Ref( MA( C/Ref(C,-2), 10 ), -5 )
 	position.score = bt.apply.matrix(ret2, SMA, 5) * mlag( bt.apply.matrix(ret2, SMA, 10), 5)
-		position.score[!buy.rule,] = NA
+		position.score[!buy.rule] = NA
 	
 	# Strategy MEOM - top 2    
 	data$weight[] = NA
@@ -4880,3 +4880,152 @@ bt.forecast.dashboard <- function() {
 	
 }
 		
+
+
+###############################################################################
+# New 60/40
+# http://gestaltu.blogspot.ca/2012/07/youre-looking-at-wrong-number.html	
+###############################################################################
+bt.new.60.40.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SHY,IEF,TLT,SPY')
+
+	data.all <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1990-01-01', env = data.all, auto.assign = T)	
+	for(i in ls(data.all)) data.all[[i]] = adjustOHLC(data.all[[i]], use.Adjusted=T)		
+	bt.prep(data.all, align='remove.na')
+	
+	prices = data.all$prices
+		n = ncol(prices)
+		nperiods = nrow(prices)
+	prices = prices/ matrix(first(prices), nr=nperiods, nc=n, byrow=T)
+	
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	plota.matplot(prices)
+dev.off()		
+	
+		
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 		
+	data <- new.env()
+		data$stock = data.all$SPY
+		data$bond = data.all$TLT	
+	bt.prep(data, align='remove.na')
+
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	# all bonds began trading at 2002-07-31
+	prices = data$prices
+		n = ncol(prices)
+		nperiods = nrow(prices)
+	
+	models = list()
+	
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]
+
+	
+	#*****************************************************************
+	# Traditional, Dollar Weighted 40% Bonds & 60% Stock
+	#****************************************************************** 			
+	weight.dollar = matrix(c(0.4, 0.6), nr=nperiods, nc=n, byrow=T)
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.dollar[period.ends,]
+	models$dollar.w.60.40 = bt.run.share(data, clean.signal=F)
+
+	
+	#*****************************************************************
+	# Risk Weighted 40% Bonds & 60% Stock
+	#****************************************************************** 				
+	ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+	hist.vol = sqrt(252) * bt.apply.matrix(ret.log, runSD, n = 21)	
+	weight.risk = weight.dollar / hist.vol
+		weight.risk = weight.risk / rowSums(weight.risk)
+		
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.risk[period.ends,]
+	models$risk.w.60.40 = bt.run.share(data, clean.signal=F)
+
+	#*****************************************************************
+	# Helper function to adjust portfolio leverage to target given volatility
+	#****************************************************************** 				
+	target.vol.strategy <- function(model, weight, 
+		target = 10/100, 
+		lookback.len = 21,
+		max.portfolio.leverage = 100/100) 
+	{	
+		ret.log.model = ROC(model$equity, type='continuous')
+		hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
+			hist.vol.model = as.vector(hist.vol.model)
+		
+		weight.target = weight * (target / hist.vol.model)
+	
+		# limit total leverage		
+		rs = rowSums(abs(weight.target))
+		weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
+		
+		return(weight.target)	
+	}
+				
+	#*****************************************************************
+	# Scale Risk Weighted 40% Bonds & 60% Stock strategy to have 6% volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk.w.60.40,
+						weight.risk, 6/100, 21, 100/100)[period.ends,]
+	models$risk.w.60.40.target6 = bt.run.share(data, clean.signal=T)
+	
+	#*****************************************************************
+	# Same, plus invest cash into SHY
+	#****************************************************************** 					
+	weight = target.vol.strategy(models$risk.w.60.40,
+						weight.risk, 6/100, 21, 100/100)
+	data.all$weight[] = NA
+		data.all$weight$SPY[period.ends,] = weight$stock[period.ends,]
+		data.all$weight$TLT[period.ends,] = weight$bond[period.ends,]
+		
+		cash = 1-rowSums(weight)
+		data.all$weight$SHY[period.ends,] = cash[period.ends]
+	models$risk.w.60.40.target6.cash = bt.run.share(data.all, clean.signal=T)
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	plotbt.strategy.sidebyside(models)
+dev.off()		
+	
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')			
+	plotbt.custom.report.part1(models)
+dev.off()		
+		
+png(filename = 'plot4.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')			
+	plotbt.custom.report.part2(models$risk.w.60.40.target6)		
+dev.off()		
+	
+png(filename = 'plot5.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')			
+	plotbt.custom.report.part2(models$risk.w.60.40.target6.cash)		
+dev.off()		
+	
+	
+}		
+
+
+	
+
+
+
+
+
+	
+
+
