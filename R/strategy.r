@@ -40,11 +40,52 @@ strategy.load.historical.data <- function
 	
 	tickers = spl(tickers)
 	data <- new.env()
-		for(i in tickers) try(getSymbols(i, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T), TRUE)	
+		for(i in 1:len(tickers)) {
+			temp = try(getSymbols(tickers[i], src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T), TRUE)	
+			if(inherits(temp, 'try-error'))
+				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
+			else	
+				cat(i, 'out of', len(tickers), 'Reading', tickers[i], format(range(index(data[[ tickers[i] ]])), '%d-%b-%Y'), '\n', sep='\t')
+		}		
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
 	bt.prep(data, align=align, dates=dates, fill.gaps=fill.gaps)
 	
 	return(data)
+}
+
+
+
+
+###############################################################################
+# Helper function to create Barplot with strategy stats
+###############################################################################
+performance.barchart.helper <- function(out, names, custom.order) 
+{
+	# Bar chart
+	layout(mat=matrix(1:4, 2, 2, byrow=FALSE)) 	
+	par(mar=c(4, 3, 2, 2))
+	col = spl('lightgray,red')
+	
+	custom.order = c(T,T,T,F)
+		names(custom.order) = spl(names)
+	for(i in names(custom.order)) {
+		y = as.double(out[i,])
+		index = order(y, decreasing = custom.order[i])		
+		x = barplot(y[index], names.arg = '', 
+			col=iif(y[index] > 0, col[1], col[2]), 
+			main=i, 
+			border = 'darkgray',las=2)
+		grid(NA,NULL)
+		abline(h=0, col='black')		
+		if(y[1] > 0) 
+			text(x, 0 * x, colnames(out)[index], adj=c(-0.1,1), srt=90, xpd = TRUE)
+		else
+			text(x, 0 * x, colnames(out)[index], adj=c(1.1,1), srt=90, xpd = TRUE)
+		
+		# add best worst labels
+		mtext('worst', side = 1,line = 0, outer = F, adj = 1, font = 1, cex = 1)
+		mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
+	}				
 }
 
 
@@ -535,17 +576,15 @@ asset.allocation.strategy.test <- function()
 	#****************************************************************** 
 	data = strategy.load.historical.data(tickers, dates)
 	
-	
 	obj = portfolio.allocation.helper(data$prices,
 		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
 	) 
-
 	
-	obj = create.strategies(obj, data)
-
-
-	models = obj$models
-
+	models = create.strategies(obj, data)$models
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
 	plotbt.custom.report.part1(models)
 	
 	plotbt.custom.report.part2(models)
@@ -556,7 +595,87 @@ asset.allocation.strategy.test <- function()
 ###############################################################################
 # Repository of Benchmark Strategies
 ###############################################################################
+benchmark.strategy.test <- function() 
+{
+	models = list()
+	
+	dates='2000::'		
+	
+	#*****************************************************************
+	# Create Benchmark Strategies
+	#****************************************************************** 						
+	# Monthly End-of-the-Month (MEOM)
+	tickers = 'DIA,EEM,EFA,EWH,EWJ,EWT,EWZ,FXI,GLD,GSG,IEF,ILF,IWM,IYR,QQQ,SPY,VNQ,XLB,XLE,XLF,XLI,XLP,XLU,XLV,XLY,XLK'
+	sub.models = meom.strategy(tickers,dates)
+
+	models$meom = sub.models$meom.top2.rank2
+			
+			
+	# Rotational Trading Strategies : ETF Sector Strategy		
+	tickers = 'XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU,IWB,IWD,IWF,IWM,IWN,IWO,IWP,IWR,IWS,IWV,IWW,IWZ'
+	sub.models = rotation.strategy(tickers,dates, top.n = 3, keep.n=6)
+	models$rotation = sub.models$top.keep
+						
+	# Asset Allocation Strategy	
+	tickers = 'SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD'
+	
+	data = strategy.load.historical.data(tickers, dates)
+	obj = portfolio.allocation.helper(data$prices, prefix='aaa.',
+		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
+	) 
+	sub.models = create.strategies(obj, data)$models
+	
+	models = c(models, sub.models)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	pdf(file = 'report.pdf', width=8.5, height=11)
+	
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+
+	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
+
+	#*****************************************************************
+	# Allocate among Benchmark Strategies
+	#****************************************************************** 						
+	global.data <- new.env()
+	for(i in names(models)) {
+		temp = models[[i]]$equity
+			colnames(temp) = 'Close'
+			temp[1:min(which(temp != 1))] = NA			
+		global.data[[i]] = temp
+	}
+	bt.prep(global.data, align='keep.all')
+	
+	obj = portfolio.allocation.helper(global.data$prices, prefix='',
+		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
+	) 
+	
+	global.models = create.strategies(obj, global.data)$models
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	layout(1:2)
+	plotbt(global.models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(global.models, return.table=T)
+
+	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
+	
+	# close pdf
+	dev.off()				
+	
+}
 
 
 
+
+	
 	
