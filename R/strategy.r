@@ -44,7 +44,9 @@ strategy.load.historical.data <- function
 			temp = try(getSymbols(tickers[i], src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T), TRUE)	
 			if(inherits(temp, 'try-error'))
 				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
-			else	
+			else if(is.null(data[[ tickers[i] ]]))
+				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
+			else
 				cat(i, 'out of', len(tickers), 'Reading', tickers[i], format(range(index(data[[ tickers[i] ]])), '%d-%b-%Y'), '\n', sep='\t')
 		}		
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
@@ -52,6 +54,7 @@ strategy.load.historical.data <- function
 	
 	return(data)
 }
+
 
 
 
@@ -87,6 +90,34 @@ performance.barchart.helper <- function(out, names, custom.order)
 		mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
 	}				
 }
+
+
+
+
+
+###############################################################################
+# Summary snapshoot of strategy perfroamnce
+###############################################################################
+strategy.performance.snapshoot <- function(models) {
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 					
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+
+	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
+
+	# Plot transition maps
+	layout(1:len(models))
+	for(m in names(models)) {
+		plotbt.transition.map(models[[m]]$weight, name=m)
+			legend('topright', legend = m, bty = 'n')
+	}
+}
+
 
 
 
@@ -385,10 +416,19 @@ rotation.strategy.test <- function()
 		constraints		# constraints
 	)
 	{
-		x = 1 / sqrt( diag(ia$cov) )
+		# allocate only among risk assets, ignore risk-less ones
+		good.asset.index = (ia$risk > 0) & !is.na(ia$risk)
+			good.asset.index[is.na(good.asset.index)] = F
+						
+		x = 1 / ia$risk[good.asset.index]
 		
 		# normalize weights to sum up to 1
-		return( x / sum(x) )
+		x = x / sum(x)
+		
+		# create allocation
+		out = rep(0, ia$n)
+			out[good.asset.index] = x
+		return(out)
 	}	
 	
 	min.var.portfolio <- function
@@ -397,11 +437,36 @@ rotation.strategy.test <- function()
 		constraints		# constraints
 	)
 	{
-		sol = solve.QP(Dmat=ia$cov, dvec=rep(0, ia$n), 
-			Amat=constraints$A, bvec=constraints$b, meq=constraints$meq)
+		# allocate only among risk assets, ignore risk-less ones
+		good.asset.index = (ia$risk > 0) & !is.na(ia$risk)
+			good.asset.index[is.na(good.asset.index)] = F
+	
+		# first try to solve QP with given Dmat
+		Dmat = ia$cov[good.asset.index, good.asset.index]		
+		sol = try(solve.QP(Dmat=Dmat, 
+						dvec=rep(0, sum(good.asset.index)), 
+						Amat=constraints$A[good.asset.index,], 
+						bvec=constraints$b, 
+						meq=constraints$meq), silent = TRUE)
+		# if error, adjust Dmat to be positive definite
+		if(inherits(sol, 'try-error'))
+			sol = solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
+						dvec=rep(0, sum(good.asset.index)), 
+						Amat=constraints$A[good.asset.index,], 
+						bvec=constraints$b, 
+						meq=constraints$meq)
+		
 		x = sol$solution
-		return( x )
+		
+		# create allocation
+		out = rep(0, ia$n)
+			out[good.asset.index] = x
+		return(out)
 	}
+	
+	
+	
+	
 	
 #*****************************************************************
 # Portfolio Allocation Helper - distribute portfolio weights according to 
@@ -418,7 +483,8 @@ portfolio.allocation.helper <- function
 	
 	universe = prices[period.ends,]>0,
 	
-	min.risk.fns = 'min.var.portfolio'	# portfolio construction functions
+	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
+	custom.stats.fn = NULL
 ) 
 {
 	load.packages('quadprog,corpcor')
@@ -469,10 +535,28 @@ portfolio.allocation.helper <- function
 	weights = list()			
 	for(f in names(min.risk.fns)) 
 		weights[[ f ]] = weight				
+
+	# custom stats logic		
+	custom = list()
+	if( !is.null(custom.stats.fn) ) {
+		dummy = matrix(NA, nr=nrow(weight), nc=len(weights))		
+			colnames(dummy) = names(weights)
+   		temp = match.fun(custom.stats.fn)(1:ncol(ret), create.historical.ia(ret, 252))
+   		
+   		for(ci in names(temp)) {
+   			temp1 = NA * dummy
+   			if(len(temp[[ ci ]]) > 1) {
+				temp1 = list()			
+				for(w in names(weights)) 
+					temp1[[w]] = NA * weights[[w]]   			   				
+   			} 
+   			custom[[ ci ]] = temp1
+   		}
+   	} 		
 		
-	risk.contributions = list()			
-	for(w in names(weights)) 
-		risk.contributions[[w]] = NA * weights[[w]]
+#	risk.contributions = list()			
+#	for(w in names(weights)) 
+#		risk.contributions[[w]] = NA * weights[[w]]
 		
 						
 	# construct portfolios			
@@ -506,34 +590,68 @@ portfolio.allocation.helper <- function
 				ia$n = n
 				ia$hist.returns = hist
 				ia$expected.return = apply(hist, 2, mean)
-				s0 = apply(hist, 2, sd)		
+				ia$risk = apply(hist, 2, sd)		
 				ia$correlation = cor(hist, use='complete.obs', method='pearson')
-				ia$cov = ia$correlation * (s0 %*% t(s0))
+				ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
 				
 				# adjust correlation and covariance matrices to be positive defined
-				ia$cov = make.positive.definite(ia$cov, 0.000000001)
-				ia$correlation = make.positive.definite(ia$correlation, 0.000000001)
+				temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
+					if(!inherits(temp, 'try-error')) ia$cov = temp				
+				temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
+					if(!inherits(temp, 'try-error')) ia$correlation = temp							
 				
-							
 			# find optimal portfolios under different risk measures
 			for(f in names(min.risk.fns)) {
 				constraints$x0 = weights[[ f ]][(j-1),index]			
 				weights[[ f ]][j,index] = min.risk.fns[[f]](ia, constraints)
 			}
 			
+			
+			# custom stats logic		
+			if( !is.null(custom.stats.fn) ) {
+				for(w in names(weights)) {
+					x = as.vector(weights[[ w ]][j, index])
+					temp = match.fun(custom.stats.fn)(x, ia)
+
+			   		for(ci in names(temp)) {
+			   			if(len(temp[[ ci ]]) > 1)
+			   				custom[[ ci ]][[ w ]][j, index] = temp[[ ci ]]
+			   			else
+			   				custom[[ ci ]][j, w] = temp[[ ci ]]
+			   		}
+				}
+		   	} 		
+			
 			# compute risk contributions implied by portfolio weihgts
-			for(w in names(weights)) {
-				x = as.vector(weights[[ w ]][j, index])
-				risk.contributions[[ w ]][j, index] = portfolio.risk.contribution(x, ia)
-			}
+#			for(w in names(weights)) {
+#				x = as.vector(weights[[ w ]][j, index])
+#				risk.contributions[[ w ]][j, index] = portfolio.risk.contribution(x, ia)
+#			}
 		}
 			
 		if( j %% 10 == 0) cat(j, '\n')		
 	}
+
 	
-	return(list(weights = weights, period.ends = period.ends, 
-		risk.contributions = risk.contributions, 
-		periodicity = periodicity, lookback.len = lookback.len))
+	return(c(list(weights = weights, period.ends = period.ends,
+		periodicity = periodicity, lookback.len = lookback.len), custom))
+
+#	return(list(weights = weights, period.ends = period.ends, 
+#		risk.contributions = risk.contributions, 
+#		periodicity = periodicity, lookback.len = lookback.len))
+}
+
+
+
+# compute portfolio allocation additional stats
+portfolio.allocation.custom.stats <- function(x,ia) {
+	return(list(
+		# vectors
+		risk.contributions = portfolio.risk.contribution(x, ia),
+		
+		# numbers
+		diversification.ratio = sqrt(x %*% ia$cov %*% x) / (sqrt(diag(ia$cov)) %*% x)
+	))
 }
 
 
@@ -553,7 +671,7 @@ create.strategies <- function
 			data$weight[obj$period.ends,] = obj$weights[[i]]	
 		models[[i]] = bt.run.share(data, clean.signal = F)
 		
-		models[[i]]$risk.contribution = obj$risk.contributions[[i]]
+#		models[[i]]$risk.contribution = obj$risk.contributions[[i]]
 		models[[i]]$period.weight = obj$weights[[i]]
 	}
 	obj$models = models
@@ -577,7 +695,8 @@ asset.allocation.strategy.test <- function()
 	data = strategy.load.historical.data(tickers, dates)
 	
 	obj = portfolio.allocation.helper(data$prices,
-		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
+		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio',
+		custom.stats.fn = 'portfolio.allocation.custom.stats'
 	) 
 	
 	models = create.strategies(obj, data)$models
@@ -589,93 +708,7 @@ asset.allocation.strategy.test <- function()
 	
 	plotbt.custom.report.part2(models)
 	
-}
-
-
-###############################################################################
-# Repository of Benchmark Strategies
-###############################################################################
-benchmark.strategy.test <- function() 
-{
-	models = list()
-	
-	dates='2000::'		
-	
-	#*****************************************************************
-	# Create Benchmark Strategies
-	#****************************************************************** 						
-	# Monthly End-of-the-Month (MEOM)
-	tickers = 'DIA,EEM,EFA,EWH,EWJ,EWT,EWZ,FXI,GLD,GSG,IEF,ILF,IWM,IYR,QQQ,SPY,VNQ,XLB,XLE,XLF,XLI,XLP,XLU,XLV,XLY,XLK'
-	sub.models = meom.strategy(tickers,dates)
-
-	models$meom = sub.models$meom.top2.rank2
-			
-			
-	# Rotational Trading Strategies : ETF Sector Strategy		
-	tickers = 'XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU,IWB,IWD,IWF,IWM,IWN,IWO,IWP,IWR,IWS,IWV,IWW,IWZ'
-	sub.models = rotation.strategy(tickers,dates, top.n = 3, keep.n=6)
-	models$rotation = sub.models$top.keep
-						
-	# Asset Allocation Strategy	
-	tickers = 'SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD'
-	
-	data = strategy.load.historical.data(tickers, dates)
-	obj = portfolio.allocation.helper(data$prices, prefix='aaa.',
-		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
-	) 
-	sub.models = create.strategies(obj, data)$models
-	
-	models = c(models, sub.models)
-	
-	#*****************************************************************
-	# Create Report
-	#****************************************************************** 					
-	pdf(file = 'report.pdf', width=8.5, height=11)
-	
-	layout(1:2)
-	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
-		mtext('Cumulative Performance', side = 2, line = 1)
-		
-	out = plotbt.strategy.sidebyside(models, return.table=T)
-
-	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
-
-	#*****************************************************************
-	# Allocate among Benchmark Strategies
-	#****************************************************************** 						
-	global.data <- new.env()
-	for(i in names(models)) {
-		temp = models[[i]]$equity
-			colnames(temp) = 'Close'
-			temp[1:min(which(temp != 1))] = NA			
-		global.data[[i]] = temp
-	}
-	bt.prep(global.data, align='keep.all')
-	
-	obj = portfolio.allocation.helper(global.data$prices, prefix='',
-		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio'
-	) 
-	
-	global.models = create.strategies(obj, global.data)$models
-	
-	#*****************************************************************
-	# Create Report
-	#****************************************************************** 					
-	layout(1:2)
-	plotbt(global.models, plotX = T, log = 'y', LeftMargin = 3)	    	
-		mtext('Cumulative Performance', side = 2, line = 1)
-		
-	out = plotbt.strategy.sidebyside(global.models, return.table=T)
-
-	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
-	
-	# close pdf
-	dev.off()				
+	strategy.performance.snapshoot(global.models)
 	
 }
-
-
-
-
-	
-	
+ 

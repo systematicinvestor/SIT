@@ -573,3 +573,20 @@ get.filename <- function(x)
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
 
 
+###############################################################################
+# Helper function to read data saved by Seasonality tool program
+###############################################################################
+getSymbols.sit <- function(Symbols = NULL, env = .GlobalEnv, src = 'yahoo', auto.assign = TRUE, ...) {
+	require(quantmod)	
+	stock.folder = 'c:/temp/Seasonality/stocks'
+	stock.date.format = '%Y-%m-%d'
+
+	# http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod
+	for(s in Symbols) {
+		temp = list()
+		temp[[ s ]] = list(src='csv', format=stock.date.format, dir=stock.folder)
+		setSymbolLookup(temp)
+	}
+
+	quantmod::getSymbols(Symbols, env = env, auto.assign = auto.assign)
+}
