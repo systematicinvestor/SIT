@@ -484,7 +484,8 @@ portfolio.allocation.helper <- function
 	universe = prices[period.ends,]>0,
 	
 	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
-	custom.stats.fn = NULL
+	custom.stats.fn = NULL,
+	shrinkage.fn = NULL		# function to compute Covariance Shrinkage Estimator 
 ) 
 {
 	load.packages('quadprog,corpcor')
@@ -520,7 +521,9 @@ portfolio.allocation.helper <- function
 		names(min.risk.fns)[i] = f.name			
 	}
 	
-
+	if( !is.null(shrinkage.fn) )
+		shrinkage.fn = match.fun(shrinkage.fn)
+		
 	#*****************************************************************
 	# Code Strategies
 	#****************************************************************** 		
@@ -539,9 +542,11 @@ portfolio.allocation.helper <- function
 	# custom stats logic		
 	custom = list()
 	if( !is.null(custom.stats.fn) ) {
+		custom.stats.fn = match.fun(custom.stats.fn)
+	
 		dummy = matrix(NA, nr=nrow(weight), nc=len(weights))		
 			colnames(dummy) = names(weights)
-   		temp = match.fun(custom.stats.fn)(1:ncol(ret), create.historical.ia(ret, 252))
+   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
    		
    		for(ci in names(temp)) {
    			temp1 = NA * dummy
@@ -594,6 +599,12 @@ portfolio.allocation.helper <- function
 				ia$correlation = cor(hist, use='complete.obs', method='pearson')
 				ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
 				
+				
+				if( !is.null(shrinkage.fn) )
+					ia$cov = shrinkage.fn(hist)
+					
+
+				
 				# adjust correlation and covariance matrices to be positive defined
 				temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
 					if(!inherits(temp, 'try-error')) ia$cov = temp				
@@ -611,7 +622,7 @@ portfolio.allocation.helper <- function
 			if( !is.null(custom.stats.fn) ) {
 				for(w in names(weights)) {
 					x = as.vector(weights[[ w ]][j, index])
-					temp = match.fun(custom.stats.fn)(x, ia)
+					temp = custom.stats.fn(x, ia)
 
 			   		for(ci in names(temp)) {
 			   			if(len(temp[[ ci ]]) > 1)
@@ -659,7 +670,8 @@ portfolio.allocation.custom.stats <- function(x,ia) {
 create.strategies <- function
 (
 	obj,	# portfolio.allocation object: list(weights = weights, period.ends = period.ends)
-	data	# historical prices
+	data,	# historical prices
+	...		
 ) 
 {
 	#*****************************************************************
@@ -669,7 +681,7 @@ create.strategies <- function
 	for(i in names(obj$weights)) {
 		data$weight[] = NA
 			data$weight[obj$period.ends,] = obj$weights[[i]]	
-		models[[i]] = bt.run.share(data, clean.signal = F)
+		models[[i]] = bt.run.share(data, clean.signal = F, ...)
 		
 #		models[[i]]$risk.contribution = obj$risk.contributions[[i]]
 		models[[i]]$period.weight = obj$weights[[i]]
@@ -708,7 +720,7 @@ asset.allocation.strategy.test <- function()
 	
 	plotbt.custom.report.part2(models)
 	
-	strategy.performance.snapshoot(global.models)
+	strategy.performance.snapshoot(models)
 	
 }
  
