@@ -486,10 +486,11 @@ write.xts <- function
 (
 	x,			# XTS object
 	filename,	# file name
-	append = FALSE
+	append = FALSE,
+	...
 )
 {
-	write.table(x, sep=',',  row.names = format(index(x)), col.names = NA, file = filename, append = append)
+	write.table(x, sep=',',  row.names = format(index(x), ...), col.names = NA, file = filename, append = append)
 	#write.csv(x, row.names = format(index(x)), filename)	
 }
 
