@@ -69,8 +69,7 @@ performance.barchart.helper <- function(out, names, custom.order)
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 	
-	custom.order = c(T,T,T,F)
-		names(custom.order) = spl(names)
+	names(custom.order) = spl(names)
 	for(i in names(custom.order)) {
 		y = as.double(out[i,])
 		index = order(y, decreasing = custom.order[i])		
@@ -527,6 +526,8 @@ portfolio.allocation.helper <- function
 	#*****************************************************************
 	# Code Strategies
 	#****************************************************************** 		
+	dates = index(prices)[period.ends]
+	
 	prices = coredata(prices)
 	ret = prices / mlag(prices) - 1
 	
@@ -546,6 +547,8 @@ portfolio.allocation.helper <- function
 	
 		dummy = matrix(NA, nr=nrow(weight), nc=len(weights))		
 			colnames(dummy) = names(weights)
+			dummy = make.xts(dummy, dates)	
+			
    		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
    		
    		for(ci in names(temp)) {

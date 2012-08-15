@@ -517,7 +517,7 @@ read.xts <- function
 # Fast alternative to index(x) for XTS object
 # NOTE index.xts is the same name as the index function in the XTS package
 ###############################################################################
-index.xts <- function
+index4xts <- function
 (
 	x			# XTS object
 )
@@ -526,14 +526,19 @@ index.xts <- function
 	class(temp)='POSIXct' 
 	
 	return(temp)
+}
 	
-	if( attr(x, '.indexCLASS')[1] == 'Date') {	
-		out = as.Date(temp)
-	} else {
-		out = as.POSIXct(temp, tz = Sys.getenv('TZ'))
-	}
-	class(out) = attr(x, '.indexCLASS')
-	return(out)
+index.xts <- function
+(
+	x			# XTS object
+)
+{
+	temp = attr(x, 'index')
+	class(temp)='POSIXct' 
+	
+	if( attr(x, '.indexCLASS')[1] == 'Date')
+		temp = as.Date(temp)
+	return(temp)
 }
 
 index2date.time <- function(temp) {
