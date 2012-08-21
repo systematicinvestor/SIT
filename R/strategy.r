@@ -97,7 +97,7 @@ performance.barchart.helper <- function(out, names, custom.order)
 ###############################################################################
 # Summary snapshoot of strategy perfroamnce
 ###############################################################################
-strategy.performance.snapshoot <- function(models) {
+strategy.performance.snapshoot <- function(models, one.page = F) {
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 					
@@ -107,6 +107,8 @@ strategy.performance.snapshoot <- function(models) {
 		
 	out = plotbt.strategy.sidebyside(models, return.table=T)
 
+	if(one.page) return()
+		
 	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
 
 	# Plot transition maps
@@ -116,7 +118,6 @@ strategy.performance.snapshoot <- function(models) {
 			legend('topright', legend = m, bty = 'n')
 	}
 }
-
 
 
 
@@ -562,10 +563,6 @@ portfolio.allocation.helper <- function
    		}
    	} 		
 		
-#	risk.contributions = list()			
-#	for(w in names(weights)) 
-#		risk.contributions[[w]] = NA * weights[[w]]
-		
 						
 	# construct portfolios			
 	for( j in start.i:len(period.ends) ) {
@@ -636,11 +633,6 @@ portfolio.allocation.helper <- function
 				}
 		   	} 		
 			
-			# compute risk contributions implied by portfolio weihgts
-#			for(w in names(weights)) {
-#				x = as.vector(weights[[ w ]][j, index])
-#				risk.contributions[[ w ]][j, index] = portfolio.risk.contribution(x, ia)
-#			}
 		}
 			
 		if( j %% 10 == 0) cat(j, '\n')		
@@ -649,10 +641,6 @@ portfolio.allocation.helper <- function
 	
 	return(c(list(weights = weights, period.ends = period.ends,
 		periodicity = periodicity, lookback.len = lookback.len), custom))
-
-#	return(list(weights = weights, period.ends = period.ends, 
-#		risk.contributions = risk.contributions, 
-#		periodicity = periodicity, lookback.len = lookback.len))
 }
 
 

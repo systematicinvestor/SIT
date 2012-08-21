@@ -5028,6 +5028,235 @@ dev.off()
 # http://www.macquarieprivatewealth.ca/dafiles/Internet/mgl/ca/en/advice/specialist/darwin/documents/darwin-adaptive-asset-allocation.pdf
 # http://cssanalytics.wordpress.com/2012/07/17/adaptive-asset-allocation-combining-momentum-with-minimum-variance/
 ###############################################################################
+
+
+
+bt.aaa.combo <- function
+(
+	data,
+	period.ends,
+	n.top = 5,		# number of momentum positions
+	n.mom = 6*22,	# length of momentum look back
+	n.vol = 1*22 	# length of volatility look back
+) 
+{
+    #*****************************************************************
+    # Combo: weight positions in the Momentum Portfolio according to Volatliliy
+    #*****************************************************************
+    prices = coredata(data$prices)  
+    ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+    hist.vol = bt.apply.matrix(ret.log, runSD, n = n.vol)   
+    	adj.vol = 1/hist.vol[period.ends,]
+    
+    momentum = prices / mlag(prices, n.mom)
+    
+    weight = ntop(momentum[period.ends,], n.top) * adj.vol
+		n.skip = max(n.mom, n.vol)
+   
+    data$weight[] = NA
+        data$weight[period.ends,] = weight / rowSums(weight, na.rm=T)   
+        data$weight[1 : n.skip,] = NA 
+    bt.run.share(data, clean.signal=F, silent=T)
+}
+
+bt.aaa.minrisk <- function
+(
+	data,
+	period.ends,
+	n.top = 5,		# number of momentum positions
+	n.mom = 6*22,	# length of momentum look back
+	n.vol = 1*22 	# length of volatility look back
+) 
+{
+    #*****************************************************************   
+    # Adaptive Asset Allocation (AAA)
+    # weight positions in the Momentum Portfolio according to 
+    # the minimum variance algorithm
+    #*****************************************************************   
+    prices = coredata(data$prices)  
+    ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+    
+    momentum = prices / mlag(prices, n.mom)
+    
+    weight = NA * prices
+        weight[period.ends,] = ntop(momentum[period.ends,], n.top)
+	n.skip = max(n.mom, n.vol)
+        
+    for( i in period.ends[period.ends >= n.skip] ) {
+    	hist = ret.log[ (i - n.vol + 1):i, ]
+    	
+		# require all assets to have full price history
+		include.index = count(hist)== n.vol      
+
+		# also only consider assets in the Momentum Portfolio
+        index = ( weight[i,] > 0 ) & include.index
+        n = sum(index)
+        
+		if(n > 0) {					
+			hist = hist[ , index]
+        
+	        # create historical input assumptions
+	        ia = create.historical.ia(hist, 252)
+	            s0 = apply(coredata(hist),2,sd)       
+	            ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
+	       
+			# create constraints: 0<=x<=1, sum(x) = 1
+			constraints = new.constraints(n, lb = 0, ub = 1)
+			constraints = add.constraints(rep(1, n), 1, type = '=', constraints)       
+			
+			# compute minimum variance weights				            
+	        weight[i,] = 0        
+	        weight[i,index] = min.risk.portfolio(ia, constraints)
+        }
+    }
+
+    # Adaptive Asset Allocation (AAA)
+    data$weight[] = NA
+        data$weight[period.ends,] = weight[period.ends,]   
+    bt.run.share(data, clean.signal=F, silent=T)
+}
+
+
+# Sensitivity Analysis based on the bt.improving.trend.following.test()
+bt.aaa.sensitivity.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	
+	tickers = spl('SPY,EFA,EWJ,EEM,IYR,RWX,IEF,TLT,DBC,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='keep.all', dates='2004:12::')
+ 
+   
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices  
+    n = ncol(prices)
+   
+    models = list()
+   
+    # find period ends
+    period.ends = endpoints(prices, 'months')
+        period.ends = period.ends[period.ends > 0]
+
+        
+	#*****************************************************************
+	# Test
+	#****************************************************************** 
+	models = list()
+	
+	models$combo = bt.aaa.combo(data, period.ends, n.top = 5,
+					n.mom = 180, n.vol = 20)
+					
+					
+	models$aaa = bt.aaa.minrisk(data, period.ends, n.top = 5,
+					n.mom = 180, n.vol = 20)
+					
+	plotbt.custom.report.part1(models) 
+
+	        
+        
+	#*****************************************************************
+	# Sensitivity Analysis: bt.aaa.combo / bt.aaa.minrisk
+	#****************************************************************** 
+	# length of momentum look back
+	mom.lens = ( 1 : 12 ) * 20
+	# length of volatility look back
+	vol.lens = ( 1 : 12 ) * 20
+
+	
+	models = list()
+	
+	# evaluate strategies
+	for(n.mom in mom.lens) {
+		cat('MOM =', n.mom, '\n')
+		
+		for(n.vol in vol.lens) {
+			cat('\tVOL =', n.vol, '\n')
+
+			models[[ paste('M', n.mom, 'V', n.vol) ]] = 
+				bt.aaa.combo(data, period.ends, n.top = 5,
+					n.mom = n.mom, n.vol = n.vol)
+		}
+	}
+	
+	out = plotbt.strategy.sidebyside(models, return.table=T, make.plot = F)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+	# allocate matrixe to store backtest results
+	dummy = matrix('', len(vol.lens), len(mom.lens))
+		colnames(dummy) = paste('M', mom.lens)
+		rownames(dummy) = paste('V', vol.lens)
+		
+	names = spl('Sharpe,Cagr,DVR,MaxDD')
+
+png(filename = 'plot1.png', width = 1000, height = 1000, units = 'px', pointsize = 12, bg = 'white')										
+		
+	layout(matrix(1:4,nrow=2))	
+	for(i in names) {
+		dummy[] = ''
+		
+		for(n.mom in mom.lens)
+			for(n.vol in vol.lens)
+				dummy[paste('V', n.vol), paste('M', n.mom)] =
+					out[i, paste('M', n.mom, 'V', n.vol) ]
+					
+		plot.table(dummy, smain = i, highlight = T, colorbar = F)
+
+	}	
+		
+dev.off()	
+    
+	#*****************************************************************
+	# Sensitivity Analysis
+	#****************************************************************** 	
+	# evaluate strategies
+	for(n.mom in mom.lens) {
+		cat('MOM =', n.mom, '\n')
+		
+		for(n.vol in vol.lens) {
+			cat('\tVOL =', n.vol, '\n')
+
+			models[[ paste('M', n.mom, 'V', n.vol) ]] = 
+				bt.aaa.minrisk(data, period.ends, n.top = 5,
+					n.mom = n.mom, n.vol = n.vol)
+		}
+	}
+	
+	out = plotbt.strategy.sidebyside(models, return.table=T, make.plot = F)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot2.png', width = 1000, height = 1000, units = 'px', pointsize = 12, bg = 'white')										
+		
+	layout(matrix(1:4,nrow=2))	
+	for(i in names) {
+		dummy[] = ''
+		
+		for(n.mom in mom.lens)
+			for(n.vol in vol.lens)
+				dummy[paste('V', n.vol), paste('M', n.mom)] =
+					out[i, paste('M', n.mom, 'V', n.vol) ]
+					
+		plot.table(dummy, smain = i, highlight = T, colorbar = F)
+
+	}	
+dev.off()	
+    
+
+    
+}
+
+
 bt.aaa.test <- function() 
 {
 	#*****************************************************************
