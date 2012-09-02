@@ -2898,13 +2898,13 @@ dist.DDTW <- function(x) {
 	x[2,] = derivative.est(x[2,])
 	
 	alignment = dtw(x[1,], x[2,])
-	stats:::dist(rbind(y[1,alignment1$index1],y[2,alignment1$index2]))
-	#proxy::dist(y[1,alignment1$index1],y[2,alignment1$index2],method='Euclidean',by_rows=F)	
+	stats:::dist(rbind(y[1,alignment$index1],y[2,alignment$index2]))
+	#proxy::dist(y[1,alignment$index1],y[2,alignment$index2],method='Euclidean',by_rows=F)	
 }	
 
 dist.DTW1 <- function(x) { 
 	alignment = dtw(x[1,], x[2,])
-	stats:::dist(rbind(x[1,alignment1$index1],x[2,alignment1$index2]))
+	stats:::dist(rbind(x[1,alignment$index1],x[2,alignment$index2]))
 }
 
 
