@@ -5392,13 +5392,57 @@ png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize =
 dev.off()               
 
 
-
-
 }
 	
 
 
+###############################################################################
+# Merging Current Stock Quotes with Historical Prices
+###############################################################################
+bt.current.quote.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	
+	tickers = spl('VTI,EFA,SHY')	
 
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data)
+ 
+   
+    # look at the data
+	last(data$prices, 2)
+
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	
+	tickers = spl('VTI,EFA,SHY')	
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+		
+		# current quotes logic
+		quotes = getQuote(tickers)
+		for(i in ls(data))
+			if( last(index(data[[i]])) < as.Date(quotes[i, 'Trade Time']) ) {
+				data[[i]] = rbind( data[[i]], make.xts(quotes[i, spl('Open,High,Low,Last,Volume,Last')],
+					as.Date(quotes[i, 'Trade Time'])))
+			}
+
+	bt.prep(data)
+ 
+	
+    # look at the data
+	last(data$prices, 2)
+}
 
 
 	

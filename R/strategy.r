@@ -29,8 +29,10 @@ strategy.load.historical.data <- function
 (
 	tickers = spl('DIA,SPY'),
 	dates = '1900::',
-	align='keep.all',
-	fill.gaps = T
+	align = 'keep.all',
+	fill.gaps = T,
+	adjust = T,
+	current = F
 ) 
 {
 	#*****************************************************************
@@ -48,8 +50,19 @@ strategy.load.historical.data <- function
 				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
 			else
 				cat(i, 'out of', len(tickers), 'Reading', tickers[i], format(range(index(data[[ tickers[i] ]])), '%d-%b-%Y'), '\n', sep='\t')
-		}		
-		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		}	
+		if(adjust) for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# current quotes logic
+		if(current) {
+		quotes = getQuote(tickers)
+		for(i in ls(data))
+			if( last(index(data[[i]])) < as.Date(quotes[i, 'Trade Time']) ) {
+				data[[i]] = rbind( data[[i]], make.xts(quotes[i, spl('Open,High,Low,Last,Volume,Last')],
+					as.Date(quotes[i, 'Trade Time'])))
+			}
+		}
+		
 	bt.prep(data, align=align, dates=dates, fill.gaps=fill.gaps)
 	
 	return(data)
