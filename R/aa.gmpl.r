@@ -105,7 +105,7 @@ Rglpk.create.constraints <- function( prob )
 ###############################################################################
 # Helper function to find Minimum Variance Portfolio
 ############################################################################### 
-min.var.portfolio <- function(ia, constraints)
+min.var.portfolio.gmpl <- function(ia, constraints)
 {
 	#--------------------------------------------------------------------------
 	# Adjust Covariance matrix
@@ -181,7 +181,7 @@ portopt.mathprog.test <- function( )
 	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
 	
 	# Solve QP problem
-	x = min.var.portfolio(ia, constraints)	
+	x = min.var.portfolio.gmpl(ia, constraints)	
 	
 	# plot weights
 png(filename = 'plot1.png', width = 600, height = 400, units = 'px', pointsize = 12, bg = 'white')										
@@ -234,7 +234,7 @@ set SYMBOLS := ', ia$symbols, ';
 	constraints = Rglpk.create.constraints(model)$constraints	
 		
 	# Solve QP problem
-	x = min.var.portfolio(ia, constraints)	
+	x = min.var.portfolio.gmpl(ia, constraints)	
 	
 	# plot weights
 png(filename = 'plot2.png', width = 600, height = 400, units = 'px', pointsize = 12, bg = 'white')										
@@ -292,7 +292,7 @@ set SYMBOLS := ', ia$symbols, ';
 	constraints = Rglpk.create.constraints(model)$constraints	
 		
 	# Solve QP problem
-	x = min.var.portfolio(ia, constraints)	
+	x = min.var.portfolio.gmpl(ia, constraints)	
 	
 	# plot weights
 png(filename = 'plot3.png', width = 600, height = 400, units = 'px', pointsize = 12, bg = 'white')										
@@ -348,7 +348,7 @@ set SYMBOLS := ', ia$symbols, ';
 	constraints = Rglpk.create.constraints(model)$constraints	
 		
 	# Solve QP problem, modify Input Assumptions to include short positions
-	x = min.var.portfolio(aa.test.ia.add.short(ia), constraints)	
+	x = min.var.portfolio.gmpl(aa.test.ia.add.short(ia), constraints)	
 	
 	# Compute total weight = longs - short
 	x = x[1:ia$n] - x[-c(1:ia$n)]
@@ -438,7 +438,7 @@ cat(';
 	
 
 	# Solve QP problem
-	x = min.var.portfolio(ia, constraints)	
+	x = min.var.portfolio.gmpl(ia, constraints)	
 		sqrt(x %*% ia$cov %*% x)
 	
 	
@@ -533,7 +533,7 @@ cat(';
 	
 
 	# Solve QP problem
-	x = min.var.portfolio(ia, constraints)	
+	x = min.var.portfolio.gmpl(ia, constraints)	
 		sqrt(x %*% ia$cov %*% x)
 	
 	
