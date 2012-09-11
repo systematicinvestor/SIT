@@ -61,6 +61,11 @@ fund.data <- function
 			})
 		}
 		
+if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
+	cat('No Data Found for', Symbol, '\n')
+	return(all.data)
+}
+		
 		# extract table from this page
 		data = extract.table.from.webpage(txt, 'INDICATORS', hasHeader = T)
 			colnames(data) = data[1,]
@@ -98,6 +103,7 @@ fund.data <- function
 		return(all.data)
 	}
 }
+
 
 
 ###############################################################################

@@ -383,6 +383,100 @@ ftse100.components <- function()
 	return(apply(holdings, 2, list))
 }
 
+
+###############################################################################
+# Get the latest prices from the Google finance:
+# http://digitalpbk.com/stock/google-finance-get-stock-quote-realtime
+#  http://finance.google.com/finance/info?client=ig&q=MSFT,AAPL,NYSE:RY
+###############################################################################
+#getQuote.google(spl('MSFT,AAPL,IBM'))
+getQuote.google <- function(tickers) {
+	url = paste('http://finance.google.com/finance/info?client=ig&q=', join(tickers,','), sep='')
+	txt = join(readLines(url))	
+		temp = gsub(':', ',', txt) 	
+		temp = scan(text = temp, what='', sep=',', quiet=T)
+	temp = matrix(trim(temp), nr=len(temp)/len(tickers), byrow=F)
+	
+	index = match(spl('t,l,lt'), tolower(temp[,1]))+1
+		names(index) = spl('ticker,last,date')
+	
+	last = as.double(temp[index['last'],])
+	date = strptime(temp[index['date'],],format=' %b %d, %H,%M')
+	
+	out = data.frame(last,date)
+		rownames(out) = temp[index['ticker'],]
+	out
+}
+
+# an xml alternative
+# http://www.jarloo.com/google-stock-api/	
+#  http://www.google.com/ig/api?stock=AAPL&stock=GOOG
+#getQuote.google.xml(spl('MSFT,AAPL,NYSE:RY'))
+getQuote.google.xml <- function(tickers) {
+	url = paste('http://www.google.com/ig/api?', paste('stock=',tickers, '&', sep='', collapse=''), sep='')
+	txt = join(readLines(url))	
+	
+		temp = txt		
+		temp = gsub('<finance.*?>', '', temp, perl = TRUE) 
+		temp = gsub('</finance>', '', temp, perl = TRUE) 
+		temp = gsub('<xml.*?>', '', temp, perl = TRUE) 
+		temp = gsub('</xml.*?>', '', temp, perl = TRUE) 
+		temp = gsub('<\\?xml.*?>', '', temp, perl = TRUE) 
+		temp = gsub('data=', '', temp, perl = TRUE) 
+		temp = gsub('/><', ' ', temp) 	
+		temp = gsub('>', '', temp) 	
+		temp = gsub('<', '', temp) 	
+	temp = scan(text = temp, what='', sep=' ', quiet=T)
+	temp = matrix(trim(temp), nr=len(temp)/len(tickers), byrow=F)
+	
+	cnames = spl('trade_date_utc,trade_time_utc,symbol,last,high,low,volume,open,avg_volume,market_cap,y_close')
+	index = match(cnames, tolower(temp[,1]))+1
+		names(index) = cnames
+		
+	date = strptime(paste(temp[index['trade_date_utc'],], temp[index['trade_time_utc'],]), format='%Y%m%d %H%M%S',tz='UTC')
+	date = as.POSIXct(date, tz = Sys.getenv('TZ'))
+	
+	out = data.frame(t(temp[index[-c(1:3)],]))
+		colnames(out) = cnames[-c(1:3)]	
+		rownames(out) = temp[index['symbol'],]
+	out
+}
+	
+
+###############################################################################
+# extend GLD and SLV historical prices with data from KITCO
+# http://wikiposit.org/w?filter=Finance/Commodities/
+# http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
+###############################################################################
+extend.GLD <- function(GLD) {
+	extend.KITCO(GLD, 'Gold.PM', 1/10)
+}
+extend.SLV <- function(SLV) {
+	extend.KITCO(SLV, 'Silver')
+}
+
+extend.KITCO <- function
+(
+	data,
+	symbol = spl('Gold.AM,Gold.PM,Silver,Platinum.AM,Platinum.PM,Palladium.AM,Palladium.PM'),
+	scale = 1,
+	extend = T
+) 
+{
+	url = 'http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO'
+	temp = read.csv(url, skip=4, header=TRUE, stringsAsFactors=F)
+	
+	hist = repCol(as.double(temp[,symbol]) * scale, ncol(data))
+		colnames(hist) = colnames(data)
+		
+	hist = make.xts(hist, as.Date(temp$Date, '%d-%b-%Y'))		
+		hist = hist[ !is.na(hist[,1]), ]
+		
+	if(extend) hist = rbind( hist[format(index(data[1])-1,'::%Y:%m:%d'),], data )
+	return( hist )
+}
+
+
 ###############################################################################
 # Download FX qoutes: end of day and hourly
 # http://www.fxhistoricaldata.com/EURUSD/

@@ -20,7 +20,7 @@
 ###############################################################################
 
 
-	
+
 ###############################################################################
 # First Steps in building Multi Factor Model
 ###############################################################################		
@@ -30,8 +30,10 @@ fm.fund.data.test <- function()
 	# Load historical fundamental data
 	# http://advfn.com/p.php?pid=financials&symbol=NYSE:WMT&mode=quarterly_reports
 	#****************************************************************** 
-	Symbol = 'NYSE:WMT'	
-	fund = fund.data(Symbol, 80)
+	symbol = 'WMT'	
+	symbol = paste(iif( nchar(symbol) <= 3, 'NYSE:', 'NASDAQ:'), symbol, sep='')
+
+	fund = fund.data(symbol, 80)
 	
 	# construct date
 	fund.date = date.fund.data(fund)	
@@ -39,15 +41,17 @@ fm.fund.data.test <- function()
 	#*****************************************************************
 	# Create and Plot Earnings per share
 	#****************************************************************** 
-	total.capitalization = as.double(gsub(',', '', fund['total capitalization',]))
-		total.capitalization = as.xts(total.capitalization, fund.date)		
-	barplot(total.capitalization)
-
-	
+	total.capitalization = get.fund.data('total capitalization', fund, fund.date)			
+		barplot(total.capitalization)
+			
 	EPS.Q = as.double(fund['Diluted EPS from Total Operations',])
 		EPS.Q = as.xts(EPS.Q, fund.date)	
 	EPS = runSum(EPS.Q, 4)
 
+	EPS.Q = get.fund.data('Diluted EPS from Total Operations', fund, fund.date)
+	EPS = get.fund.data('Diluted EPS from Total Operations', fund, fund.date, is.12m.rolling=T)
+	
+	
 	# Plot
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	layout(1:2)

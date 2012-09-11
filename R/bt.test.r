@@ -1496,35 +1496,40 @@ bt.max.deviation.rebalancing <- function
 	model, 
 	target.allocation, 
 	max.deviation = 3/100, 
-	rebalancing.ratio = 0	# 0 means rebalance all-way to target.allocation
+	rebalancing.ratio = 0,	# 0 means rebalance all-way to target.allocation
 							# 0.5 means rebalance half-way to target.allocation
+	start.index = 1,
+	period.ends = 1:nrow(model$weight)							
 ) 
 {
-	start.index = 1
 	nperiods = nrow(model$weight)
 	action.index = rep(F, nperiods)
+	
+	start.index = period.ends[start.index]
+	start.index0 = start.index
 	
 	while(T) {	
 		# find rows that violate max.deviation
 		weight = model$weight
-		index = which( apply(abs(weight - repmat(target.allocation, nperiods, 1)), 1, max) > max.deviation)	
+		index = apply(abs(weight - repRow(target.allocation, nperiods)), 1, max) > max.deviation
+		index = which( index[period.ends] )
 	
 		if( len(index) > 0 ) {
+			index = period.ends[index]
 			index = index[ index > start.index ]
 		
 			if( len(index) > 0 ) {
 				action.index[index[1]] = T
 				
 				data$weight[] = NA	
-					data$weight[1,] = target.allocation
+					data$weight[start.index0,] = target.allocation
 					
-					temp = repmat(target.allocation, sum(action.index), 1)
+					temp = repRow(target.allocation, sum(action.index))
 					data$weight[action.index,] = temp + 
 						rebalancing.ratio * (weight[action.index,] - temp)					
 					
-					capital = 100000
-					data$weight[] = (capital / data$prices) * data$weight
-				model = bt.run(data, type='share', capital=capital, silent=T)	
+				model = bt.run.share(data, clean.signal=F, silent=T)
+				
 				start.index = index[1]
 			} else break			
 		} else break		
@@ -1532,6 +1537,10 @@ bt.max.deviation.rebalancing <- function
 	return(model)
 }
 
+
+
+
+	
 
 
 
@@ -5268,15 +5277,48 @@ bt.aaa.test <- function()
 
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	
+	
+	# contruct another back-test enviroment with split-adjusted prices, do not include dividends
+	# http://www.fintools.com/wp-content/uploads/2012/02/DividendAdjustedStockPrices.pdf
+	# http://www.pstat.ucsb.edu/research/papers/momentum.pdf
+	data.price <- new.env()
+		for(i in ls(data)) data.price[[i]] = adjustOHLC(data[[i]], symbol.name=i, adjust='split', use.Adjusted=F)
+	bt.prep(data.price, align='keep.all', dates='2004:12::')	
+	
+	
+	# create split and dividend adjusted prices
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
 	bt.prep(data, align='keep.all', dates='2004:12::')
  
+	
+	# flag to indicate whether to use Total(split and dividend adjusted) or Price(split adjusted) prices
+	use.total = FALSE
+	
+	
+	#*****************************************************************
+    # Sample Plot of Total and Price only time series
+    #******************************************************************	 
+    if(F) {
+		y = data$prices$TLT
+		y.price = data.price$prices$TLT
+			y = y / as.double(y[1])
+			y.price = y.price / as.double(y.price[1])
+			
+		plota(y, type='l', ylim=range(y, y.price, na.rm=T))
+			plota.lines(y.price, col='red')
+		plota.legend('Total,Price', 'black,red')
+	}			
+		
    
     #*****************************************************************
     # Code Strategies
     #******************************************************************
-    prices = data$prices  
+    prices = data$prices      
     n = ncol(prices)
+    
+	prices4mom = iif(use.total, data$prices, data.price$prices)
+	prices4vol = iif(use.total, data$prices, data.price$prices)    
    
     models = list()
    
@@ -5299,7 +5341,7 @@ bt.aaa.test <- function()
     #*****************************************************************
     # Volatliliy Position Sizing
     #******************************************************************
-    ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+    ret.log = bt.apply.matrix(prices4vol, ROC, type='continuous')
     hist.vol = bt.apply.matrix(ret.log, runSD, n = n.vol)
    
     adj.vol = 1/hist.vol[period.ends,]
@@ -5311,7 +5353,7 @@ bt.aaa.test <- function()
     #*****************************************************************
     # Momentum Portfolio
     #*****************************************************************
-    momentum = prices / mlag(prices, n.mom)
+    momentum = prices4mom / mlag(prices4mom, n.mom)
    
     data$weight[] = NA
         data$weight[period.ends,] = ntop(momentum[period.ends,], n.top)   
@@ -5444,6 +5486,125 @@ bt.current.quote.test <- function()
 	last(data$prices, 2)
 }
 
+
+###############################################################################
+# Extending Gold time series
+# http://wikiposit.org/w?filter=Finance/Commodities/
+# http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
+###############################################################################
+bt.extend.GLD.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	GLD = getSymbols('GLD', src = 'yahoo', from = '1970-01-01', auto.assign = F)			
+		GLD = adjustOHLC(GLD, use.Adjusted=T)
+		
+	# get Gold.PM - London Gold afternoon fixing prices
+	temp = read.csv('http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO',skip=4,header=TRUE, stringsAsFactors=F)
+	Gold.PM = make.xts(as.double(temp$Gold.PM) / 10, as.Date(temp$Date, '%d-%b-%Y'))
+		Gold.PM = Gold.PM[ !is.na(Gold.PM), ]
+
+	# merge GLD and Gold.PM
+	data <- new.env()
+		data$GLD = GLD
+		data$Gold.PM = Gold.PM
+	bt.prep(data, align='remove.na')
+	
+
+	#*****************************************************************
+	# Plot GLD and Gold.PM
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+	
+	layout(1:2)
+	plota(data$GLD, type='l', col='black', plotX=F)	
+		plota.lines(data$Gold.PM, col='blue')	
+	plota.legend('GLD,Gold.PM', 'black,blue', list(data$GLD, data$Gold.PM))
+		
+	# plot GLD and London afternoon gold fix spread
+	spread = 100 * (Cl(data$GLD) - data$Gold.PM) / data$Gold.PM
+	plota(spread , type='l', col='black')	
+		plota.legend('GLD vs Gold.PM % spread', 'black', spread)
+	
+dev.off()		
+	
+		
+	#*****************************************************************
+	# Look at Silver
+	#****************************************************************** 
+	SLV = getSymbols('SLV', src = 'yahoo', from = '1970-01-01', auto.assign = F)
+		SLV = adjustOHLC(SLV, use.Adjusted=T)
+	Silver = make.xts(as.double(temp$Silver), as.Date(temp$Date, '%d-%b-%Y'))
+		Silver = Silver[ !is.na(Silver), ]
+
+	data <- new.env()
+		data$SLV = SLV
+		data$Silver = Silver
+	bt.prep(data, align='remove.na')
+		
+		
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+	
+	layout(1:2)
+	plota(data$SLV, type='l', col='black')	
+		plota.lines(data$Silver, col='blue')	
+	plota.legend('SLV,Silver', 'black,blue', list(data$SLV, data$Silver))
+
+	spread = 100*(Cl(data$SLV) - data$Silver) / data$Silver
+	plota(spread , type='l', col='black')	
+		plota.legend('SLV vs Silver % spread', 'black', spread)
+	
+dev.off()
+		
+	#*****************************************************************
+	# Create simple equal weight back-test
+	#****************************************************************** 
+	tickers = spl('GLD,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# extend GLD with Gold.PM - London Gold afternoon fixing prices
+		data$GLD = extend.GLD(data$GLD)
+		
+	bt.prep(data, align='remove.na')
+ 
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices      
+    n = ncol(prices)
+  
+    # find period ends
+    period.ends = endpoints(prices, 'months')
+        period.ends = period.ends[period.ends > 0]
+        
+    models = list()
+   
+    #*****************************************************************
+    # Equal Weight
+    #******************************************************************
+    data$weight[] = NA
+        data$weight[period.ends,] = ntop(prices[period.ends,], n)   
+    models$equal.weight = bt.run.share(data, clean.signal=F)
+
+    
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.custom.report.part1(models)       
+dev.off()		
+
+png(filename = 'plot4.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		               
+    plotbt.custom.report.part2(models)       
+dev.off()		
+
+				
+}
 
 	
 
