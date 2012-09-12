@@ -85,9 +85,10 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 		temp = gsub(pattern = '</option>', replacement = '</tr>', temp, perl = TRUE)	
 		temp = extract.table.from.webpage(temp, 'All amounts', hasHeader = T)
 		
-		index.selected = grep('selected', temp[,1])
-		option.value = as.double( gsub('.*value=\'([0-9]*).*', '\\1', temp[index.selected,1]) )
-		
+    	temp = apply(temp,1,join)
+        index.selected = grep('selected', temp)
+        option.value = as.double( gsub('.*value=\'([0-9]*).*', '\\1', temp[index.selected]) ) 
+        				
 		if(option.value > 0) {
 			# can only get 5 time periods at a time
 			option.value = option.value - 5
