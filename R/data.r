@@ -140,7 +140,8 @@ PricingZeroCouponBond <- function
 processTBill <- function 
 ( 
 	yields, 
-	timetomaturity = 1/4
+	timetomaturity = 1/4,
+	frequency = 365
 )
 {
 	yield = coredata(yields) / 100
@@ -151,7 +152,7 @@ processTBill <- function
 		pr[1] = 0
 
 	# interest return
-	ir = mlag(yield, nlag=1) / 12
+	ir = mlag(yield, nlag=1) / frequency
 		ir[1] = 0
 	
 	# total return
@@ -442,7 +443,6 @@ getQuote.google.xml <- function(tickers) {
 	out
 }
 	
-
 ###############################################################################
 # extend GLD and SLV historical prices with data from KITCO
 # http://wikiposit.org/w?filter=Finance/Commodities/
@@ -475,6 +475,56 @@ extend.KITCO <- function
 	if(extend) hist = rbind( hist[format(index(data[1])-1,'::%Y:%m:%d'),], data )
 	return( hist )
 }
+
+
+
+###############################################################################
+# Download historical prices from Pi Trading - Free Market Data
+# http://pitrading.com/free_market_data.htm
+###############################################################################
+getSymbols.PI <- function
+(
+	Symbols, 
+	env = .GlobalEnv, 
+	auto.assign = TRUE,
+	download = TRUE	
+) 
+{
+	# setup temp folder
+	temp.folder = paste(getwd(), 'temp', sep='/')
+	dir.create(temp.folder, F)
+	
+	# read all Symbols
+	for (i in 1:len(Symbols)) {	
+		if(download) {
+			# http://pitrading.com/free_eod_data/SPX.zip
+			url = paste('http://pitrading.com/free_eod_data/', Symbols[i], '.zip', sep='')
+			filename = paste(temp.folder, '/', Symbols[i], '.zip', sep='')			
+			download.file(url, filename,  mode = 'wb')
+			
+			# unpack
+			unzip(filename, exdir=temp.folder)	
+		}
+		
+		filename = paste(temp.folder, '/', Symbols[i], '.txt', sep='')
+		
+		temp = read.delim(filename, header=TRUE, sep=',')		
+		out = make.xts(temp[,-1], as.Date(temp[,1],'%m/%d/%Y'))
+			out$Adjusted = out$Close
+			
+cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')					
+			
+		if (auto.assign) {		
+			assign(paste(gsub('\\^', '', Symbols[i]), sep='_'), out, env)	
+		}	
+	}
+	if (!auto.assign) {
+		return(out)
+	} else {		
+		return(env)				
+	}	
+}
+		
 
 
 ###############################################################################

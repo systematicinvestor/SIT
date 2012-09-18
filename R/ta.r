@@ -36,6 +36,48 @@ ifna.prev <- function(y)
 	return( y[cummax( (1:length(y)) * y1 )]	)
 }
 
+# index of non NAs filled from left to right
+ifna.prevx <- function(y) { 	
+	y1 = !is.na(y)
+	
+	# in case y starts with NA
+	y1[1]=T
+	
+	return( cummax( (1:length(y)) * y1 ) )
+}
+
+# index of non NAs filled from right to left
+ifna.prevx.rev <- function(y) {
+	y1 = !is.na(y)
+	
+	y1[length(y)] = T
+	y1[!y1] = Inf
+	
+    rev(cummin(rev((1:length(y)) * y1)))
+}
+
+# test
+ifna.prevx.test <- function() {
+	y = c(NA,1,1,NA,2,2,NA,NA)
+
+	y[ifna.prevx(y)]
+	y[ifna.prevx.rev(y)]
+}
+
+###############################################################################
+# Cross - gives a "1" or true on the day that ARRAY1 crosses above ARRAY2. Otherwise the result is "0".
+# To find out when ARRAY1 crosses below ARRAY2, use the formula cross(ARRAY2, ARRAY1)
+# http://www.amibroker.com/guide/afl/afl_view.php?id=34
+############################################################################### 
+cross <- function( array1, array2 ) {
+	array1 > array2 & iif(len(array1) > 1, mlag(array1), array1) < iif(len(array2) > 1, mlag(array2), array2)
+}
+
+cross.up <- function( array1, array2 ) { cross( array1, array2 ) }
+cross.dn <- function( array1, array2 ) { cross( array2, array1 ) }
+    
+
+
 ###############################################################################
 # Percentile Rank over given window
 ############################################################################### 
@@ -58,6 +100,38 @@ percent.rank <- function
     out[] = c( rep(NA,(n-1)), sapply(rng, function(i) pctRank(data, i) / n) )
 
     return(out)
+}
+
+
+###############################################################################
+# Percentile Rank over given window, multiple arrays version
+############################################################################### 
+percent.rankM <- function
+(
+	..., 	# data
+	n = 252	# window length
+)
+{	
+	data = variable.number.arguments( ... )
+		
+    out = data[[1]]
+	
+	for(j in 1:len(data)) data[[j]] = coredata(data[[j]])
+	
+	rank.data = data[[ len(data) ]]
+	
+	# simple percent rank function
+    pctRank <- function(x,i) sum(rank.data[i] >= x[(i- (n-1) ):i])    
+ 
+    
+    # Apply the percent rank function to the coredata of our results
+    rng = n:len(rank.data)
+    
+    out[] = 0
+    for(j in 1:len(data))
+    	out[] = out[] + c( rep(NA,(n-1)), sapply(rng, function(i) pctRank(data[[j]], i) / n) )
+
+    return(out/len(data))
 }
 
 
@@ -129,6 +203,32 @@ TSI <- function
 
 	ratio = ( HLC[,3] - mlag(HLC[,3], n) ) / ATR( HLC , n )[, "atr"]
 	out = SMA( SMA( ratio , n ), 100 )
+	return(out)
+}
+
+
+###############################################################################    
+# Rolling EV Ratio: A Trend Indicator or Performance Measurement Statistic
+# cumulative W% (up periods/total periods) x W/L ratio (sum of wins/sum of losses)            
+# http://cssanalytics.wordpress.com/2010/06/02/rolling-ev-ratio-a-trend-indicator-or-performance-measurement-statistic/    
+# http://davesbrain.blogs.com/mindmoneymarkets/2010/07/will-mean-reversion-bounce-back.html
+###############################################################################
+ev.ratio <- function
+(
+	data, 	# data
+	n = 252	# window length
+)
+{
+	ret = coredata(data / mlag(data) - 1)
+		
+    rng = n:len(data)    
+	    
+    out = data
+   	out[] = c( rep(NA,(n-1)), sapply(rng, 
+   		function(i) {
+			r = ret[(i- (n-1) ):i]
+    		-sum(r > 0) / n * sum(r[r > 0]) / sum(r[r < 0])
+    	}))
 	return(out)
 }
 

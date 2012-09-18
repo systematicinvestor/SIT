@@ -5606,6 +5606,104 @@ dev.off()
 				
 }
 
+
+
+
+###############################################################################
+# Permanent Portfolio
+# http://catallacticanalysis.com/permanent-portfolio/
+# http://systematicinvestor.wordpress.com/2011/12/16/backtesting-rebalancing-methods/
+# http://en.wikipedia.org/wiki/Fail-Safe_Investing#The_Permanent_Portfolio
+###############################################################################
+bt.permanent.portfolio.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY,TLT,GLD,SHY')
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# extend GLD with Gold.PM - London Gold afternoon fixing prices
+		data$GLD = extend.GLD(data$GLD)
+	
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 		
+	prices = data$prices   
+		n = ncol(prices)
+		nperiods = nrow(prices)
+
+	# annual
+	period.ends = endpoints(prices, 'years')
+		period.ends = period.ends[period.ends > 0]		
+		period.ends.y = c(1, period.ends)
+
+	# quarterly
+	period.ends = endpoints(prices, 'quarters')
+		period.ends = period.ends[period.ends > 0]		
+		period.ends.q = c(1, period.ends)
+					
+
+	models = list()
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	target.allocation = matrix(rep(1/n,n), nrow=1)
+	
+	# Buy & Hold	
+	data$weight[] = NA	
+		data$weight[period.ends.y[1],] = target.allocation
+	models$buy.hold = bt.run.share(data, clean.signal=F)
+
+		
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[period.ends.y,] = ntop(prices[period.ends.y,], n)
+	models$equal.weight.y = bt.run.share(data, clean.signal=F)
+
+	# Rebalance only when threshold is broken
+	models$threshold.y = bt.max.deviation.rebalancing(data, models$buy.hold, target.allocation, 10/100, 0, period.ends = period.ends.y) 
+
+	#*****************************************************************
+	# Quarterly
+	#****************************************************************** 	
+	# Equal Weight
+	data$weight[] = NA
+		data$weight[period.ends.q,] = ntop(prices[period.ends.q,], n)
+	models$equal.weight.q = bt.run.share(data, clean.signal=F)
+
+	# Rebalance only when threshold is broken
+	models$threshold.q = bt.max.deviation.rebalancing(data, models$buy.hold, target.allocation, 10/100, 0, period.ends = period.ends.q) 
+	
+		
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.custom.report.part1(models)       
+dev.off()					
+	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.strategy.sidebyside(models)
+dev.off()			
+	
+	
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+	# Plot Portfolio Turnover for each Rebalancing method
+	layout(1:2)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover', F)
+	barplot.with.labels(sapply(models, compute.max.deviation, target.allocation), 'Maximum Deviation from Target Mix')
+dev.off()			
+	
+}
+	
 	
 
 

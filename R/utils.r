@@ -113,6 +113,35 @@ ifna <- function
 }
 
 ###############################################################################
+# Faster version of rep fucntion
+############################################################################### 
+fast.rep <- function(x, times) { 
+	length(x) = times
+	x[] = x[1]		
+	x
+}
+
+fast.rep.test.speed <- function() {
+	#install.packages('rbenchmark_0.3.tar.gz', repos = NULL, type="source")
+
+	test1 <- function() {
+		rep(101,10000)
+	}
+	test2 <- function() {
+		fast.rep(101,10000)
+	}
+		
+	library(rbenchmark)
+	 benchmark(
+	     test1(), 
+	     test2(),
+	     columns = c("test", "replications", "elapsed", "relative"),
+	     order = "relative",
+	     replications = 10000
+	 )
+}	
+
+###############################################################################
 # Check for NULL
 ############################################################################### 
 ifnull <- function

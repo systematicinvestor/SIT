@@ -694,19 +694,28 @@ bt.apply.matrix <- function
 
 
 
+
 ###############################################################################
 # Remove excessive signal
+# http://www.amibroker.com/guide/afl/exrem.html
 ###############################################################################
+exrem <- function(x) {        
+    temp = c(0, ifna(ifna.prev(x),0))
+        itemp = which(temp != mlag(temp))
+    x[] = NA
+    x[(itemp-1)] = temp[itemp]    
+    return(x)
+}
+
+exrem.test <- function() {
+	exrem(c(NA,1,1,0,1,1,NA,0))
+}
+
 bt.exrem <- function(weight)
 {
-	bt.apply.matrix(weight, function(x) {		
-		temp = c(0, ifna(ifna.prev(x),0))
-			itemp = which(temp != mlag(temp))
-		x[] = NA 
-		x[(itemp-1)] = temp[itemp]	
-		return(x)
-	})
-}	
+    bt.apply.matrix(weight, exrem)
+}
+
 
 ###############################################################################
 # Timed Exit: exit trade after nlen bars
