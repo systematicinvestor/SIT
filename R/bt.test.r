@@ -5704,6 +5704,97 @@ dev.off()
 	
 }
 	
+
+
+
+###############################################################################
+# Minimum Correlation Algorithm Example
+###############################################################################
+bt.mca.test <- function() 
+{
+
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod,quadprog')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='keep.all', dates='2002:08::')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'weeks',
+		min.risk.fns = list(EW=equal.weight.portfolio,
+						RP=risk.parity.portfolio,
+						MV=min.var.portfolio,
+						MD=max.div.portfolio,
+						MC=min.corr.portfolio,
+						MC2=min.corr2.portfolio),
+		custom.stats.fn = 'portfolio.allocation.custom.stats'
+	) 
+	
+	models = create.strategies(obj, data)$models
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+dev.off()
+
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   	
+	# Plot time series of components of Composite Diversification Indicator
+	cdi = custom.composite.diversification.indicator(obj,plot.table = F)	
+		out = rbind(colMeans(cdi, na.rm=T), out)
+		rownames(out)[1] = 'Composite Diversification Indicator(CDI)'
+dev.off()		
+				
+	# Portfolio Turnover for each strategy
+	y = 100 * sapply(models, compute.turnover, data)
+		out = rbind(y, out)
+		rownames(out)[1] = 'Portfolio Turnover'		
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   				
+	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
+dev.off()	
+	
+png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   		
+	performance.barchart.helper(out, 'Volatility,Portfolio Turnover,Composite Diversification Indicator(CDI)', c(F,F,T))
+dev.off()	
+
+	
+png(filename = 'plot5.png', width = 600, height = 1000, units = 'px', pointsize = 12, bg = 'white')   			
+	# Plot transition maps
+	layout(1:len(models))
+	for(m in names(models)) {
+		plotbt.transition.map(models[[m]]$weight, name=m)
+			legend('topright', legend = m, bty = 'n')
+	}
+dev.off()	
+	
+png(filename = 'plot6.png', width = 600, height = 1000, units = 'px', pointsize = 12, bg = 'white')   					
+	# Plot transition maps for Risk Contributions
+	dates = index(data$prices)[obj$period.ends]
+	layout(1:len(models))
+	for(m in names(models)) {
+		plotbt.transition.map(make.xts(obj$risk.contributions[[m]], dates), 
+		name=paste('Risk Contributions',m))
+			legend('topright', legend = m, bty = 'n')
+	}
+dev.off()	
+	
+	
+}	
+
 	
 
 

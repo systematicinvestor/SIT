@@ -43,11 +43,17 @@ strategy.load.historical.data <- function
 	tickers = spl(tickers)
 	data <- new.env()
 		for(i in 1:len(tickers)) {
+			# getSymbols removes ^ from Yahoo indexes
+			ticker0 = gsub('\\^', '', tickers[i])
+			
 			temp = try(getSymbols(tickers[i], src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T), TRUE)	
 			if(inherits(temp, 'try-error'))
 				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
 			else if(is.null(data[[ tickers[i] ]]))
-				cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
+				if( is.null(data[[ ticker0 ]]) )
+					cat(i, 'out of', len(tickers), 'Error Reading', tickers[i], '\n', sep='\t')
+				else
+					cat(i, 'out of', len(tickers), 'Reading', ticker0, format(range(index(data[[ ticker0 ]])), '%d-%b-%Y'), '\n', sep='\t')
 			else
 				cat(i, 'out of', len(tickers), 'Reading', tickers[i], format(range(index(data[[ tickers[i] ]])), '%d-%b-%Y'), '\n', sep='\t')
 		}	
@@ -421,7 +427,19 @@ rotation.strategy.test <- function()
 	{
 		rep(1/ia$n, ia$n)
 	}	
+	
 
+	# allocate only among assets with risk > 0, ignore cash (i.e. risk = 0)
+	get.risky.asset.index <- function(ia) {
+		(ia$risk > 0) & !is.na(ia$risk)
+	}
+	set.risky.asset <- function(x, risk.index) {
+		out = rep(0, len(risk.index))
+			out[risk.index] = x
+		return(out)
+	}
+	
+	
 	# equal.risk.portfolio
 	risk.parity.portfolio <- function
 	(
@@ -429,56 +447,139 @@ rotation.strategy.test <- function()
 		constraints		# constraints
 	)
 	{
-		# allocate only among risk assets, ignore risk-less ones
-		good.asset.index = (ia$risk > 0) & !is.na(ia$risk)
-			good.asset.index[is.na(good.asset.index)] = F
-						
-		x = 1 / ia$risk[good.asset.index]
+		risk.index = get.risky.asset.index(ia)
+				
+		# re-scale weights to penalize for risk		
+		x = 1 / ia$risk[risk.index]
 		
 		# normalize weights to sum up to 1
-		x = x / sum(x)
-		
-		# create allocation
-		out = rep(0, ia$n)
-			out[good.asset.index] = x
-		return(out)
+		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
 	min.var.portfolio <- function
 	(
 		ia,				# input assumptions
-		constraints		# constraints
+		constraints,	# constraints
+		cov.matrix = ia$cov
 	)
 	{
-		# allocate only among risk assets, ignore risk-less ones
-		good.asset.index = (ia$risk > 0) & !is.na(ia$risk)
-			good.asset.index[is.na(good.asset.index)] = F
+		risk.index = get.risky.asset.index(ia)
 	
 		# first try to solve QP with given Dmat
-		Dmat = ia$cov[good.asset.index, good.asset.index]		
+		Dmat = cov.matrix[risk.index, risk.index]		
 		sol = try(solve.QP(Dmat=Dmat, 
-						dvec=rep(0, sum(good.asset.index)), 
-						Amat=constraints$A[good.asset.index,], 
+						dvec=rep(0, sum(risk.index)), 
+						Amat=constraints$A[risk.index,], 
 						bvec=constraints$b, 
 						meq=constraints$meq), silent = TRUE)
+						
 		# if error, adjust Dmat to be positive definite
 		if(inherits(sol, 'try-error'))
 			sol = solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
-						dvec=rep(0, sum(good.asset.index)), 
-						Amat=constraints$A[good.asset.index,], 
+						dvec=rep(0, sum(risk.index)), 
+						Amat=constraints$A[risk.index,], 
 						bvec=constraints$b, 
 						meq=constraints$meq)
-		
-		x = sol$solution
-		
-		# create allocation
-		out = rep(0, ia$n)
-			out[good.asset.index] = x
-		return(out)
+						
+		set.risky.asset(sol$solution, risk.index)
 	}
 	
+	# Toward Maximum Diversification by Y. Choueifaty, Y. Coignard
+	# The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51
+	max.div.portfolio <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+		
+		x = min.var.portfolio(ia, constraints, ia$correlation)
+				
+		# re-scale weights to penalize for risk
+		x = x[risk.index] / ia$risk[risk.index]
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)
+	}	
+	
+	# MinCorr by David Varadi
+	min.corr.portfolio <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+		
+		cor.matrix = ia$correlation[risk.index, risk.index]
+		
+		upper.index = upper.tri(cor.matrix)
+		cor.m = cor.matrix[upper.index]
+			cor.mu = mean(cor.m)
+			cor.sd = sd(cor.m)
+			
+		norm.dist.m = 0 * cor.matrix
+			diag(norm.dist.m) = NA
+			norm.dist.m[upper.index] = 1-pnorm(cor.m, cor.mu, cor.sd)
+		norm.dist.m = (norm.dist.m + t(norm.dist.m))
+		
+		norm.dist.avg = rowMeans(norm.dist.m, na.rm=T)
+		
+		norm.dist.rank = rank(-norm.dist.avg)
+				
+		norm.dist.weight = norm.dist.rank / sum(norm.dist.rank)
+		
+			diag(norm.dist.m) = 0
+		weighted.norm.dist.average = norm.dist.weight %*% norm.dist.m
+
+		final.weight = weighted.norm.dist.average / sum(weighted.norm.dist.average)
+
+				
+		# re-scale weights to penalize for risk
+		x = final.weight		
+		x = x[risk.index] / ia$risk[risk.index]
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)		
+	}		
 	
 	
+	# MinCorr2 by David Varadi
+	min.corr2.portfolio <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+		
+		cor.matrix = ia$correlation[risk.index, risk.index]
+		
+	
+		cor.m = cor.matrix
+			diag(cor.m) = 0
+			
+		avg = rowMeans(cor.m)
+			cor.mu = mean(avg)
+			cor.sd = sd(avg)
+		norm.dist.avg = 1-pnorm(avg, cor.mu, cor.sd)
+		
+		norm.dist.rank = rank(-norm.dist.avg)
+		
+		norm.dist.weight = norm.dist.rank / sum(norm.dist.rank)
+				
+		weighted.norm.dist.average = norm.dist.weight %*% (1-cor.m)
+		final.weight = weighted.norm.dist.average / sum(weighted.norm.dist.average)
+
+				
+		# re-scale weights to penalize for risk
+		x = final.weight		
+		x = x[risk.index] / ia$risk[risk.index]
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)		
+	}		
 	
 	
 #*****************************************************************
@@ -660,14 +761,19 @@ portfolio.allocation.helper <- function
 
 # compute portfolio allocation additional stats
 portfolio.allocation.custom.stats <- function(x,ia) {
+	risk.contributions = portfolio.risk.contribution(x, ia)
 	return(list(
 		# vectors
-		risk.contributions = portfolio.risk.contribution(x, ia),
+		risk.contributions = risk.contributions,				
 		
 		# numbers
-		diversification.ratio = sqrt(x %*% ia$cov %*% x) / (sqrt(diag(ia$cov)) %*% x)
+		degree.diversification = 1 - sqrt(x %*% ia$cov %*% x) / (ia$risk %*% x),
+		risk.gini = 1 - portfolio.concentration.gini.coefficient(risk.contributions)
 	))
 }
+
+
+
 
 
 # Create strategies based on portfolio weights
@@ -675,9 +781,16 @@ create.strategies <- function
 (
 	obj,	# portfolio.allocation object: list(weights = weights, period.ends = period.ends)
 	data,	# historical prices
+	leverage = 1,	
 	...		
 ) 
 {
+	# adjust weights
+	if(len(leverage) == 1) leverage = rep(leverage, len(obj$weights))
+		names(leverage) = names(obj$weights)
+	
+	for(i in names(obj$weights)) obj$weights[[i]] = leverage[i] * obj$weights[[i]]		
+
 	#*****************************************************************
 	# Create strategies
 	#****************************************************************** 		
@@ -696,7 +809,6 @@ create.strategies <- function
 	
 
 	
-
 #*****************************************************************
 # Asset Allocation Strategy
 #*****************************************************************
