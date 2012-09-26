@@ -5707,6 +5707,138 @@ dev.off()
 
 
 
+
+
+bt.permanent.portfolio2.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY,TLT,GLD,SHY')
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# extend GLD with Gold.PM - London Gold afternoon fixing prices
+		#data$GLD = extend.GLD(data$GLD)
+	
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 		
+	prices = data$prices   
+		n = ncol(prices)
+		nperiods = nrow(prices)
+
+	# quarterly
+	period.ends = endpoints(prices, 'quarters')
+		period.ends = period.ends[period.ends > 0]		
+		period.ends = c(1, period.ends)
+					
+
+	models = list()
+	
+	
+	#*****************************************************************
+	# Dollar Weighted
+	#****************************************************************** 			
+	target.allocation = matrix(rep(1/n,n), nrow=1)
+	weight.dollar = ntop(prices, n)
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.dollar[period.ends,]
+	models$dollar = bt.run.share(data, clean.signal=F)
+
+	#*****************************************************************
+	# Helper function to adjust portfolio leverage to target given volatility
+	#****************************************************************** 				
+	target.vol.strategy <- function(model, weight, 
+		target = 10/100, 
+		lookback.len = 21,
+		max.portfolio.leverage = 100/100) 
+	{	
+		ret.log.model = ROC(model$equity, type='continuous')
+		hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
+			hist.vol.model = as.vector(hist.vol.model)
+		
+		weight.target = weight * (target / hist.vol.model)
+	
+		# limit total leverage		
+		rs = rowSums(abs(weight.target))
+		weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
+		
+		return(weight.target)	
+	}
+				
+	#*****************************************************************
+	# Dollar Weighted + 7% target volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$dollar,
+						weight.dollar, 7/100, 21, 100/100)[period.ends,]
+	models$dollar.target7 = bt.run.share(data, clean.signal=T)
+	
+	#*****************************************************************
+	# Risk Weighted
+	#****************************************************************** 				
+	ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+	hist.vol = sqrt(252) * bt.apply.matrix(ret.log, runSD, n = 21)	
+	weight.risk = weight.dollar / hist.vol
+		weight.risk = weight.risk / rowSums(weight.risk)
+		
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.risk[period.ends,]
+	models$risk = bt.run.share(data, clean.signal=F)
+
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk,
+						weight.risk, 7/100, 21, 100/100)[period.ends,]
+	models$risk.target7 = bt.run.share(data, clean.signal=T)
+
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk,
+						weight.risk, 5/100, 21, 100/100)[period.ends,]
+	models$risk.target5 = bt.run.share(data, clean.signal=T)
+		
+	#*****************************************************************
+	# Tactical: 10 month moving average, Market Filter
+	#****************************************************************** 				
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]		
+		period.ends = c(1, period.ends)
+
+	sma = bt.apply.matrix(prices, SMA, 200)
+	weight.dollar.tactical = weight.dollar * (prices > sma)	
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.dollar.tactical[period.ends,]
+	models$dollar.tactical = bt.run.share(data, clean.signal=F)
+
+	#*****************************************************************
+	# Tactical + 7% target volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$dollar.tactical,
+						weight.dollar.tactical, 7/100, 21, 100/100)[period.ends,]
+	models$dollar.tactical.target7 = bt.run.share(data, clean.signal=T)
+		
+			
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+    plotbt.custom.report.part1(models)       
+	
+    plotbt.strategy.sidebyside(models)
+	
+}
+
+
+
+
+
 ###############################################################################
 # Minimum Correlation Algorithm Example
 ###############################################################################
@@ -5796,5 +5928,76 @@ dev.off()
 }	
 
 	
+###############################################################################
+# Minimum Correlation Algorithm Speed test
+###############################################################################
+bt.mca.speed.test <- function() 
+{
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	load.packages('quadprog,corpcor')
+	
+	n = 100
+	hist = matrix(rnorm(1000*n), nc=n)
+	
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+		constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+						
+	# create historical input assumptions
+	ia = list()
+		ia$n = n
+		ia$risk = apply(hist, 2, sd)
+		ia$correlation = cor(hist, use='complete.obs', method='pearson')
+		ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+				
+		ia$cov = make.positive.definite(ia$cov, 0.000000001)
+		ia$correlation = make.positive.definite(ia$correlation, 0.000000001)
+		
+	#*****************************************************************
+	# Time
+	#*****************************************************************				
+	load.packages('rbenchmark')			
+
+	benchmark(
+		min.var.portfolio(ia, constraints),
+		min.corr.portfolio(ia, constraints),
+		min.corr2.portfolio(ia, constraints),
+		
+		
+	columns=c("test", "replications", "elapsed", "relative"),
+	order="relative",
+	replications=100
+	)
+	
+	
+	#*****************************************************************
+	# Check the bottle neck
+	#*****************************************************************				
+	Rprof()
+	for(i in 1:10)
+		min.corr.portfolio(ia, constraints)
+	Rprof(NULL)
+	summaryRprof()
+
+	
+				
+	#ia$cov = make.positive.definite.fast(ia$cov)
+	#ia$correlation = make.positive.definite.fast(ia$correlation)
+
+	
+		
+}	
+
+
+
+
+
+
 
 
