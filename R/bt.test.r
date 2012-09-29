@@ -6141,9 +6141,9 @@ dev.off()
     
     
     #*****************************************************************
-    # Load long series of gold prices from Deutch Bank
+    # Load long series of gold prices from Bundes Bank
     #****************************************************************** 
-    data = deutch.bank.data.gold()
+    data = bundes.bank.data.gold()
 
     #*****************************************************************
     # Look at the Month of the Year Seasonality
@@ -6151,7 +6151,19 @@ dev.off()
 png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
 	month.year.seasonality(data, 'GOLD', lookback.len = nrow(data))
 dev.off()    
-    
+
+
+    #*****************************************************************
+    # Create file for Seasonality Tool
+    #******************************************************************     
+    GLD = getSymbols(ticker, src = 'yahoo', from = '1970-01-01', auto.assign = F)
+        GLD = adjustOHLC(GLD, use.Adjusted=T)
+        
+
+	write.xts(extend.data(GLD, data / 10), 'GOLD.csv')
+
+
+
 }    
 
 

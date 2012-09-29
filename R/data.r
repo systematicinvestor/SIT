@@ -477,7 +477,7 @@ extend.data <- function
 {
 	hist = hist[format(index(current[1])-1,'::%Y:%m:%d'),]
 	
-	hist = repCol(hist, ncol(current))
+	hist = make.xts( repCol(hist, ncol(current)), index(hist))
 		colnames(hist) = colnames(current)
 		
 	rbind( hist, current )
@@ -485,11 +485,11 @@ extend.data <- function
 
 
 ###############################################################################
-# Deutch Bank - long history of gold prices
+# Bundes Bank - long history of gold prices
 # http://www.bundesbank.de/Navigation/EN/Statistics/Time_series_databases/Macro_economic_time_series/its_list_node.html?listId=www_s331_b01015_3
 # http://wikiposit.org/w?filter=Finance/Commodities/
 ###############################################################################  
-deutch.bank.data <- function(symbol) {
+bundes.bank.data <- function(symbol) {
 	url = paste('http://www.bundesbank.de/cae/servlet/CsvDownload?tsId=', symbol, '&its_csvFormat=en&mode=its', sep='')
 	temp = read.csv(url, skip=5, header=F, stringsAsFactors=F)
 
@@ -497,8 +497,8 @@ deutch.bank.data <- function(symbol) {
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
-deutch.bank.data.gold <- function() {
-	deutch.bank.data('BBK01.WT5512')
+bundes.bank.data.gold <- function() {
+	bundes.bank.data('BBK01.WT5512')
 }
 
 
