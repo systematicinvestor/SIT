@@ -115,17 +115,18 @@ dev.off()
 
 
 
+
 #############################################################################
 # Month of the Year Seasonality
 #############################################################################
 month.year.seasonality <- function
 (
 	data,	# xts time series data
-	ticker
+	ticker,
+	lookback.len = 20*252	# last 20 years of data
 ) 
 {
-	# analyze last 20 years of data
-	data = last(data, 20*252)
+	data = last(data, lookback.len)
 		nperiods = nrow(data)
 	
 	#*****************************************************************
@@ -145,15 +146,16 @@ month.year.seasonality <- function
 	# Plot
 	#****************************************************************** 
 	data_list = lapply(apply(ret.by.month, 2, list), '[[', 1)
-	group.seasonality(data_list, paste(ticker, 'Monthly'))
-			
-}	
+	group.seasonality(data_list, paste(ticker, 'Monthly', join(format(range(index(data)), '%d-%b-%Y'), ' to\n')))
+
+}    
 
 
 group.seasonality <- function
 (
 	data_list,	# data list for each group
-	smain		
+	smain,
+	...		
 ) 
 {
 	#*****************************************************************
@@ -177,11 +179,12 @@ group.seasonality <- function
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 		
-	for(i in spl('Sharpe,% Positive,Min,Avg')) {
+	stats.names = spl('Sharpe,% Positive,Min,Avg')
+	for(i in stats.names) {
 		barplot(100*out[i,], names.arg = colnames(out), 
 			col=iif(out[i,] > 0, col[1], col[2]), 
-			main=paste(smain,' ', i, sep=''), 
-			border = 'darkgray',las=2)
+			main=iif(i == stats.names[1], paste(smain,' ', i, sep=''), i), 
+			border = 'darkgray',las=2, ...)
 		grid(NA,NULL)
 		abline(h=0, col='black')		
 	}				

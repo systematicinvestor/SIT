@@ -449,32 +449,60 @@ getQuote.google.xml <- function(tickers) {
 # http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
 ###############################################################################
 extend.GLD <- function(GLD) {
-	extend.KITCO(GLD, 'Gold.PM', 1/10)
+	extend.data(GLD, KITCO.data('Gold.PM') / 10)
 }
 extend.SLV <- function(SLV) {
-	extend.KITCO(SLV, 'Silver')
+	extend.data(SLV, KITCO.data('Silver'))
 }
 
-extend.KITCO <- function
+
+KITCO.data <- function
 (
-	data,
-	symbol = spl('Gold.AM,Gold.PM,Silver,Platinum.AM,Platinum.PM,Palladium.AM,Palladium.PM'),
-	scale = 1,
-	extend = T
-) 
+	symbol = spl('Gold.AM,Gold.PM,Silver,Platinum.AM,Platinum.PM,Palladium.AM,Palladium.PM')
+)
 {
 	url = 'http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO'
 	temp = read.csv(url, skip=4, header=TRUE, stringsAsFactors=F)
-	
-	hist = repCol(as.double(temp[,symbol]) * scale, ncol(data))
-		colnames(hist) = colnames(data)
 		
-	hist = make.xts(hist, as.Date(temp$Date, '%d-%b-%Y'))		
-		hist = hist[ !is.na(hist[,1]), ]
-		
-	if(extend) hist = rbind( hist[format(index(data[1])-1,'::%Y:%m:%d'),], data )
-	return( hist )
+	hist = make.xts(as.double(temp[,symbol]), as.Date(temp[,1], '%d-%b-%Y'))		
+		colnames(hist)='Close'
+	return( hist[!is.na(hist)] )
 }
+
+extend.data <- function
+(
+	current,
+	hist
+) 
+{
+	hist = hist[format(index(current[1])-1,'::%Y:%m:%d'),]
+	
+	hist = repCol(hist, ncol(current))
+		colnames(hist) = colnames(current)
+		
+	rbind( hist, current )
+}
+
+
+###############################################################################
+# Deutch Bank - long history of gold prices
+# http://www.bundesbank.de/Navigation/EN/Statistics/Time_series_databases/Macro_economic_time_series/its_list_node.html?listId=www_s331_b01015_3
+# http://wikiposit.org/w?filter=Finance/Commodities/
+###############################################################################  
+deutch.bank.data <- function(symbol) {
+	url = paste('http://www.bundesbank.de/cae/servlet/CsvDownload?tsId=', symbol, '&its_csvFormat=en&mode=its', sep='')
+	temp = read.csv(url, skip=5, header=F, stringsAsFactors=F)
+
+	hist = make.xts(as.double(temp[,2]), as.Date(temp[,1], '%Y-%m-%d'))		
+		colnames(hist)='Close'
+	return( hist[!is.na(hist)] )
+}
+deutch.bank.data.gold <- function() {
+	deutch.bank.data('BBK01.WT5512')
+}
+
+
+
 
 
 
@@ -834,8 +862,4 @@ get.fama.french.data <- function(
 	}
 	return( data )
 }
-
-
-
-
 

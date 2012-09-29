@@ -840,3 +840,23 @@ asset.allocation.strategy.test <- function()
 	
 }
  
+#*****************************************************************
+# Adjust portfolio leverage to given target volatility
+#****************************************************************** 				
+target.vol.strategy <- function(model, weight, 
+	target = 10/100, 
+	lookback.len = 21,
+	max.portfolio.leverage = 100/100) 
+{	
+	ret.log.model = ROC(model$equity, type='continuous')
+	hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
+		hist.vol.model = as.vector(hist.vol.model)
+		
+	weight.target = weight * (target / hist.vol.model)
+	
+	# limit total leverage		
+	rs = rowSums(abs(weight.target))
+	weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
+		
+	return(weight.target)	
+}

@@ -4962,27 +4962,6 @@ dev.off()
 	data$weight[] = NA
 		data$weight[period.ends,] = weight.risk[period.ends,]
 	models$risk.w.60.40 = bt.run.share(data, clean.signal=F)
-
-	#*****************************************************************
-	# Helper function to adjust portfolio leverage to target given volatility
-	#****************************************************************** 				
-	target.vol.strategy <- function(model, weight, 
-		target = 10/100, 
-		lookback.len = 21,
-		max.portfolio.leverage = 100/100) 
-	{	
-		ret.log.model = ROC(model$equity, type='continuous')
-		hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
-			hist.vol.model = as.vector(hist.vol.model)
-		
-		weight.target = weight * (target / hist.vol.model)
-	
-		# limit total leverage		
-		rs = rowSums(abs(weight.target))
-		weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
-		
-		return(weight.target)	
-	}
 				
 	#*****************************************************************
 	# Scale Risk Weighted 40% Bonds & 60% Stock strategy to have 6% volatility
@@ -5707,8 +5686,14 @@ dev.off()
 
 
 
-
-
+###############################################################################
+# Additional example for Permanent Portfolio
+# that employs:
+# * risk allocation
+# * volatility targeting
+# * makret filter (10 month SMA)
+# to improve strategy perfromance
+###############################################################################
 bt.permanent.portfolio2.test <- function() 
 {
 	#*****************************************************************
@@ -5733,7 +5718,6 @@ bt.permanent.portfolio2.test <- function()
 		n = ncol(prices)
 		nperiods = nrow(prices)
 
-	# quarterly
 	period.ends = endpoints(prices, 'quarters')
 		period.ends = period.ends[period.ends > 0]		
 		period.ends = c(1, period.ends)
@@ -5751,27 +5735,6 @@ bt.permanent.portfolio2.test <- function()
 	data$weight[] = NA
 		data$weight[period.ends,] = weight.dollar[period.ends,]
 	models$dollar = bt.run.share(data, clean.signal=F)
-
-	#*****************************************************************
-	# Helper function to adjust portfolio leverage to target given volatility
-	#****************************************************************** 				
-	target.vol.strategy <- function(model, weight, 
-		target = 10/100, 
-		lookback.len = 21,
-		max.portfolio.leverage = 100/100) 
-	{	
-		ret.log.model = ROC(model$equity, type='continuous')
-		hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
-			hist.vol.model = as.vector(hist.vol.model)
-		
-		weight.target = weight * (target / hist.vol.model)
-	
-		# limit total leverage		
-		rs = rowSums(abs(weight.target))
-		weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
-		
-		return(weight.target)	
-	}
 				
 	#*****************************************************************
 	# Dollar Weighted + 7% target volatility
@@ -5793,18 +5756,20 @@ bt.permanent.portfolio2.test <- function()
 		data$weight[period.ends,] = weight.risk[period.ends,]
 	models$risk = bt.run.share(data, clean.signal=F)
 
+	# risk weighted + 7% target volatility
 	data$weight[] = NA
 		data$weight[period.ends,] = target.vol.strategy(models$risk,
 						weight.risk, 7/100, 21, 100/100)[period.ends,]
 	models$risk.target7 = bt.run.share(data, clean.signal=T)
 
+	# risk weighted + 5% target volatility
 	data$weight[] = NA
 		data$weight[period.ends,] = target.vol.strategy(models$risk,
 						weight.risk, 5/100, 21, 100/100)[period.ends,]
 	models$risk.target5 = bt.run.share(data, clean.signal=T)
 		
 	#*****************************************************************
-	# Tactical: 10 month moving average, Market Filter
+	# Market Filter (tactical): 10 month moving average
 	#****************************************************************** 				
 	period.ends = endpoints(prices, 'months')
 		period.ends = period.ends[period.ends > 0]		
@@ -5855,6 +5820,8 @@ bt.mca.test <- function()
 	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
 	bt.prep(data, align='keep.all', dates='2002:08::')
+	
+	#write.xts(data$prices, 'data.csv')
 	
 	#*****************************************************************
 	# Code Strategies
@@ -5989,14 +5956,203 @@ bt.mca.speed.test <- function()
 				
 	#ia$cov = make.positive.definite.fast(ia$cov)
 	#ia$correlation = make.positive.definite.fast(ia$correlation)
-
-	
 		
 }	
 
 
+###############################################################################
+# Testing Universal Portfolios - Constant Rebalanced portfolio
+# http://optimallog.blogspot.ca/2012/06/universal-portfolio-part-3.html
+# http://optimallog.blogspot.ca/2012/06/universal-portfolio-part-4.html
+# to call internal function in logopt use logopt:::crp_bh(x) or logopt:::roll.bcrp
+###############################################################################
+bt.crp.test <- function() 
+{
+	#*****************************************************************
+	# Example from http://optimallog.blogspot.ca/2012/06/universal-portfolio-part-3.html
+	#****************************************************************** 
+	load.packages('FNN')
+	load.packages('logopt', 'http://R-Forge.R-project.org')
+	
+	load.packages('quantmod')
+
+	data(nyse.cover.1962.1984)
+	x = nyse.cover.1962.1984
+	x = x[,spl('iroqu,kinar')]
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	data <- new.env()
+		for(i in names(x)) {
+			data[[i]] = cumprod(x[,i])
+			colnames(data[[i]]) = 'Close'
+			}
+	bt.prep(data, align='remove.na')
+	
+	
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices  
+	    n = ncol(prices)
+	
+    #*****************************************************************
+    # Plot 1
+    #******************************************************************
+	plota(prices$iroqu, col='blue', type='l',   ylim=range(prices), main = '"iroqu" and "kinar"', ylab='')
+		plota.lines(prices$kinar, col='red')
+		grid()
+	plota.legend('iroqu,kinar', 'blue,red')	
+	
+    #*****************************************************************
+    # Compute Universal Portfolio
+    #******************************************************************	
+	universal = prices[,1] * 0	    
+	alphas = seq(0,1,by=0.05)
+	crps = alphas
+	for (i in 1:length(crps)) {
+		data$weight[] = NA
+			data$weight[] = c(alphas[i], 1-alphas[i])
+		equity = bt.run(data, silent=T)$equity
+		
+		universal = universal + equity
+		crps[i] = last(equity)
+	}	    
+	universal = universal/length(alphas)
+	    
+    #*****************************************************************
+    # Plot 2
+    #******************************************************************
+	plot(alphas, crps, col="blue", type="l", ylab="",
+		main='20 Year Return vs. mix of "iroqu" and "kinar"',
+		xlab='Fraction of "iroqu" in Portfolio')
+	points(alphas, crps, pch=19, cex=0.5, col="red")
+	abline(h=mean(crps), col="green")
+	text(0.5,mean(crps)*1.05,labels="Return from Universal Portfolio")
+		grid()	
+
+    #*****************************************************************
+    # Plot 3
+    #******************************************************************
+	plota(prices$iroqu, col='blue', type='l',   ylim=range(prices, universal), 
+			main = 'Universal Portfolios with "iroqu" and "kinar"', ylab="")
+		plota.lines(prices$kinar, col='red')
+		plota.lines(universal, col='green')
+		grid()
+	plota.legend('iroqu,kinar,universal', 'blue,red,green')	
+    
+	
+	
+	
 
 
+	# Constant Rebalanced portfolio
+	crp.portfolio <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		bcrp.optim(1 + ia$hist.returns, fast.only = TRUE )
+	}
+
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod,quadprog')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='keep.all', dates='2002:08::')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'weeks', lookback.len = 460, 
+		min.risk.fns = list(CRP=crp.portfolio)
+	) 
+	
+	models = create.strategies(obj, data)$models
+				
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+    # quite volatlie for a short lookback.len
+    plotbt.custom.report.part2( models$CRP )
+    
+    
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'weeks',
+		min.risk.fns = list(EW=equal.weight.portfolio,
+						RP=risk.parity.portfolio,
+						MC=min.corr.portfolio,
+						MC2=min.corr2.portfolio)
+	) 
+	
+	models = c(models, create.strategies(obj, data)$models)
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+	# performance is inferior to other algos
+    layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+	
+}
+
+
+
+###############################################################################
+# Interesting that Sep/Nov perfromance changes over different time frames
+# http://www.marketwatch.com/story/an-early-halloween-for-gold-traders-2012-09-26
+# An early Halloween for gold traders
+# Commentary: October is worst month of calendar for gold bullion
+# By Mark Hulbert
+# Watch out, gold traders: Halloween is likely to come early. 
+###############################################################################
+bt.october.gold.test <- function() 
+{
+    #*****************************************************************
+    # Load historical data
+    #****************************************************************** 
+    load.packages('quantmod')
+    ticker = 'GLD'
+    
+    data = getSymbols(ticker, src = 'yahoo', from = '1970-01-01', auto.assign = F)
+        data = adjustOHLC(data, use.Adjusted=T)
+        
+    #*****************************************************************
+    # Look at the Month of the Year Seasonality
+    #****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
+	month.year.seasonality(data, ticker)
+dev.off()    
+    
+    
+    
+    #*****************************************************************
+    # Load long series of gold prices from Deutch Bank
+    #****************************************************************** 
+    data = deutch.bank.data.gold()
+
+    #*****************************************************************
+    # Look at the Month of the Year Seasonality
+    #****************************************************************** 
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
+	month.year.seasonality(data, 'GOLD', lookback.len = nrow(data))
+dev.off()    
+    
+}    
 
 
 

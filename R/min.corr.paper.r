@@ -546,3 +546,167 @@ custom.returns.kpi <- function
 	return( list(System=out))
 }
 
+			
+###############################################################################
+# "Let us skip now to the general case. If we sum up the situations from the point
+# of view of mathematical de nitions of these portfolios, they are as follows (where
+# we use the fact that MV portfolios are equalizing marginal contributions to risk; see
+# Scherer, 2007b)"  (this is from the Roncalli Paper)
+#
+# "All stocks belonging to the MDP have the same correlation to it" (Choeifaty: Properties of the Most Diversified Portfolio)
+#
+# The marginals for the minimum variance and maximum diversification portfolios 
+# and the property of equal marginals ONLY holds is we do not impose long-only constraints. 
+#
+# If we only have a budget constraint (i.e. sum of portfolio weights = 100%)
+# min.var weights =  | 2.05, -0.57,  -0.48 |
+# marginal risk contributions = | 0.01468981, 0.01468981, 0.01468981 |
+#
+# max.div weights =  | -0.26,  0.65,  0.61 |
+# marginal correlation contributions = |  0.8434783, 0.8434783, 0.8434783 |
+# marginal contributions are the same
+#
+# Now if we add long only constraint (i.e. all weights >= 0 and sum of portfolio weights = 100%)
+# min.var weights =  | 1, 0,  0 |
+# marginal risk contributions = | 0.0196, 0.02268, 0.02618 |
+# 
+# max.div weights =  | 0,  0.5,  0.5 |
+# marginal correlation contributions = |   0.875, 0.85, 0.85 |
+# marginal contributions are the different
+###############################################################################
+#
+# Numerical examples used in the Minimum Correlation Algorithm papaer
+#
+###############################################################################
+min.corr.paper.numerical.examples <- function() 
+{
+	#*****************************************************************
+	# create input assumptions
+	#*****************************************************************
+		n = 3
+		ia = list()
+			ia$n = 3
+			ia$risk = c(14, 18, 22) / 100;
+			ia$correlation = matrix(
+				c(1, 0.90, 0.85,
+				0.90, 1, 0.70,
+				0.85, 0.70, 1), nr=3, byrow=T)
+			ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+
+	#*****************************************************************
+	# create constraints
+	#*****************************************************************
+		constraints = new.constraints(n)
+		# 0 <= x.i <= 1
+		constraints = new.constraints(n, lb = 0, ub = 1)
+			constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+			constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+
+		# SUM x.i = 1
+		constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+				
+	#*****************************************************************
+	# Minimum Variance Portfolio 
+	#*****************************************************************
+		x = min.var.portfolio(ia, constraints)
+		
+		sol = solve.QP(Dmat=ia$cov, dvec=rep(0, ia$n), 
+			Amat=constraints$A, bvec=constraints$b, meq=constraints$meq)
+		x = sol$solution
+		
+			round(x,4)
+			sqrt(x %*% ia$cov %*% x)
+			
+		# marginal contributions	
+		x %*% ia$cov
+		
+	#*****************************************************************
+	# Maximum Diversification Portfolio 
+	#*****************************************************************			
+		sol = solve.QP(Dmat=ia$correlation, dvec=rep(0, ia$n), 
+			Amat=constraints$A, bvec=constraints$b, meq=constraints$meq)
+		x = sol$solution
+			round(x,4)
+			
+		# marginal contributions
+		x %*% ia$correlation
+		
+		
+		# re-scale and normalize weights to sum up to 1
+		x = x / sqrt( diag(ia$cov) )
+		x = x / sum(x)
+			round(x,4)
+			sqrt(x %*% ia$cov %*% x)
+			
+	#*****************************************************************
+	# Minimum Correlation Portfolio 
+	#*****************************************************************						
+		upper.index = upper.tri(ia$correlation)
+		cor.m = ia$correlation[upper.index]
+			cor.mu = mean(cor.m)
+			cor.sd = sd(cor.m)
+			
+		norm.dist.m = 0 * ia$correlation	
+			diag(norm.dist.m) = NA
+			norm.dist.m[upper.index] = sapply(cor.m, function(x) 1-pnorm(x, cor.mu, cor.sd))
+		norm.dist.m = (norm.dist.m + t(norm.dist.m))
+		
+		norm.dist.avg = apply(norm.dist.m, 1, mean, na.rm=T)
+		
+		norm.dist.rank = rank(-norm.dist.avg)
+		
+			adjust.factor = 1
+		adjusted.norm.dist.rank = norm.dist.rank ^ adjust.factor
+		
+		norm.dist.weight = adjusted.norm.dist.rank / sum(adjusted.norm.dist.rank)
+		
+		weighted.norm.dist.average = norm.dist.weight %*% ifna(norm.dist.m,0)
+		
+		final.weight = weighted.norm.dist.average / sum(weighted.norm.dist.average)
+		
+		x = final.weight
+		
+		# re-scale and normalize weights to sum up to 1
+		x = x / sqrt( diag(ia$cov) )
+		x = x / sum(x)
+			round(x,4)
+			x = as.vector(x)
+			sqrt(x %*% ia$cov %*% x)
+			
+	#*****************************************************************
+	# Minimum Correlation 2 Portfolio 
+	#*****************************************************************						
+		cor.m = ia$correlation
+			diag(cor.m) = 0
+			
+		avg = rowMeans(cor.m)
+			cor.mu = mean(avg)
+			cor.sd = sd(avg)
+		norm.dist.avg = 1-pnorm(avg, cor.mu, cor.sd)
+		
+		norm.dist.rank = rank(-norm.dist.avg)
+		
+			adjust.factor = 1
+		adjusted.norm.dist.rank = norm.dist.rank ^ adjust.factor
+		
+		norm.dist.weight = adjusted.norm.dist.rank / sum(adjusted.norm.dist.rank)
+				
+		weighted.norm.dist.average = norm.dist.weight %*% (1-cor.m)
+		final.weight = weighted.norm.dist.average / sum(weighted.norm.dist.average)
+		
+		x = final.weight
+		
+		# re-scale and normalize weights to sum up to 1
+		x = x / sqrt( diag(ia$cov) )
+		x = x / sum(x)
+			round(x,4)
+			x = as.vector(x)
+			sqrt(x %*% ia$cov %*% x)
+					
+			
+		#min.corr.portfolio(ia, constraints)
+		#min.corr2.portfolio(ia, constraints)					
+}
+	
+
+
