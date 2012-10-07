@@ -87,7 +87,9 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 		
     	temp = apply(temp,1,join)
         index.selected = grep('selected', temp)
-        option.value = as.double( gsub('.*value=\'([0-9]*).*', '\\1', temp[index.selected]) ) 
+        option.value = 0
+        if(	len(index.selected) )
+        	option.value = as.double( gsub('.*value=\'([0-9]*).*', '\\1', temp[index.selected]) ) 
         				
 		if(option.value > 0) {
 			# can only get 5 time periods at a time
@@ -97,6 +99,9 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 			break
 		}
 	}
+	
+	# remove empty columns
+	all.data = all.data[, colSums(nchar(trim(all.data))) > 0]
 	
 	if( ncol(all.data) > n ) {	
 		return(all.data[,(ncol(all.data)-n+1):ncol(all.data)])

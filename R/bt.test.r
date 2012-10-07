@@ -1147,6 +1147,8 @@ bt.aa.test <- function()
 	#****************************************************************** 
 	load.packages('quantmod,quadprog,corpcor,lpSolve')
 	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+	#tickers = dow.jones.components()
+
 
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
@@ -1183,8 +1185,8 @@ bt.aa.test <- function()
 	ret = prices / mlag(prices) - 1
 	start.i = which(period.ends >= (63 + 1))[1]
 
-	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio,min.gini.portfolio')	
-	#min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio')
+	#min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio,min.mad.portfolio,min.cvar.portfolio,min.cdar.portfolio,min.cor.insteadof.cov.portfolio,min.mad.downside.portfolio,min.risk.downside.portfolio,min.avgcor.portfolio,find.erc.portfolio,min.gini.portfolio')	
+	min.risk.fns = spl('min.risk.portfolio,min.maxloss.portfolio')
 	
 	# Gini risk measure optimization takes a while, uncomment below to add Gini risk measure
 	# min.risk.fns = c(min.risk.fns, 'min.gini.portfolio')
@@ -5707,7 +5709,7 @@ bt.permanent.portfolio2.test <- function()
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
 		
 		# extend GLD with Gold.PM - London Gold afternoon fixing prices
-		#data$GLD = extend.GLD(data$GLD)
+		data$GLD = extend.GLD(data$GLD)
 	
 	bt.prep(data, align='remove.na')
 
@@ -5716,7 +5718,6 @@ bt.permanent.portfolio2.test <- function()
 	#****************************************************************** 		
 	prices = data$prices   
 		n = ncol(prices)
-		nperiods = nrow(prices)
 
 	period.ends = endpoints(prices, 'quarters')
 		period.ends = period.ends[period.ends > 0]		
@@ -5742,7 +5743,7 @@ bt.permanent.portfolio2.test <- function()
 	data$weight[] = NA
 		data$weight[period.ends,] = target.vol.strategy(models$dollar,
 						weight.dollar, 7/100, 21, 100/100)[period.ends,]
-	models$dollar.target7 = bt.run.share(data, clean.signal=T)
+	models$dollar.target7 = bt.run.share(data, clean.signal=F)
 	
 	#*****************************************************************
 	# Risk Weighted
@@ -5756,18 +5757,19 @@ bt.permanent.portfolio2.test <- function()
 		data$weight[period.ends,] = weight.risk[period.ends,]
 	models$risk = bt.run.share(data, clean.signal=F)
 
-	# risk weighted + 7% target volatility
-	data$weight[] = NA
-		data$weight[period.ends,] = target.vol.strategy(models$risk,
-						weight.risk, 7/100, 21, 100/100)[period.ends,]
-	models$risk.target7 = bt.run.share(data, clean.signal=T)
-
-	# risk weighted + 5% target volatility
-	data$weight[] = NA
-		data$weight[period.ends,] = target.vol.strategy(models$risk,
-						weight.risk, 5/100, 21, 100/100)[period.ends,]
-	models$risk.target5 = bt.run.share(data, clean.signal=T)
-		
+	if(F) {
+		# risk weighted + 7% target volatility
+		data$weight[] = NA
+			data$weight[period.ends,] = target.vol.strategy(models$risk,
+							weight.risk, 7/100, 21, 100/100)[period.ends,]
+		models$risk.target7 = bt.run.share(data, clean.signal=F)
+	
+		# risk weighted + 5% target volatility
+		data$weight[] = NA
+			data$weight[period.ends,] = target.vol.strategy(models$risk,
+							weight.risk, 5/100, 21, 100/100)[period.ends,]
+		models$risk.target5 = bt.run.share(data, clean.signal=F)
+	}	
 	#*****************************************************************
 	# Market Filter (tactical): 10 month moving average
 	#****************************************************************** 				
@@ -5788,18 +5790,170 @@ bt.permanent.portfolio2.test <- function()
 	data$weight[] = NA
 		data$weight[period.ends,] = target.vol.strategy(models$dollar.tactical,
 						weight.dollar.tactical, 7/100, 21, 100/100)[period.ends,]
-	models$dollar.tactical.target7 = bt.run.share(data, clean.signal=T)
+	models$dollar.tactical.target7 = bt.run.share(data, clean.signal=F)
 		
 			
     #*****************************************************************
     # Create Report
     #******************************************************************       
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
     plotbt.custom.report.part1(models)       
+dev.off()					
 	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
     plotbt.strategy.sidebyside(models)
+dev.off()	    
 	
 }
 
+
+
+
+###############################################################################
+# Additional example for Permanent Portfolio
+# add transaction cost and 
+# RR - remove SHY from basket
+###############################################################################
+bt.permanent.portfolio3.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('SPY,TLT,GLD,SHY')
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# extend GLD with Gold.PM - London Gold afternoon fixing prices
+		data$GLD = extend.GLD(data$GLD)
+	
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 		
+	prices = data$prices   
+		n = ncol(prices)
+
+	period.ends = endpoints(prices, 'months')
+		period.ends = period.ends[period.ends > 0]		
+		period.ends = c(1, period.ends)
+					
+
+	models = list()
+	commission = 0.1
+	
+	#*****************************************************************
+	# Dollar Weighted
+	#****************************************************************** 			
+	target.allocation = matrix(rep(1/n,n), nrow=1)
+	weight.dollar = ntop(prices, n)
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.dollar[period.ends,]
+	models$dollar = bt.run.share(data, commission=commission, clean.signal=F)
+				
+	#*****************************************************************
+	# Dollar Weighted + 7% target volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$dollar,
+						weight.dollar, 7/100, 21, 100/100)[period.ends,]
+	models$dollar.target7 = bt.run.share(data, commission=commission, clean.signal=F)
+	
+	#*****************************************************************
+	# Risk Weighted
+	#****************************************************************** 				
+	ret.log = bt.apply.matrix(prices, ROC, type='continuous')
+	hist.vol = sqrt(252) * bt.apply.matrix(ret.log, runSD, n = 21)	
+	weight.risk = weight.dollar / hist.vol
+		weight.risk$SHY = 0 
+		weight.risk = weight.risk / rowSums(weight.risk)
+		
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.risk[period.ends,]
+	models$risk = bt.run.share(data, commission=commission, clean.signal=F)
+
+	#*****************************************************************
+	# Risk Weighted + 7% target volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk,
+						weight.risk, 7/100, 21, 100/100)[period.ends,]
+	models$risk.target7 = bt.run.share(data, commission=commission, clean.signal=F)
+
+	#*****************************************************************
+	# Risk Weighted + 7% target volatility + SHY
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk,
+						weight.risk, 7/100, 21, 100/100)[period.ends,]
+						
+  		cash = 1-rowSums(data$weight)
+	    data$weight$SHY[period.ends,] = cash[period.ends]
+	models$risk.target7.shy = bt.run.share(data, commission=commission, clean.signal=F)
+	
+	#*****************************************************************
+	# Market Filter (tactical): 10 month moving average
+	#****************************************************************** 				
+	sma = bt.apply.matrix(prices, SMA, 200)
+	weight.dollar.tactical = weight.dollar * (prices > sma)	
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.dollar.tactical[period.ends,]
+	models$dollar.tactical = bt.run.share(data, commission=commission, clean.signal=F)
+
+	#*****************************************************************
+	# Tactical + 7% target volatility
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$dollar.tactical,
+						weight.dollar.tactical, 7/100, 21, 100/100)[period.ends,]
+	models$dollar.tactical.target7 = bt.run.share(data, commission=commission, clean.signal=F)
+		
+		
+	
+	
+	#*****************************************************************
+	# Risk Weighted + Tactical 
+	#****************************************************************** 				
+	weight.risk.tactical = weight.risk * (prices > sma)	
+	
+	data$weight[] = NA
+		data$weight[period.ends,] = weight.risk.tactical[period.ends,]
+	models$risk.tactical = bt.run.share(data, commission=commission, clean.signal=F)
+	
+	#*****************************************************************
+	# Risk Weighted + Tactical + 7% target volatility + SHY
+	#****************************************************************** 				
+	data$weight[] = NA
+		data$weight[period.ends,] = target.vol.strategy(models$risk.tactical,
+						weight.risk.tactical, 7/100, 21, 100/100)[period.ends,]
+  		cash = 1-rowSums(data$weight)
+	    data$weight$SHY[period.ends,] = cash[period.ends]						
+	models$risk.tactical.target7.shy = bt.run.share(data, commission=commission, clean.signal=F)
+	
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.custom.report.part1(models)       
+dev.off()					
+	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.strategy.sidebyside(models)
+dev.off()	    
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    	
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	   	
+
+}
 
 
 

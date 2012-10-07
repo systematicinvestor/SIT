@@ -799,22 +799,28 @@ plota.stacked <- function
 plota.matplot <- function
 (
 	y,				# xts object or list of xts objects to plot
-	dates = NULL,	# dates subset
+	dates = NULL,	# dates subset	
+	ylim = NULL,
+	type = 'l',
 	...				# other parameters for plot
 )
 {
-	# find ylim
-	ylim = c()
+	# find ylim	
 	if( is.list(y) ) {
-		n = len(y)
-		for( i in 1:n ) {
-   			if(!is.null(dates)) y[[i]] = y[[i]][dates]
-			ylim = range(ylim, y[[i]], na.rm = T)
+		if(!is.null(dates)) y[[1]] = y[[1]][dates]
+		
+		if(is.null(ylim)) {
+			ylim = c()
+			n = len(y)
+			for( i in 1:n ) {
+	   			if(!is.null(dates)) y[[i]] = y[[i]][dates]
+				ylim = range(ylim, y[[i]], na.rm = T)
+			}
 		}
 		
-		plota(y[[1]], ylim = ylim, col = 1, type = 'l', ...)
+		plota(y[[1]], ylim = ylim, col = 1, type = type, ...)
 		if( n > 1 ) {
-			for( i in 2:n ) plota.lines(y[[i]], col = i)
+			for( i in 2:n ) plota.lines(y[[i]], col = i, type = type, ...)
 		}
 
 		plota.legend(names(y), paste(1:n), y)	
@@ -822,11 +828,11 @@ plota.matplot <- function
 	} else {
 		n = ncol(y)
 		if(!is.null(dates)) y = y[dates]
-		ylim = range(y, na.rm = T)
+		if(is.null(ylim)) ylim = range(y, na.rm = T)
 		
-		plota(y[,1], ylim = ylim, col = 1, type = 'l', ...)
+		plota(y[,1], ylim = ylim, col = 1, type = type, ...)
 		if( n > 1 ) {
-			for( i in 2:n ) plota.lines(y[,i], col = i)
+			for( i in 2:n ) plota.lines(y[,i], col = i, type = type, ...)
 		}
 		
 		plota.legend(names(y), paste(1:n), as.list(y))	

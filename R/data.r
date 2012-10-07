@@ -502,8 +502,29 @@ bundes.bank.data.gold <- function() {
 }
 
 
+###############################################################################
+# Pacific Exchange Rate Service - FX rates
+# Daily data is maximum for 4 years
+# http://fx.sauder.ubc.ca/data.html
+# http://fx.sauder.ubc.ca/cgi/fxdata?b=USD&c=AUD&c=GBP&c=CAD&c=NOK&c=EUR&c=JPY&c=NZD&c=SEK&c=CHF&rd=&fd=1&fm=1&fy=2011&ld=31&lm=12&ly=2012&y=daily&q=volume&f=csv&o= 
+#
+# Example
+# base.cur = 'USD'
+# target.curs = 'AUD,CAD,EUR'
+# fx.data = rbind(fx.sauder.data(2000, 2003, base.cur, target.curs), 
+#				fx.sauder.data(2004, 2007, base.cur, target.curs), 
+#				fx.sauder.data(2008, 2011, base.cur, target.curs),
+#				fx.sauder.data(2012, 2012, base.cur, target.curs))
+###############################################################################  
+fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
+	url = paste('http://fx.sauder.ubc.ca/cgi/fxdata?b=', base.cur, join(paste('&c=', spl(target.curs), sep='')), '&rd=&fd=1&fm=1&fy=', start.year, '&ld=31&lm=12&ly=', end.year, '&y=daily&q=volume&f=csv&o=', sep='')
+	temp = read.csv(url, skip=1, header=T, stringsAsFactors=F)
 
-
+	hist = make.xts(as.matrix(temp[,-c(1:3)]), as.Date(temp[,2], '%Y/%m/%d'))		
+		colnames(hist) = gsub(paste('.', base.cur, sep=''), '', colnames(hist))
+		
+	return( hist[!is.na(hist[,1]),] )
+}
 
 
 ###############################################################################
