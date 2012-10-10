@@ -7,13 +7,18 @@ if exist c:\temp\code.r del c:\temp\code.r
 :: create code.r
 echo. >c:\temp\code.r
 
-copy/b c:\temp\code.r+Readme.txt c:\temp\code.r
+::copy/b c:\temp\code.r+Readme.txt c:\temp\code.r
 
 :: merge all R\*.r files
 for /r %%a in (R\*.r) do (
 	echo. >>c:\temp\code.r
 	copy/b c:\temp\code.r+"%%a" c:\temp\code.r
 )
+
+remove_r_comments c:\temp\code.r c:\temp\code1.r
+del c:\temp\code.r
+copy/b Readme.txt+c:\temp\code1.r c:\temp\code.r
+
 
 :: delete sit.zip if present
 if exist sit.gz del sit.gz

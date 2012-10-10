@@ -31,7 +31,7 @@ bl.compute.risk.aversion <- function(bench, risk.free = 0)
 {
 	# The implied risk aversion coefficient can be estimated by dividing
 	# the expected excess return by the variance of the portfolio
-	lambda  = mean(coredata(bench) - coredata(risk.free)) / var(coredata(bench))
+	lambda = mean(coredata(bench) - coredata(risk.free)) / var(coredata(bench))
 	return( as.double(lambda) )
 }
 

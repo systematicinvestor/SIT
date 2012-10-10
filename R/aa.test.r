@@ -37,6 +37,7 @@ png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize =
 	plot.ia(ia)
 	
 dev.off()	
+
 png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 		
 
@@ -373,13 +374,14 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 			abline(h=10, col = 'red')
 			
 		plot(100* ef$risk, rowSums(!is.na(y), na.rm = T), pch=20, type='b', 
-			xlab='Risk', ylab='# Assets', main='Number of Assets')
+			xlab='Risk', ylab='Number of Assets', main='Number of Assets')
 	
 	}
 	
 	aa.plot.ef.summary.test(ef.risk)
 
 dev.off()	
+
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
 
 	layout( matrix(1:4, nrow = 2) )

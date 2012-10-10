@@ -2276,7 +2276,7 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 		}
 		text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
 			adj=c(1,-1), col='black',xpd=TRUE)
-		plota.legend('Pattern,Match #','blue,red')
+		plota.legend('Pattern,Match Number','blue,red')
 dev.off()			
 	
 	#*****************************************************************
@@ -2356,7 +2356,7 @@ dev.off()
 		
 	# plot table
 png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-	plot.table(temp, smain='Match #')
+	plot.table(temp, smain='Match Number')
 dev.off()		
 	
 }	
@@ -2583,7 +2583,7 @@ bt.matching.find <- function
 			}
 			text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
 				adj=c(1,-1), col='black',xpd=TRUE)
-			plota.legend(paste('Pattern: ', main, ',Match #'),'blue,red')	
+			plota.legend(paste('Pattern: ', main, ',Match Number'),'blue,red')	
 	}
 	
 	return(list(min.index=min.index, dist=dist[min.index], query=query, reference=reference, dates = index(data), main = main))
@@ -2731,7 +2731,7 @@ bt.matching.overlay.table <- function
 	# plot table
 	if(plot) {			
 		if(is.null(layout)) layout(1)
-		plot.table(temp, smain='Match #')	
+		plot.table(temp, smain='Match Number')	
 	}
 	
 	return(temp)
@@ -5895,6 +5895,31 @@ bt.permanent.portfolio3.test <- function()
 	    data$weight$SHY[period.ends,] = cash[period.ends]
 	models$risk.target7.shy = bt.run.share(data, commission=commission, clean.signal=F)
 	
+	
+	
+
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.custom.report.part1(models)       
+dev.off()					
+	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.strategy.sidebyside(models)
+dev.off()	    
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    	
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	   	
+	
+	
+	
+	
+	
+	
 	#*****************************************************************
 	# Market Filter (tactical): 10 month moving average
 	#****************************************************************** 				
@@ -5936,23 +5961,6 @@ bt.permanent.portfolio3.test <- function()
 	models$risk.tactical.target7.shy = bt.run.share(data, commission=commission, clean.signal=F)
 	
 	
-    #*****************************************************************
-    # Create Report
-    #******************************************************************       
-png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
-    plotbt.custom.report.part1(models)       
-dev.off()					
-	
-png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
-    plotbt.strategy.sidebyside(models)
-dev.off()	    
-
-png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    	
-	# Plot Portfolio Turnover for each strategy
-	layout(1)
-	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
-dev.off()	   	
-
 }
 
 

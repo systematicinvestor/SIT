@@ -34,6 +34,7 @@ fundamental.fb.test <- function()
 	#*****************************************************************
 	# Load historical fundamental and pricing data
 	#****************************************************************** 
+	load.packages('quantmod') 
 	tickers = spl('FB,LNKD,GRPN,AAPL,GOOG')
 	tickers.temp = spl('NASDAQ:FB,NYSE:LNKD,NASDAQ:GRPN,NASDAQ:AAPL,NASDAQ:GOOG')
 	
