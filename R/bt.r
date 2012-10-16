@@ -870,6 +870,15 @@ compute.sharpe <- function(x)
 	return(sqrt(temp) * mean(x)/sd(x) )
 }
 
+# http://alumnus.caltech.edu/~amir/mdd-risk.pdf
+# The Calmar Ratio is equal to the compounded annual growth rate divided by the maximum drawdown.
+# The maximum drawdown is typically measured over a three year period.
+# Calmar Ratio = CAGR / MAXDD
+compute.calmar <- function(x)
+{
+    compute.cagr(x) / compute.max.drawdown(x)
+}
+
 # R2 equals the square of the correlation coefficient
 compute.R2 <- function(equity) 
 {

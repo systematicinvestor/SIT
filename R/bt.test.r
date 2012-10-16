@@ -163,39 +163,39 @@ dev.off()
 		
 		
 	#*****************************************************************
-	# Simple example showing the difference in a way commsion is integrated into returns
+	# Simple example showing the difference in a way commission is integrated into returns
 	#****************************************************************** 	
-	commsion = 4
+	commission = 4
 	data$weight[] = NA
 		data$execution.price[] = NA
 		data$weight[201,] = 1
 		data$weight[316,] = 0				
-		data$execution.price[201,] = prices[201,] + commsion
-		data$execution.price[316,] = prices[316,] - commsion		
+		data$execution.price[201,] = prices[201,] + commission
+		data$execution.price[316,] = prices[316,] - commission		
 	models$test.com = bt.run.share(data, clean.signal=T, trade.summary=T)
 
 	data$weight[] = NA
 		data$execution.price[] = NA
 		data$weight[201,] = 1
 		data$weight[316,] = 0					
-	models$test.com.new = bt.run.share(data, commision=commsion, trade.summary=T, clean.signal=T)
+	models$test.com.new = bt.run.share(data, commission=commission, trade.summary=T, clean.signal=T)
 
 	cbind(last(models$test.com$equity), last(models$test.com.new$equity),
-		as.double(prices[316] - commsion)/as.double(prices[201] + commsion))
+		as.double(prices[316] - commission)/as.double(prices[201] + commission))
 	
-	as.double(prices[202]) / as.double(prices[201] + commsion)-1
+	as.double(prices[202]) / as.double(prices[201] + commission)-1
 	models$test.com$equity[202]-1
 	
-	as.double(prices[202] - commsion) / as.double(prices[201])-1
+	as.double(prices[202] - commission) / as.double(prices[201])-1
 	models$test.com.new$equity[202]-1
 	
 	
 	#plotbt.custom.report.part1(models)
 	
 	#*****************************************************************
-	# Example showing the difference in a way commsion is integrated into returns
+	# Example showing the difference in a way commission is integrated into returns
 	#****************************************************************** 		
-	commsion = 0.1
+	commission = 0.1
 	sma.fast = SMA(prices, 50)
 	sma.slow = SMA(prices, 200)
 
@@ -210,19 +210,19 @@ dev.off()
 	data$weight[] = NA
 		data$execution.price[] = NA
 		data$weight[] = weight
-	models$test.com.new = bt.run.share(data, commision=commsion, trade.summary=T, clean.signal=T)
+	models$test.com.new = bt.run.share(data, commission=commission, trade.summary=T, clean.signal=T)
 	
 	
 	data$weight[] = NA
 		data$execution.price[] = NA
 		
 		index = which(trade.direction > 0)
-		data$execution.price[trade.start[index],] = prices[trade.start[index],] + commsion
-		data$execution.price[trade.end[index],] = prices[trade.end[index],] - commsion
+		data$execution.price[trade.start[index],] = prices[trade.start[index],] + commission
+		data$execution.price[trade.end[index],] = prices[trade.end[index],] - commission
 		
 		index = which(trade.direction < 0)
-		data$execution.price[trade.start[index],] = prices[trade.start[index],] - commsion
-		data$execution.price[trade.end[index],] = prices[trade.end[index],] + commsion
+		data$execution.price[trade.start[index],] = prices[trade.start[index],] - commission
+		data$execution.price[trade.end[index],] = prices[trade.end[index],] + commission
 		
 		data$weight[trade.start,] = trade.direction
 		data$weight[trade.end,] = 0		

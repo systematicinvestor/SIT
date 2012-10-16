@@ -560,6 +560,7 @@ index4xts <- function
 	return(temp)
 }
 	
+# maybe rename to bt.index.xts
 index.xts <- function
 (
 	x			# XTS object
