@@ -36,10 +36,14 @@ fund.data <- function
 	all.data = c()
 	option.value = -1
 	
+	start_date = spl('istart_date,start_date')
+		names(start_date) = spl('quarterly,annual')
+	
+	
 	repeat {
 		# download Quarterly Financial Report data
 		if(option.value >= 0) {
-			url = paste('http://advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports&istart_date=', option.value, sep = '')	
+			url = paste('http://advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports&', start_date[mode[1]], '=', option.value, sep = '')	
 		} else {
 			url = paste('http://advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports', sep = '')
 		}
@@ -120,7 +124,7 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 date.fund.data <- function(data)
 {
 	# construct date
-	quarter.end.date = as.Date(paste(data['quarter end date',], '/1', sep=''), '%Y/%m/%d')	
+	quarter.end.date = as.Date(paste(data[1,], '/1', sep=''), '%Y/%m/%d')	
 	quarterly.indicator = data['quarterly indicator',]
 	date.preliminary.data.loaded = as.Date(data['date preliminary data loaded',], '%Y-%m-%d') + 1
 	

@@ -108,8 +108,126 @@ png(filename = 'plot4.png', width = 600, height = 600, units = 'px', pointsize =
     plota.matplot(prices)
 dev.off()					
 	
-	
-	
 }	
- 
 
+
+
+###############################################################################
+# DCF - Discounted Cash Flow
+# http://www.independent-stock-investing.com/Discounted-Cash-Flow.html
+# http://www.oldschoolvalue.com/blog/stock-analysis/apple-aapl-valuation/
+# www.focusinvestor.com/DiscountedCashFlows.xls
+# http://en.wikipedia.org/wiki/Discounted_cash_flow
+###############################################################################
+fundamental.dcf.test <- function() 
+{
+	#*****************************************************************
+	# Load historical fundamental and pricing data
+	#****************************************************************** 
+	load.packages('quantmod') 
+	tickers = spl('AAPL')
+	tickers.temp = paste(iif( nchar(tickers) <= 3, 'NYSE:', 'NASDAQ:'), tickers, sep='')
+
+
+	
+	# get fundamental data
+	data.fund <- new.env()
+	for(i in 1:len(tickers))
+		data.fund[[tickers[i]]] = fund.data(tickers.temp[i], 80, 'annual')
+
+			
+	# get pricing data
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)			
+
+
+	fund = data.fund[[tickers[1]]]
+	fund.date = date.fund.data(fund)
+			
+	price = Cl(data[[tickers[1]]]['1995::'])
+		
+	#*****************************************************************
+	# Extract Inputs for DCF Valuation
+	#****************************************************************** 				
+	# Free Cash Flows
+	FCF = get.fund.data('free cash flow', fund, fund.date)
+	
+	# Invested Capital
+	IC = get.fund.data('invested capital', fund, fund.date)
+		
+	# Sales
+	SALE = get.fund.data('total revenue', fund, fund.date)
+
+	# Common Equity
+	CEQ = get.fund.data('total equity', fund, fund.date)
+
+	# Common Shares Outstanding
+	CSHO = get.fund.data('total common shares out', fund, fund.date)
+
+	# Growth Rate
+	CROIC = FCF/IC
+	
+	# Average inputs
+	g = runMean(CROIC, 5)
+	cash = runMean(FCF, 5)
+	
+	
+	#*****************************************************************
+	# Helper function to compute Intrinsic Value
+	#****************************************************************** 				
+	compute.DCF.IV <- function(cash, eqity, shares, g, R) {
+		if( cash <= 0 ) return(NA)
+		
+		if( len(R) == 1 ) R = rep(R, len(g))
+		
+		value = eqity + sum(cash * cumprod(1 + g) / cumprod(1 + R))
+		return( value / shares )
+	}
+
+		
+	#*****************************************************************
+	# Compute Intrinsic Value, assumptions:
+	# Company will grow for the first 3 years at current Growth Rate
+	# slowed down by 20% for the next 4 years, and slowed down by a further 20% for the next 3 years
+	# and finally 3% growth for the next 10 years
+	#
+	# The Discount Rate is 9%
+	#
+	# http://www.oldschoolvalue.com/blog/stock-analysis/apple-aapl-valuation/
+	#****************************************************************** 				
+	dcf.price = NA * g
+	i.start = which(!is.na(g))[1] 
+	
+	for(i in i.start : nrow(g)) {
+		# Create Growth Rate scenario: 		
+		g.scenario = c(rep(g[i],3), rep(g[i],4)*0.8, rep(g[i],3)*0.8*0.8, rep(3/100,10))
+		
+		# Compute Intrinsic Value
+		dcf.price[i] = compute.DCF.IV(cash[i], CEQ[i], CSHO[i], g.scenario, 9/100)
+	}
+	
+	#*****************************************************************
+	# Create Plot
+	#****************************************************************** 
+
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+	plota(price, type='l', log = 'y', col='blue', main=tickers[1],
+		ylim=range(price,dcf.price,na.rm=T))
+	plota.lines(dcf.price, type='s', col='red', lwd=2)
+	plota.legend('Close,Intrinsic Value', 'blue,red', list(price, dcf.price))	
+dev.off()	
+
+	
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+	plota(g, type='b', col='blue', pch=0, main='Growth Rate')	
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    	
+	plota(cash, type='b', col='blue', pch=0, main='Free Cash Flows')	
+dev.off()			
+	
+	
+			
+ 
+}
