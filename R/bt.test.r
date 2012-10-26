@@ -6331,3 +6331,150 @@ dev.off()
 
 
 
+###############################################################################
+# Couch Potato strategy
+# http://www.moneysense.ca/2006/04/05/couch-potato-portfolio-introduction/
+###############################################################################
+	# helper function to model Couch Potato strategy - a fixed allocation strategy
+	couch.potato.strategy <- function
+	(
+		data.all,
+		tickers = 'XIC.TO,XSP.TO,XBB.TO',
+		weights = c( 1/3, 1/3, 1/3 ), 		
+		periodicity = 'years',
+		dates = '1900::',
+		commission = 0.1
+	) 
+	{ 
+		#*****************************************************************
+		# Load historical data 
+		#****************************************************************** 
+		tickers = spl(tickers)
+		names(weights) = tickers
+		
+		data <- new.env()
+		for(s in tickers) data[[ s ]] = data.all[[ s ]]
+		
+		bt.prep(data, align='remove.na', dates=dates)
+	
+		#*****************************************************************
+		# Code Strategies
+		#******************************************************************
+		prices = data$prices   
+			n = ncol(prices)
+			nperiods = nrow(prices)
+	
+		# find period ends
+		period.ends = endpoints(data$prices, periodicity)
+			period.ends = c(1, period.ends[period.ends > 0])
+	
+		#*****************************************************************
+		# Code Strategies
+		#******************************************************************
+		data$weight[] = NA
+			for(s in tickers) data$weight[period.ends, s] = weights[s]
+		model = bt.run.share(data, clean.signal=F, commission=commission)
+		
+		return(model)
+	} 	
+
+bt.couch.potato.test <- function() 
+{
+	#*****************************************************************
+	# Canadian  Version	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	map = list()
+		map$can.eq = 'XIC.TO'
+		map$can.div = 'XDV.TO'		
+		map$us.eq = 'XSP.TO'
+		map$us.div = 'DVY'			
+		map$int.eq = 'XIN.TO'		
+		map$can.bond = 'XBB.TO'
+		map$can.real.bond = 'XRB.TO'
+		map$can.re = 'XRE.TO'		
+		map$can.it = 'XTR.TO'
+		map$can.gold = 'XGD.TO'
+			
+	data <- new.env()
+	for(s in names(map)) {
+		data[[ s ]] = getSymbols(map[[ s ]], src = 'yahoo', from = '1995-01-01', env = data, auto.assign = F)
+		data[[ s ]] = adjustOHLC(data[[ s ]], use.Adjusted=T)	
+	}
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	models = list()
+		periodicity = 'years'
+		dates = '2006::'
+	
+	models$classic = couch.potato.strategy(data, 'can.eq,us.eq,can.bond', rep(1/3,3), periodicity, dates)
+	models$global = couch.potato.strategy(data, 'can.eq,us.eq,int.eq,can.bond', c(0.2, 0.2, 0.2, 0.4), periodicity, dates)
+	models$yield = couch.potato.strategy(data, 'can.div,can.it,us.div,can.bond', c(0.25, 0.25, 0.25, 0.25), periodicity, dates)
+	models$growth = couch.potato.strategy(data, 'can.eq,us.eq,int.eq,can.bond', c(0.25, 0.25, 0.25, 0.25), periodicity, dates)
+	
+	models$complete = couch.potato.strategy(data, 'can.eq,us.eq,int.eq,can.re,can.real.bond,can.bond', c(0.2, 0.15, 0.15, 0.1, 0.1, 0.3), periodicity, dates)	
+	
+	models$permanent = couch.potato.strategy(data, 'can.eq,can.gold,can.bond', c(0.25,0.25,0.5), periodicity, dates)	
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+dev.off()
+	
+	
+	
+	#*****************************************************************
+	# US Version	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	tickers = spl('VIPSX,VTSMX,VGTSX,SPY,TLT,GLD,SHY')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1995-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)	
+		
+		# extend GLD with Gold.PM - London Gold afternoon fixing prices
+		data$GLD = extend.GLD(data$GLD)
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	models = list()
+		periodicity = 'years'
+		dates = '2003::'
+	
+	models$classic = couch.potato.strategy(data, 'VIPSX,VTSMX', rep(1/2,2), periodicity, dates)
+	models$margarita = couch.potato.strategy(data, 'VIPSX,VTSMX,VGTSX', rep(1/3,3), periodicity, dates)
+	models$permanent = couch.potato.strategy(data, 'SPY,TLT,GLD,SHY', rep(1/4,4), periodicity, dates)
+		
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')   
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	out = plotbt.strategy.sidebyside(models, return.table=T)
+dev.off()
+   	
+}
+
+	
+ 	 
+
+
+
+
+			
