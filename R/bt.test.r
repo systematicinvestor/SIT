@@ -2274,7 +2274,7 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 		for(i in 1:n.match) {
 		plota.lines(data[(min.index[i]-n.query + 1):min.index[i]], col='red')
 		}
-		text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
+		text(index4xts(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
 			adj=c(1,-1), col='black',xpd=TRUE)
 		plota.legend('Pattern,Match Number','blue,red')
 dev.off()			
@@ -2581,7 +2581,7 @@ bt.matching.find <- function
 			for(i in 1:n.match) {
 			plota.lines(data[(min.index[i]-n.query + 1):min.index[i]], col='red')
 			}
-			text(index(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
+			text(index4xts(data)[min.index - n.query/2], reference[min.index - n.query/2], 1:n.match, 
 				adj=c(1,-1), col='black',xpd=TRUE)
 			plota.legend(paste('Pattern: ', main, ',Match Number'),'blue,red')	
 	}

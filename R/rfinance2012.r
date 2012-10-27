@@ -387,7 +387,7 @@ find.patterns <- function
 	n.index = len(data.extrema.loc)
 
 	if(is.xts(mhat)) {
-		dates = index(obj$mhat)
+		dates = index4xts(obj$mhat)
 	} else {
 		dates = 1:len(data)
 	}		
