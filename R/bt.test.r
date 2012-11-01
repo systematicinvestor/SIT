@@ -6471,6 +6471,89 @@ dev.off()
    	
 }
 
+
+
+###############################################################################
+# Regime Detection
+# http://blogs.mathworks.com/pick/2011/02/25/markov-regime-switching-models-in-matlab/
+###############################################################################
+bt.regime.detection.test <- function() 
+{	
+	#*****************************************************************
+	# Generate data as in the post
+	#****************************************************************** 
+	bull1 = rnorm( 100, 0.10, 0.15 )
+	bear  = rnorm( 100, -0.01, 0.20 )
+	bull2 = rnorm( 100, 0.10, 0.15 )
+	true.states = c(rep(1,100),rep(2,100),rep(1,100))
+	returns = c( bull1, bear,  bull2 )
+
+
+	# find regimes
+	load.packages('RHmm')
+
+	y=returns
+	ResFit = HMMFit(y, nStates=2)
+	VitPath = viterbi(ResFit, y)
+	# HMMGraphicDiag(VitPath, ResFit, y)
+	# HMMPlotSerie(y, VitPath)
+
+	#Forward-backward procedure, compute probabilities
+	fb = forwardBackward(ResFit, y)
+
+	# Plot probabilities and implied states
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:2)
+	plot(VitPath$states, type='s', main='Implied States', xlab='', ylab='State')
+	
+	matplot(fb$Gamma, type='l', main='Smoothed Probabilities', ylab='Probability')
+		legend(x='topright', c('State1','State2'),  fill=1:2, bty='n')
+dev.off()	
+
+	
+		
+	# http://lipas.uwasa.fi/~bepa/Markov.pdf
+	# Expected duration of each regime (1/(1-pii))                
+	#1/(1-diag(ResFit$HMM$transMat))
+
+
+	#*****************************************************************
+	# Add some data and see if the model is able to identify the regimes
+	#****************************************************************** 
+	bear2  = rnorm( 100, -0.01, 0.20 )
+	bull3 = rnorm( 100, 0.10, 0.10 )
+	bear3  = rnorm( 100, -0.01, 0.25 )
+	y = c( bull1, bear,  bull2, bear2, bull3, bear3 )
+	VitPath = viterbi(ResFit, y)$states
+
+	
+	# map states: sometimes HMMFit function does not assign states consistently
+	# let's use following formula to rank states
+	# i.e. high risk, low returns => state 2 and low risk, high returns => state 1
+	map = rank(sqrt(ResFit$HMM$distribution$var) - ResFit$HMM$distribution$mean)
+	VitPath = map[VitPath]
+
+	#*****************************************************************
+	# Plot regimes
+	#****************************************************************** 
+	load.packages('quantmod')
+	data = xts(y, as.Date(1:len(y)))
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	layout(1:3)
+		plota.control$col.x.highlight = col.add.alpha(true.states+1, 150)
+	plota(data, type='h', plotX=F, x.highlight=T)
+		plota.legend('Returns + True Regimes')
+	plota(cumprod(1+data/100), type='l', plotX=F, x.highlight=T)
+		plota.legend('Equity + True Regimes')
+	
+		plota.control$col.x.highlight = col.add.alpha(VitPath+1, 150)
+	plota(data, type='h', x.highlight=T)
+		plota.legend('Returns + Detected Regimes')				
+dev.off()	
+
+}
+
 	
  	 
 
