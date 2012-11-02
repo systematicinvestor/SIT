@@ -703,7 +703,8 @@ cat('\t\t\t Missing data for ', symbol, '\n');
 	#*****************************************************************
 	# Add symbolnames, symbol.descriptions, and symbol.groups
 	#****************************************************************** 		
-	index = match(ls(env), def[,1])	
+	index = match(ls(env)[ na.omit(match(def[,1], ls(env))) ], def[,1])	
+
 	
 	temp = def[index,1]
 		names(temp) = def[index,1]
@@ -739,8 +740,8 @@ cat('\t\t\t Missing data for ', symbol, '\n');
 	#****************************************************************** 			
 	data = env
 	
-	# fix DX time series
-	data$DX['::2007:04:04', 'Unadjusted'] = coredata(data$DX['::2007:04:04']$Unadjusted * 10)
+	# fix DX time series - fixed by the Trading Blox
+	# if(!is.null(data$DX)) data$DX['::2007:04:04', 'Unadjusted'] = coredata(data$DX['::2007:04:04']$Unadjusted * 10)
 	
 	#*****************************************************************
 	# To compute returns and backtest, recreate each futures series:
