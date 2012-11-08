@@ -308,8 +308,9 @@ dev.off()
 # range(a-b)
 ###############################################################################
 # s0 * matrix(exp(nu * dt + sigma * sqrt(dt) * rnorm(nsteps * nsims)), nc=nsims)
-#s0 * apply(matrix(exp(nu * dt + sigma * sqrt(dt) * rnorm(nsteps * nsims)), nc=nsims), 2, cumprod)
-#s0 * exp(apply(matrix(nu * dt + sigma * sqrt(dt) * rnorm(nsteps * nsims), nc=nsims), 2, cumsum))
+#
+# s0 * apply(matrix(exp(nu * dt + sigma * sqrt(dt) * rnorm(nsteps * nsims)), nc=nsims), 2, cumprod)
+# s0 * exp(apply(matrix(nu * dt + sigma * sqrt(dt) * rnorm(nsteps * nsims), nc=nsims), 2, cumsum))
 ###############################################################################
 # Simulating Multiple Asset Paths
 # http://www.goddardconsulting.ca/matlab-monte-carlo-assetpaths.html

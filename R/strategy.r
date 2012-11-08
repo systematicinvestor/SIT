@@ -581,6 +581,71 @@ rotation.strategy.test <- function()
 		set.risky.asset(x / sum(x), risk.index)		
 	}		
 	
+	#*****************************************************************
+	# Shrinkage functions
+	#*****************************************************************
+	sample.shrinkage <- function( hist, hist.all ) {
+		cov(hist, use='complete.obs', method='pearson')
+	}
+
+	sample.anchored.shrinkage <- function( hist, hist.all ) {
+		cov(hist.all, use='complete.obs', method='pearson')
+	}
+	
+	sample.mix.shrinkage <- function( hist, hist.all ) {
+		0.5 * sample.shrinkage(hist, hist.all) +
+		0.5 * sample.anchored.shrinkage(hist, hist.all)
+	}
+	
+	exp.sample.shrinkage <- function( hist, hist.all ) {
+		hist = na.omit(hist)
+		# Exponentially weighted
+		lam = 0.9
+		i = 0:(nrow(hist)-1)
+		wt = lam^i
+		wt = wt/sum(wt)
+		cov.wt(hist, wt=rev(wt))$cov
+	}		
+		
+	diagonal.shrinkage <- function( hist, hist.all ) {
+		n = ncol(hist)
+		s0 = apply(hist, 2, sd, na.rm=T)
+		diag(n) * (s0 %*% t(s0))
+	}
+		
+	average.shrinkage <- function( hist, hist.all ) {
+		n = ncol(hist)
+		correlation = cor(hist, use='complete.obs', method='pearson')
+		avg.correlation = (sum(correlation) - n) / (n*n - n)		
+		create.cov.matrix(avg.correlation, hist)
+	}
+
+	min.shrinkage <- function( hist, hist.all ) {
+		correlation = cor(hist, use='complete.obs', method='pearson')
+		create.cov.matrix(min(correlation), hist)
+	}
+	
+	max.shrinkage <- function( hist, hist.all ) {
+		n = ncol(hist)
+		correlation = cor(hist, use='complete.obs', method='pearson')
+		create.cov.matrix(max(correlation-diag(n)), hist)
+	}
+		
+	create.cov.matrix <- function( value, hist ) {
+		n = ncol(hist)
+		s0 = apply(hist, 2, sd, na.rm=T)
+		temp = diag(n)
+		((matrix(1,n,n) - temp) * value + temp) * (s0 %*% t(s0))	
+	}
+
+	ledoit.wolf.shrinkage <- function( hist, hist.all ) {
+		var.shrink.eqcor(hist, 1, compatible = T)
+	}
+		
+	factor.model.shrinkage <- function( hist, hist.all ) {
+		factor.model.stat(hist, 1)
+	}
+	
 	
 #*****************************************************************
 # Portfolio Allocation Helper - distribute portfolio weights according to 
@@ -599,7 +664,11 @@ portfolio.allocation.helper <- function
 	
 	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
 	custom.stats.fn = NULL,
-	shrinkage.fn = NULL		# function to compute Covariance Shrinkage Estimator 
+	shrinkage.fns = 'sample.shrinkage',	# covariance Shrinkage Estimator functions
+	
+	const.lb = 0, 
+	const.ub = 1,
+	const.sum = 1
 ) 
 {
 	load.packages('quadprog,corpcor')
@@ -610,9 +679,12 @@ portfolio.allocation.helper <- function
 	period.ends = period.ends[period.ends > 0]
 	
 	universe[is.na(universe)] = F
+	
+	if(len(const.lb) == 1) const.lb = rep(const.lb, ncol(prices))
+	if(len(const.ub) == 1) const.ub = rep(const.ub, ncol(prices))
 		
 	#*****************************************************************
-	# Transform min.risk.fns in the named list
+	# Transform min.risk.fns and shrinkage.fns to the named lists
 	#*****************************************************************
 	if(is.character(min.risk.fns)) {
 		min.risk.fns = spl(min.risk.fns)
@@ -634,9 +706,22 @@ portfolio.allocation.helper <- function
 		}
 		names(min.risk.fns)[i] = f.name			
 	}
+
 	
-	if( !is.null(shrinkage.fn) )
-		shrinkage.fn = match.fun(shrinkage.fn)
+	if(is.character(shrinkage.fns)) {
+		shrinkage.fns = spl(shrinkage.fns)
+		names(shrinkage.fns) = shrinkage.fns
+		shrinkage.fns = as.list(shrinkage.fns)
+	}
+	for(i in 1:len(shrinkage.fns)) {
+		f = names(shrinkage.fns)[i]
+		f.name = gsub('\\.shrinkage', '', f[1])
+		
+		if(is.character(shrinkage.fns[[ i ]]))
+			shrinkage.fns[[ i ]] = match.fun(f)		
+		names(shrinkage.fns)[i] = f.name			
+	}
+	
 		
 	#*****************************************************************
 	# Code Strategies
@@ -653,7 +738,9 @@ portfolio.allocation.helper <- function
 		
 	weights = list()			
 	for(f in names(min.risk.fns)) 
-		weights[[ f ]] = weight				
+		for(c in names(shrinkage.fns)) 
+			weights[[ paste(f,c,sep='.') ]] = weight
+				
 
 	# custom stats logic		
 	custom = list()
@@ -693,14 +780,17 @@ portfolio.allocation.helper <- function
 		
 		if(n > 0) {					
 			hist = hist[ , index]
+			hist.all = ret[ 1:i, index]		
+
 	
 			# 0 <= x.i <= 1
-			constraints = new.constraints(n, lb = 0, ub = 1)
-				constraints = add.constraints(diag(n), type='>=', b=0, constraints)
-				constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+			constraints = new.constraints(n, lb = const.lb[index], ub = const.ub[index])
+				constraints = add.constraints(diag(n), type='>=', b=const.lb[index], constraints)
+				constraints = add.constraints(diag(n), type='<=', b=const.ub[index], constraints)
 
 			# SUM x.i = 1
-			constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+			if(!is.na(const.sum))
+				constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
 						
 			# create historical input assumptions
 			#ia = new.env()
@@ -708,29 +798,33 @@ portfolio.allocation.helper <- function
 				ia$index = index
 				ia$n = n
 				ia$hist.returns = hist
-				ia$expected.return = apply(hist, 2, mean)
-				ia$risk = apply(hist, 2, sd)		
+				ia$expected.return = apply(hist, 2, mean)				
+				ia$risk = apply(hist, 2, sd)
 				ia$correlation = cor(hist, use='complete.obs', method='pearson')
-				ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+				#ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
 				
 				
-				if( !is.null(shrinkage.fn) )
-					ia$cov = shrinkage.fn(hist)
-					
+				
+			for(c in names(shrinkage.fns)) {
+				#ia$cov = shrinkage.fns[[c]](hist, risk, correlation)
+				ia$cov = shrinkage.fns[[c]](hist, hist.all)
+					s0 = 1 / sqrt(diag(ia$cov))
+				ia$correlation = ia$cov * (s0 %*% t(s0))
 
-				
+							
 				# adjust correlation and covariance matrices to be positive defined
 				temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
 					if(!inherits(temp, 'try-error')) ia$cov = temp				
 				temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
 					if(!inherits(temp, 'try-error')) ia$correlation = temp							
 				
-			# find optimal portfolios under different risk measures
-			for(f in names(min.risk.fns)) {
-				constraints$x0 = weights[[ f ]][(j-1),index]			
-				weights[[ f ]][j,index] = min.risk.fns[[f]](ia, constraints)
-			}
-			
+				# find optimal portfolios under different risk measures
+				for(f in names(min.risk.fns)) {
+					fname = paste(f,c,sep='.')				
+					constraints$x0 = weights[[ fname ]][(j-1),index]			
+					weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
+				}
+			}			
 			
 			# custom stats logic		
 			if( !is.null(custom.stats.fn) ) {
@@ -750,6 +844,12 @@ portfolio.allocation.helper <- function
 		}
 			
 		if( j %% 10 == 0) cat(j, '\n')		
+	}
+	
+	if( len(shrinkage.fns) == 1 ) {
+		names(weights) = gsub( paste('\\.', names(shrinkage.fns), '$', sep=''), '', names(weights) )
+		for(ci in names(custom))
+			names(custom[[ ci ]]) = gsub( paste('\\.', names(shrinkage.fns), '$', sep=''), '', names(custom[[ ci ]]) )		
 	}
 
 	
