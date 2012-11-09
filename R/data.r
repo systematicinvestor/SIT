@@ -136,6 +136,7 @@ PricingZeroCouponBond <- function
 ###############################################################################
 # Convert Historical TBills rates to Total Returns
 # http://timelyportfolio.blogspot.com/2011/04/historical-sources-of-bond-returns_17.html
+# http://timelyportfolio.blogspot.ca/2012/11/cashopportunity-lost-or-opportunity.html
 ###############################################################################
 processTBill <- function 
 ( 
@@ -148,11 +149,12 @@ processTBill <- function
 	
 	# price return
 	pr = sapply( yield, function(x) PricingZeroCouponBond(x, timetomaturity) )
-		pr = ROC(pr)
+		pr = ROC(pr, type='discrete')
 		pr[1] = 0
 
 	# interest return
-	ir = mlag(yield, nlag=1) / frequency
+	ir = (1+mlag(yield, nlag=1))^(1 / frequency)-1
+	#ir = mlag(yield, nlag=1) / frequency 
 		ir[1] = 0
 	
 	# total return
@@ -170,6 +172,59 @@ processTBill <- function
 		
 	return(out)
 }
+
+
+processTBill.test <- function()	
+{
+	#*****************************************************************
+	# Get 1 year t-bill
+	#****************************************************************** 	
+	quantmod::getSymbols("GS1", src = "FRED")
+	ir = (1 + mlag(GS1) / 100) ^ (1/12) - 1
+		ir[1] = 0
+		
+	out = processTBill(GS1, timetomaturity = 1,12)
+
+	plota(cumprod(1 + ir), type='l', log = 'y')
+		plota.lines(Ad(out), type='l', col='red')
+
+	#*****************************************************************
+	# Get 3 years t-bill
+	#****************************************************************** 	
+	SHY = getSymbols('SHY', src='yahoo', auto.assign = FALSE)	
+		
+	tbill.m = quantmod::getSymbols('GS3', src='FRED', auto.assign = FALSE)	
+	tbill.d = quantmod::getSymbols('DGS3', src='FRED', auto.assign = FALSE)	
+	timetomaturity = 3
+		
+	compute.raw.annual.factor(tbill.d)
+	compute.raw.annual.factor(tbill.m)
+	
+	# compute returns
+	tbill.m = processTBill(tbill.m, timetomaturity = timetomaturity, 12)
+		#index(tbill.m) = as.Date(paste('1/', format(index(tbill.m), '%m/%Y'), sep=''), '%d/%m/%Y')
+
+	tbill.d[] = ifna.prev(tbill.d)		
+	tbill.d = processTBill(tbill.d, timetomaturity = timetomaturity,261)
+
+	
+	# scale to start at 1	
+	dates = '2003::'
+	tbill.m = tbill.m[dates,2]
+		tbill.m = tbill.m / as.double(tbill.m[1])
+	tbill.d = tbill.d[dates,2]
+		tbill.d = tbill.d / as.double(tbill.d[1])
+	SHY = Ad(SHY[dates,])
+		SHY = SHY / as.double(SHY[1])
+		
+	# plot
+	plota(tbill.d, type='l')		
+		plota.lines(tbill.m, type='s', col='blue')								
+		plota.lines(SHY, type='l', col='red')
+	plota.legend('Daily 3YR T-Bills,Monthly 3YR T-Bills,SHY','black,blue,red')
+
+}
+
 
 ###############################################################################
 # Load CRB Commodities Index 

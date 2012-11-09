@@ -856,12 +856,17 @@ compute.nyears <- function(x)
 	as.double(diff(as.Date(range(index.xts(x)))))/365
 }
 
+compute.raw.annual.factor = function(x) {
+	round( nrow(x) / compute.nyears(x) )
+}
+
 # 252 - days, 52 - weeks, 26 - biweeks, 12-months, 6,4,3,2,1
 compute.annual.factor = function(x) {
 	possible.values = c(252,52,26,13,12,6,4,3,2,1)
-	index = which.min(abs( nrow(x) / compute.nyears(x) - possible.values ))
+	index = which.min(abs( compute.raw.annual.factor(x) - possible.values ))
 	round( possible.values[index] )
 }
+
 
 compute.sharpe <- function(x) 
 { 
