@@ -461,11 +461,18 @@ compute.cor <- function
 # lookup.index(factors$TV$BP, which(factors$TV$BP > 8)) 		
 # plot(factors$TV$BP$BAC)
 ###############################################################################
-lookup.index <- function(data, i) {
-	irow = i %% nrow(data)
-	icol = (i %/% nrow(data)) +1
-	list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[max(0,irow-5):min(nrow(data),irow+5),icol])
-}	
+# play with following example: update 1 %% 4	
+###############################################################################
+lookup.index <- function(data, i, details=F) {
+	nrow(data) = n
+	irow = ((i - 1) %% n) + 1	
+	icol = ((i - 1) %/% n) +1 
+	if(details)
+		list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[max(0,irow-5):min(nrow(data),irow+5),icol])
+	else
+		list(irow=irow,icol=icol)
+}
+
 
 ###############################################################################
 # Convert beta or slope (coefficient of x) to degrees
@@ -486,6 +493,24 @@ beta.degree <- function(beta)
 # must set timezone before any calls to xts
 Sys.setenv(TZ = 'GMT')
 #Sys.setenv(TZ = 'EST')
+# 
+# We want to set the timezone, so that following code produces expected results
+# Sys.getenv('TZ')
+# test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
+#	as.numeric(test)
+#	as.numeric(as.POSIXct(as.Date(test)))
+# as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
+# test == as.POSIXct(as.Date(test))
+#
+# Set Time Zone
+# Sys.setenv(TZ = 'GMT')
+# Sys.getenv('TZ')
+# test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
+#	as.numeric(test)
+#	as.numeric(as.POSIXct(as.Date(test)))
+# as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
+# test == as.POSIXct(as.Date(test))
+#
 
 
 make.xts <- function
@@ -539,6 +564,10 @@ read.xts <- function
 {
 	out = read.csv(filename, stringsAsFactors=F)
 	return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
+	
+# getSymbols.yahoo: as.POSIXct - to avoid Dates problems
+# fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())
+# indexClass(fr) = "Date"	
 }
 
 
@@ -621,11 +650,24 @@ getSymbols.sit <- function(Symbols = NULL, env = .GlobalEnv, src = 'yahoo', auto
 	stock.date.format = '%Y-%m-%d'
 
 	# http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod
-	for(s in Symbols) {
+	for(i in 1:len(Symbols)) {
+		s = Symbols[i]
+		
 		temp = list()
 		temp[[ s ]] = list(src='csv', format=stock.date.format, dir=stock.folder)
 		setSymbolLookup(temp)
+		
+		temp = quantmod::getSymbols(s, env = env, auto.assign = auto.assign)		
+		if (!auto.assign) {
+			cat(s, format(range(index(temp)), '%d-%b-%Y'), '\n', sep='\t')	
+			return(temp)
+		}
+		if(!is.null(env[[ s ]]))
+			cat(i, 'out of', len(Symbols), 'Reading', s, format(range(index(env[[ s ]])), '%d-%b-%Y'), '\n', sep='\t')	
+		else
+			cat(i, 'out of', len(Symbols), 'Missing', s, '\n', sep='\t')	
 	}
 
-	quantmod::getSymbols(Symbols, env = env, auto.assign = auto.assign)
+	#quantmod::getSymbols(Symbols, env = env, auto.assign = auto.assign)
+	 	
 }

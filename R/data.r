@@ -230,13 +230,16 @@ processTBill.test <- function()
 # Load CRB Commodities Index 
 # http://www.jefferies.com/cositemgr.pl/html/ProductsServices/SalesTrading/Commodities/ReutersJefferiesCRB/IndexData/index.shtml
 ###############################################################################
-get.CRB <- function()
+# ... parameters for read.xls function
+# i.e. CRB = get.CRB(perl = 'c:/perl/bin/perl.exe')
+###############################################################################
+get.CRB <- function(...)
 {
 	load.packages('gtools,gdata')
 	
 	#http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Excess&StartDate=19940103&EndDate=20111202
 	url = paste('http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Total&StartDate=19940101&EndDate=', format(Sys.Date(), '%Y%m%d'), sep='')	
-  	temp = read.xls(url)
+  	temp = read.xls(url, ...)
   	
   	temp = as.matrix(temp[-c(1:7),])
   	
@@ -246,7 +249,8 @@ get.CRB <- function()
 	out = make.xts( out,  as.Date(temp[,1], '%m/%d/%y'))
 		
 	return(out)
-}
+} 	
+	
 
 get.CRB.test <- function()	
 {
@@ -277,8 +281,23 @@ get.CRB.test <- function()
 	temp = compute.cor(temp / mlag(temp)- 1, 'pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 	plot.table(temp)	
+	
+	
+	layout(1:3)	
+	plota.matplot(CRB[,c('Close','Adjusted')])	
+	plota.matplot(DBC[,c('DBC.Close','DBC.Adjusted')])	
+	plota.matplot(GSG[,c('GSG.Close','GSG.Adjusted')])	
+	
+	
+	layout(1)				
+	comm = extend.data(DBC, CRB, scale=T)
+	plota(comm, type='l', col=1)
+		plota.lines(CRB*0.078, type='l', lwd=5, col=col.add.alpha(2,150))
+		plota.lines(DBC, type='l', lwd=5, col=col.add.alpha(3,150))
+		plota.lines(comm, type='l', col=1)
+	plota.legend('comm,CRB,DBC', 1:3, list(comm,CRB,DBC))
 }	
-
+	
 
 ###############################################################################
 # Get Dow Jones Components
@@ -524,16 +543,37 @@ KITCO.data <- function
 	return( hist[!is.na(hist)] )
 }
 
+
+# gold = extend.GLD(data$GLD)
+# comm = extend.data(data$DBC, get.CRB(), scale=T)
 extend.data <- function
 (
 	current,
-	hist
+	hist,
+	scale = F
 ) 
 {
-	hist = hist[format(index(current[1])-1,'::%Y:%m:%d'),]
+	# find Close in hist
+	close.index = find.names('Close', colnames(hist))$Close
+	if(is.na(close.index)) close.index = 1
+
+	if(scale) {
+		# find first common observation in current and hist series
+		map = match(index(current), index(hist))
+		common = which.min(map)
+		
+		scale = as.numeric(Cl(current)[common]) / as.numeric(hist[map[common],close.index])
+		
+		hist = hist * scale
+	}
 	
-	hist = make.xts( repCol(hist, ncol(current)), index(hist))
-		colnames(hist) = colnames(current)
+	# subset history before current
+	hist = hist[format(index(current[1])-1,'::%Y:%m:%d'),,drop=F]
+	
+	
+	if( ncol(hist) != ncol(current) )	
+		hist = make.xts( repCol(hist[,close.index], ncol(current)), index(hist))
+	colnames(hist) = colnames(current)
 		
 	rbind( hist, current )
 }

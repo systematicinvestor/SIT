@@ -6554,7 +6554,123 @@ dev.off()
 
 }
 
+
+###############################################################################
+# Regime Detection Pitfalls
+###############################################################################
+bt.regime.detection.pitfalls.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	data <- new.env()
+	getSymbols('SPY', src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		data$SPY = adjustOHLC(data$SPY, use.Adjusted=T)							
+	bt.prep(data)
 	
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 		
+	nperiods = nrow(data$prices)
+
+	models = list()
+	
+	rets = ROC(Ad(data$SPY))
+		rets[1] = 0
+	
+	# use 10 years: 1993:2002 for training	
+	in.sample.index = '1993::2002'
+	out.sample.index = '2003::'
+		
+	in.sample = rets[in.sample.index]
+	out.sample = rets[out.sample.index]
+	out.sample.first.date = nrow(in.sample) + 1
+
+	#*****************************************************************
+	# Fit Model
+	#****************************************************************** 		
+	load.packages('RHmm')	
+	fit = HMMFit(in.sample, nStates=2)
+	
+	# find states
+	states.all = rets * NA
+	states.all[] = viterbi(fit, rets)$states
+			
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[] = iif(states.all == 1, 0, 1)
+		data$weight[in.sample.index] = NA
+    models$states.all = bt.run.share(data)
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										    
+	plotbt.custom.report.part1(models) 
+dev.off()	
+	
+	#*****************************************************************
+	# Find problem - results are too good
+	#****************************************************************** 		
+	# The viterbi function need to see all data to compute the most likely sequence of states
+	# or forward/backward probabilities
+	# http://en.wikipedia.org/wiki/Forward%E2%80%93backward_algorithm
+	# http://en.wikipedia.org/wiki/Viterbi_algorithm
+	
+	# We can use expanding window to determine the states
+	states.win1 = states.all * NA
+	for(i in out.sample.first.date:nperiods) {
+		states.win1[i] = last(viterbi(fit, rets[1:i])$states)
+		if( i %% 100 == 0) cat(i, 'out of', nperiods, '\n')
+	}
+	
+	# Or we can refit model over expanding window as suggested in the
+	# Regime Shifts: Implications for Dynamic Strategies by M. Kritzman, S. Page, D. Turkington
+	# Out-of-Sample Analysis, page 8
+	initPoint = fit$HMM
+	states.win2 = states.all * NA
+	for(i in out.sample.first.date:nperiods) {
+		fit2 = HMMFit(rets[2:i], nStates=2, control=list(init='USER', initPoint = initPoint))
+			initPoint = fit2$HMM
+		states.win2[i] = last(viterbi(fit2, rets[2:i])$states)
+		if( i %% 100 == 0) cat(i, 'out of', nperiods, '\n')
+	}
+
+	#*****************************************************************
+	# Plot States
+	#****************************************************************** 			
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										    	
+	layout(1:3)
+	col = col.add.alpha('white',210)
+	plota(states.all[out.sample.index], type='s', plotX=F)
+		plota.legend('Implied States based on all data', x='center', bty='o', bg=col, box.col=col,border=col,fill=col,cex=2)
+	plota(states.win1[out.sample.index], type='s')
+		plota.legend('Implied States based on rolling window', x='center', bty='o', bg=col, box.col=col,border=col,fill=col,cex=2)
+	plota(states.win2[out.sample.index], type='s')
+		plota.legend('Implied States based on rolling window(re-fit)', x='center', bty='o', bg=col, box.col=col,border=col,fill=col,cex=2)
+dev.off()
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 		
+	data$weight[] = NA
+		data$weight[] = iif(states.win1 == 1, 0, 1)
+		data$weight[in.sample.index] = NA
+    models$states.win1 = bt.run.share(data)
+		
+	data$weight[] = NA
+		data$weight[] = iif(states.win2 == 1, 0, 1)
+		data$weight[in.sample.index] = NA
+    models$states.win2 = bt.run.share(data)
+
+	#*****************************************************************
+	# Create report
+	#****************************************************************** 			
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										    		
+	plotbt.custom.report.part1(models) 
+dev.off()
+
+}	
  	 
 
 

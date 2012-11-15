@@ -778,54 +778,63 @@ portfolio.allocation.helper <- function
 		index = universe[j,] & include.index						
 		n = sum(index)
 		
-		if(n > 0) {					
-			hist = hist[ , index]
-			hist.all = ret[ 1:i, index]		
-
+		if(n > 0) {
+			if(n > 1) {			
+				hist = hist[ , index]
+				hist.all = ret[ 1:i, index]		
 	
-			# 0 <= x.i <= 1
-			constraints = new.constraints(n, lb = const.lb[index], ub = const.ub[index])
-				constraints = add.constraints(diag(n), type='>=', b=const.lb[index], constraints)
-				constraints = add.constraints(diag(n), type='<=', b=const.ub[index], constraints)
-
-			# SUM x.i = 1
-			if(!is.na(const.sum))
-				constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
-						
-			# create historical input assumptions
-			#ia = new.env()
-			ia = list()
-				ia$index = index
-				ia$n = n
-				ia$hist.returns = hist
-				ia$expected.return = apply(hist, 2, mean)				
-				ia$risk = apply(hist, 2, sd)
-				ia$correlation = cor(hist, use='complete.obs', method='pearson')
-				#ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
-				
-				
-				
-			for(c in names(shrinkage.fns)) {
-				#ia$cov = shrinkage.fns[[c]](hist, risk, correlation)
-				ia$cov = shrinkage.fns[[c]](hist, hist.all)
-					s0 = 1 / sqrt(diag(ia$cov))
-				ia$correlation = ia$cov * (s0 %*% t(s0))
-
+		
+				# 0 <= x.i <= 1
+				constraints = new.constraints(n, lb = const.lb[index], ub = const.ub[index])
+					constraints = add.constraints(diag(n), type='>=', b=const.lb[index], constraints)
+					constraints = add.constraints(diag(n), type='<=', b=const.ub[index], constraints)
+	
+				# SUM x.i = 1
+				if(!is.na(const.sum))
+					constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
 							
-				# adjust correlation and covariance matrices to be positive defined
-				temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
-					if(!inherits(temp, 'try-error')) ia$cov = temp				
-				temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
-					if(!inherits(temp, 'try-error')) ia$correlation = temp							
+				# create historical input assumptions
+				#ia = new.env()
+				ia = list()
+					ia$index = index
+					ia$n = n
+					ia$hist.returns = hist
+					ia$expected.return = apply(hist, 2, mean)				
+					ia$risk = apply(hist, 2, sd)
+					ia$correlation = cor(hist, use='complete.obs', method='pearson')
+					#ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+					
+					
+					
+				for(c in names(shrinkage.fns)) {
+					#ia$cov = shrinkage.fns[[c]](hist, risk, correlation)
+					ia$cov = shrinkage.fns[[c]](hist, hist.all)
+						s0 = 1 / sqrt(diag(ia$cov))
+					ia$correlation = ia$cov * (s0 %*% t(s0))
+	
+								
+					# adjust correlation and covariance matrices to be positive defined
+					temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
+						if(!inherits(temp, 'try-error')) ia$cov = temp				
+					temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
+						if(!inherits(temp, 'try-error')) ia$correlation = temp							
+					
+					# find optimal portfolios under different risk measures
+					for(f in names(min.risk.fns)) {
+						fname = paste(f,c,sep='.')				
+						constraints$x0 = weights[[ fname ]][(j-1),index]			
+						weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
+					}
+				}			
+			} else {
+				for(c in names(shrinkage.fns)) {
+					for(f in names(min.risk.fns)) {
+						fname = paste(f,c,sep='.')				
+						weights[[ fname ]][j,index] = 1
+					}
+				}			
+			}
 				
-				# find optimal portfolios under different risk measures
-				for(f in names(min.risk.fns)) {
-					fname = paste(f,c,sep='.')				
-					constraints$x0 = weights[[ fname ]][(j-1),index]			
-					weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
-				}
-			}			
-			
 			# custom stats logic		
 			if( !is.null(custom.stats.fn) ) {
 				for(w in names(weights)) {

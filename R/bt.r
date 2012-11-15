@@ -244,6 +244,24 @@ bt.prep.remove.symbols <- function
 	}
 }
 
+bt.prep.trim <- function
+(
+	b, 					# enviroment with symbols time series
+	dates = NULL	# subset of dates
+) 
+{	
+	if(is.null(dates)) return(b)
+	
+	data.copy <- new.env()
+	for(s in b$symbolnames) data.copy[[s]] = b[[s]][dates,,drop=F]
+		 
+	data.copy$symbolnames = b$symbolnames
+	data.copy$prices = b$prices[dates,,drop=F]
+	data.copy$weight = b$weight[dates,,drop=F]
+	data.copy$execution.price = b$execution.price[dates,,drop=F]
+	return(data.copy)
+}
+ 
 
 ###############################################################################
 # Helper function to backtest for type='share'

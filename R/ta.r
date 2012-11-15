@@ -207,6 +207,22 @@ TSI <- function
 }
 
 
+
+###############################################################################
+# Ulcer Index: alternative to Standard Devation
+# http://en.wikipedia.org/wiki/Ulcer_index
+# http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ulcer_index
+############################################################################### 
+ulcer.index <- function
+(
+	x, 		# prices
+	n=14	# window length
+)
+{
+	sqrt(runSum((100*( x - runMax(x,n) ) / runMax(x,n))^2, n) / n)
+}
+
+
 ###############################################################################    
 # Rolling EV Ratio: A Trend Indicator or Performance Measurement Statistic
 # cumulative W% (up periods/total periods) x W/L ratio (sum of wins/sum of losses)            
