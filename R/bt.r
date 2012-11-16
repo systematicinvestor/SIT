@@ -488,6 +488,7 @@ bt.summary <- function
 			totalcash = NA * cash
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
+				totalcash = ifna(totalcash,0)	# check this
 
 		
 		# We can introduce transaction cost to portfolio returns as
