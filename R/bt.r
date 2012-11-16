@@ -278,7 +278,8 @@ bt.run.share <- function
 	silent = F,
 	capital = 100000,
 	commission = 0,
-	weight = b$weight	
+	weight = b$weight,
+	dates = 1:nrow(b$prices)	
 ) 
 {
 	# make sure that prices are available, assume that
@@ -299,11 +300,32 @@ bt.run.share <- function
 		silent = silent,
 		capital = capital,
 		commission = commission,
-		weight = weight)	
+		weight = weight,
+		dates = dates)	
 }
 
 ###############################################################################
 # Run backtest
+#
+# Inputs are assumed as if they were computed at point in time (i.e. no lags)
+#
+# For 'weight' back-test, the default action is to lage weights by one day,
+# because weights are derived using all the information avalaible today, 
+# so we can only implement these weights tomorrow:
+#   portfolio.returns = lag(weights,1) * returns = weights * ( p / lag(p,1) - 1 )
+# user can specify a different lag for weights, by changing the do.lag parameter.
+#
+# For example, for the end of the month strategy: if we open position at the close
+# on the 30th, hold position on the 31st and sell it at the close on the 1st. If our
+# weights have 0 on the 30th, 1 on the 31st, 1 on the 1st, and 0 on the 2nd, we
+# can specify do.lag = 0 to get correct portfolio.returns
+#
+# Alternatively, if our weights have 0 on the 29th, 1 on the 30st, 1 on the 31st, and 0 on the 1nd, we
+# can leave do.lag = 1 to get correct portfolio.returns
+#
+# For 'share' back-test, the portfolio returns:
+#   portfolio.returns = lag(shares,1) * ( p - lag(p,1) ) / ( lag(shares,1) * lag(p,1) )
+# 
 ###############################################################################
 # some operators do not work well on xts
 # weight[] = apply(coredata(weight), 2, ifna_prev)
@@ -318,9 +340,13 @@ bt.run <- function
 	silent = F,
 	capital = 100000,
 	commission = 0,
-	weight = b$weight	
+	weight = b$weight,
+	dates = 1:nrow(b$prices)	
 ) 
 {
+	# convert dates to dates.index
+	dates.index = dates2index(b$prices, dates) 
+	
 	# setup
 	type = type[1]
 
@@ -382,7 +408,8 @@ bt.run <- function
 
 	# prepare output
 	bt = list()
-		bt = bt.summary(weight, ret, type, b$prices, capital, commission)
+		bt$dates.index = dates.index 
+		bt = bt.summary(weight, ret, type, b$prices, capital, commission, dates.index)
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
@@ -407,9 +434,18 @@ bt.summary <- function
 	type = c('weight', 'share'),
 	close.prices,
 	capital = 100000,
-	commission = 0
+	commission = 0,
+	dates.index = 1:nrow(weight)
 ) 
 {
+	# subset dates
+	if(len(dates.index) != nrow(weight)) {
+		weight = weight[dates.index,,drop=F]
+		ret = ret[dates.index,,drop=F]
+		close.prices = close.prices[dates.index,,drop=F]	
+	}
+	
+	
 	type = type[1]
     n = nrow(ret)
 	     	
@@ -504,7 +540,7 @@ compute.turnover <- function
 		portfolio.turnover = rowSums( abs(bt$weight - mlag(bt$weight)) )
 	} else {
 		# logic from bt.summary function				
-		cash = bt$capital - rowSums(bt$share * mlag(b$prices), na.rm=T)
+		cash = bt$capital - rowSums(bt$share * mlag(b$prices[bt$dates.index,,drop=F]), na.rm=T)
 		
 			# find trade dates
 			share.nextday = mlag(bt$share, -1)
@@ -517,9 +553,9 @@ compute.turnover <- function
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
 		
-		portfolio.value = totalcash + rowSums(bt$share * mlag(b$prices), na.rm=T)		
+		portfolio.value = totalcash + rowSums(bt$share * mlag(b$prices[bt$dates.index,,drop=F]), na.rm=T)		
 		
-		portfolio.turnover = rowSums( mlag(b$prices) * abs(bt$share - mlag(bt$share)) )				
+		portfolio.turnover = rowSums( mlag(b$prices[bt$dates.index,,drop=F]) * abs(bt$share - mlag(bt$share)) )				
 	}
 	
 	portfolio.turnover[1:2] = 0
@@ -566,12 +602,12 @@ bt.trade.summary <- function
 		trade = ifna(tstart | tend, FALSE)
 	
 	# prices
-	prices = b$prices
+	prices = b$prices[bt$dates.index,,drop=F]
 	
 	# execution price logic
 	if( sum(trade) > 0 ) {
-		execution.price = coredata(b$execution.price)
-		prices1 = coredata(b$prices)
+		execution.price = coredata(b$execution.price[bt$dates.index,,drop=F])
+		prices1 = coredata(b$prices[bt$dates.index,,drop=F])
 		
 		prices1[trade] = iif( is.na(execution.price[trade]), prices1[trade], execution.price[trade] )
 		

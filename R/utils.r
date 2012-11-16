@@ -288,6 +288,17 @@ third.friday.month <- function(year, month)
 
 
 
+# convert dates to dates.index
+dates2index <- function( x, dates = 1:nrow(x) ) {
+	dates.index = dates
+	if(!is.numeric(dates)) {
+		temp = x[,1]
+		temp[] = 1:nrow(temp)
+		dates.index = as.numeric(temp[dates])
+	}
+	return(dates.index)
+} 
+
 ###############################################################################
 # Load Packages that are available and install ones that are not available.
 ############################################################################### 
