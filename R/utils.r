@@ -23,9 +23,24 @@
 ###############################################################################
 # Convenience Utilities
 ###############################################################################
-# Split string into tokens using delim
+#' Split string into tokens using delim
+#'
+#' This function will split given string into tokens using delim
+#'
+#' @param s input string
+#'
+#' @param delim delimiter, \strong{defaults to ","}
+#'
+#' @return array of tokens
+#'
+#' @export 
+#'
+#' @examples
+#'
+#' spl('a,b,c')
+#'
 ###############################################################################
-spl <- function
+spl <- function 
 (
 	s,			# input string
 	delim = ','	# delimiter

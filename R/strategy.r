@@ -582,7 +582,7 @@ rotation.strategy.test <- function()
 	}		
 	
 	#*****************************************************************
-	# Shrinkage functions
+	# Shrinkage functions - maybe instead provide full input assumptions
 	#*****************************************************************
 	sample.shrinkage <- function( hist, hist.all ) {
 		cov(hist, use='complete.obs', method='pearson')
@@ -639,10 +639,12 @@ rotation.strategy.test <- function()
 	}
 
 	ledoit.wolf.shrinkage <- function( hist, hist.all ) {
+		requier(BurStFin)
 		var.shrink.eqcor(hist, 1, compatible = T)
 	}
 		
 	factor.model.shrinkage <- function( hist, hist.all ) {
+		requier(BurStFin)
 		factor.model.stat(hist, 1)
 	}
 	
@@ -665,6 +667,9 @@ portfolio.allocation.helper <- function
 	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
 	custom.stats.fn = NULL,
 	shrinkage.fns = 'sample.shrinkage',	# covariance Shrinkage Estimator functions
+	
+	adjust2positive.definite = T,
+	silent = F,
 	
 	const.lb = 0, 
 	const.ub = 1,
@@ -812,12 +817,14 @@ portfolio.allocation.helper <- function
 						s0 = 1 / sqrt(diag(ia$cov))
 					ia$correlation = ia$cov * (s0 %*% t(s0))
 	
-								
+										
 					# adjust correlation and covariance matrices to be positive defined
-					temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
-						if(!inherits(temp, 'try-error')) ia$cov = temp				
-					temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
-						if(!inherits(temp, 'try-error')) ia$correlation = temp							
+					if(adjust2positive.definite) {
+						temp = try(make.positive.definite(ia$cov, 0.000000001), TRUE)	
+							if(!inherits(temp, 'try-error')) ia$cov = temp				
+						temp = try(make.positive.definite(ia$correlation, 0.000000001), TRUE)	
+							if(!inherits(temp, 'try-error')) ia$correlation = temp							
+					}
 					
 					# find optimal portfolios under different risk measures
 					for(f in names(min.risk.fns)) {
@@ -852,7 +859,7 @@ portfolio.allocation.helper <- function
 			
 		}
 			
-		if( j %% 10 == 0) cat(j, '\n')		
+		if( j %% 10 == 0) if(!silent) cat(j, '\n')		
 	}
 	
 	if( len(shrinkage.fns) == 1 ) {
@@ -881,6 +888,104 @@ portfolio.allocation.custom.stats <- function(x,ia) {
 	))
 }
 
+
+
+# this is a basic version of portfolio.allocation.helper function
+portfolio.allocation.helper.basic <- function
+(
+	prices,					# prices
+	periodicity = 'weeks',	#  rebalancing frequency
+	period.ends = endpoints(prices, periodicity),	# rebalancing times
+	
+	lookback.len = 60,		# lookback to construct input assumptions each period
+	prefix = '',
+	
+	universe = prices[period.ends,]>0,
+	
+	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
+	silent = F
+) 
+{
+	load.packages('quadprog,corpcor')
+	
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	period.ends = period.ends[period.ends > 0]
+	
+	universe[is.na(universe)] = F
+	
+	if(is.character(min.risk.fns)) min.risk.fns = spl(min.risk.fns)
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 		
+	dates = index(prices)[period.ends]
+	
+	prices = coredata(prices)
+	ret = prices / mlag(prices) - 1
+	
+	start.i = which(period.ends >= (lookback.len + 1))[1]
+
+	weight = NA * prices[period.ends,]
+		weight[] = 0
+		
+	weights = list()			
+	for(f in min.risk.fns) 
+		weights[[f]] = weight
+		
+						
+	# construct portfolios			
+	for( j in start.i:len(period.ends) ) {
+		i = period.ends[j]
+		
+		# histtory to construct input assumptions
+		hist = ret[ (i- lookback.len +1):i, ]
+		
+		# require all assets to have full price history
+		include.index = count(hist)== lookback.len      
+
+		index = universe[j,] & include.index						
+		n = sum(index)
+		
+		if(n > 0) {
+			if(n > 1) {			
+				hist = hist[ , index]
+	
+				# 0 <= x.i <= 1
+				constraints = new.constraints(n, lb = 0, ub = 1)
+					constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+					constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+	
+				# SUM x.i = 1
+				constraints = add.constraints(rep(1, n), type = '=', b=1, constraints)
+							
+				# create historical input assumptions
+				#ia = new.env()
+				ia = list()
+					ia$index = index
+					ia$n = n
+					ia$hist.returns = hist
+					ia$expected.return = apply(hist, 2, mean)				
+					ia$risk = apply(hist, 2, sd)
+					ia$correlation = cor(hist, use='complete.obs', method='pearson')
+					ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+					
+				# find optimal portfolios under different risk measures
+				for(f in min.risk.fns)
+					weights[[ f ]][j,index] = match.fun(f)(ia, constraints)						
+			} else {
+				for(f in min.risk.fns)
+					weights[[ f ]][j,index] = 1
+			}
+		}
+			
+		if( j %% 10 == 0) if(!silent) cat(j, '\n')		
+	}
+		
+	return(list(weights = weights, period.ends = period.ends,
+		periodicity = periodicity, lookback.len = lookback.len))
+}
 
 
 

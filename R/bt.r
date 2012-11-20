@@ -407,8 +407,7 @@ bt.run <- function
 	
 
 	# prepare output
-	bt = list()
-		bt = bt.summary(weight, ret, type, b$prices, capital, commission, dates.index)
+	bt = bt.summary(weight, ret, type, b$prices, capital, commission, dates.index)
 		bt$dates.index = dates.index 
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
