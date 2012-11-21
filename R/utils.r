@@ -622,9 +622,10 @@ index.xts <- function
 )
 {
 	temp = attr(x, 'index')
-	class(temp)='POSIXct' 
+	class(temp) = c('POSIXct', 'POSIXt')
 	
-	if( attr(x, '.indexCLASS')[1] == 'Date')
+    type = attr(x, '.indexCLASS')[1]
+    if( type == 'Date' || type == 'yearmon' || type == 'yearqtr')
 		temp = as.Date(temp)
 	return(temp)
 }
