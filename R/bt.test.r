@@ -5469,6 +5469,92 @@ bt.current.quote.test <- function()
 
 
 ###############################################################################
+# Extending Commodity  time series
+# with CRB Commodities Index 
+# http://www.jefferies.com/cositemgr.pl/html/ProductsServices/SalesTrading/Commodities/ReutersJefferiesCRB/IndexData/index.shtml
+###############################################################################
+bt.extend.DBC.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 	
+	load.packages('quantmod')		
+	CRB = get.CRB()
+		
+	tickers = spl('GSG,DBC')		
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01')
+	
+	#*****************************************************************
+	# Compare different indexes
+	#****************************************************************** 	
+	out = na.omit(merge(Ad(CRB), Ad(GSG), Ad(DBC)))
+		colnames(out) = spl('CRB,GSG,DBC')
+	temp = out / t(repmat(as.vector(out[1,]),1,nrow(out)))
+		
+png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    	
+	# Plot side by side
+	layout(1:2, heights=c(4,1))
+	plota(temp, ylim=range(temp))
+		plota.lines(temp[,1],col=1)
+		plota.lines(temp[,2],col=2)
+		plota.lines(temp[,3],col=3)
+	plota.legend(colnames(temp),1:3)
+			
+	# Plot correlation table	
+	temp = compute.cor(temp / mlag(temp)- 1, 'pearson')
+			temp[] = plota.format(100 * temp, 0, '', '%')
+	plot.table(temp)	
+dev.off()		
+	
+	
+	#*****************************************************************
+	# Create simple equal weight back-test
+	#****************************************************************** 
+	tickers = spl('GLD,DBC,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+		# extend Gold and Commodity time series
+		data$GLD = extend.GLD(data$GLD)	
+		data$DBC = extend.data(data$DBC, get.CRB(), scale=T)
+			
+	bt.prep(data, align='remove.na')
+ 
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices      
+    n = ncol(prices)
+  
+    # find period ends
+    period.ends = endpoints(prices, 'months')
+        period.ends = period.ends[period.ends > 0]
+        
+    models = list()
+   
+    #*****************************************************************
+    # Equal Weight
+    #******************************************************************
+    data$weight[] = NA
+        data$weight[period.ends,] = ntop(prices[period.ends,], n)   
+    models$equal.weight = bt.run.share(data, clean.signal=F)
+
+    
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       
+png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
+    plotbt.custom.report.part1(models)       
+dev.off()		
+
+png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		               
+    plotbt.custom.report.part2(models)       
+dev.off()	
+}
+
+###############################################################################
 # Extending Gold time series
 # http://wikiposit.org/w?filter=Finance/Commodities/
 # http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
