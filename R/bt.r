@@ -190,7 +190,7 @@ bt.prep.matrix <- function
 		b$dates = b$dates[index]
 	}
  
-	if( r_align == 'remove.na' ) { 
+	if( align == 'remove.na' ) { 
 		index = which(count(b$Cl, side=1) < nsymbols )
 	} else {
 		index = which(count(b$Cl,side=1) < max(1,0.1 * nsymbols) )
@@ -213,6 +213,40 @@ bt.prep.matrix <- function
 	b$prices = dummy.mat
 }
 
+
+bt.prep.matrix.test <- function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	# example csv file holds returns
+	# Date ,A,B
+	# Jan-70,0.01,0.02
+	returns = read.xts('Example.csv', date.fn=function(x) paste('1',x), format='%d %b-%y')
+	prices = bt.apply.matrix(1 + returns, cumprod)
+	
+	data <- new.env()
+		data$symbolnames = colnames(prices)
+		data$dates = index(prices)
+		data$fields = 'Cl'
+		data$Cl = prices				
+		
+	bt.prep.matrix(data)
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	# Buy & Hold	
+	data$weight[] = NA
+		data$weight[] = 1
+	buy.hold = bt.run.share(data)
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 		
+	plotbt(buy.hold, plotX = T, log = 'y', LeftMargin = 3)	    	
+			mtext('Cumulative Performance', side = 2, line = 1)
+}
 
 ###############################################################################
 # Remove symbols from enviroment

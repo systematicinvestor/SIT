@@ -585,11 +585,13 @@ write.xts <- function
 read.xts <- function
 (
 	filename,	# file name
+	date.fn = paste,
 	...
 )
 {
 	out = read.csv(filename, stringsAsFactors=F)
-	return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
+	#return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
+	return( make.xts(out[,-1,drop=F], as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv("TZ"), ...)) )
 	
 # getSymbols.yahoo: as.POSIXct - to avoid Dates problems
 # fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())

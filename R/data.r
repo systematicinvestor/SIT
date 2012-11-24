@@ -246,7 +246,8 @@ get.CRB <- function(...)
 	out = repmat(as.double(temp[,2]), 1, 6)
    		colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
    		out[, 'Volume'] = 0
-	out = make.xts( out,  as.Date(temp[,1], '%m/%d/%y'))
+	#out = make.xts( out, as.Date(temp[,1], '%m/%d/%y'))
+	out = make.xts( out, as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%m/%d/%y'))	
 		
 	return(out)
 } 	
@@ -538,7 +539,8 @@ KITCO.data <- function
 	url = 'http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO'
 	temp = read.csv(url, skip=4, header=TRUE, stringsAsFactors=F)
 		
-	hist = make.xts(as.double(temp[,symbol]), as.Date(temp[,1], '%d-%b-%Y'))		
+	#hist = make.xts(as.double(temp[,symbol]), as.Date(temp[,1], '%d-%b-%Y'))
+	hist = make.xts(as.double(temp[,symbol]), as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%d-%b-%Y'))	
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
@@ -588,7 +590,8 @@ bundes.bank.data <- function(symbol) {
 	url = paste('http://www.bundesbank.de/cae/servlet/CsvDownload?tsId=', symbol, '&its_csvFormat=en&mode=its', sep='')
 	temp = read.csv(url, skip=5, header=F, stringsAsFactors=F)
 
-	hist = make.xts(as.double(temp[,2]), as.Date(temp[,1], '%Y-%m-%d'))		
+	#hist = make.xts(as.double(temp[,2]), as.Date(temp[,1], '%Y-%m-%d'))		
+	hist = make.xts(as.double(temp[,2]), as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%Y-%m-%d'))			
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
@@ -615,7 +618,8 @@ fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
 	url = paste('http://fx.sauder.ubc.ca/cgi/fxdata?b=', base.cur, join(paste('&c=', spl(target.curs), sep='')), '&rd=&fd=1&fm=1&fy=', start.year, '&ld=31&lm=12&ly=', end.year, '&y=daily&q=volume&f=csv&o=', sep='')
 	temp = read.csv(url, skip=1, header=T, stringsAsFactors=F)
 
-	hist = make.xts(as.matrix(temp[,-c(1:3)]), as.Date(temp[,2], '%Y/%m/%d'))		
+	#hist = make.xts(as.matrix(temp[,-c(1:3)]), as.Date(temp[,2], '%Y/%m/%d'))		
+	hist = make.xts(as.matrix(temp[,-c(1:3)]), as.POSIXct(temp[,2], tz = Sys.getenv("TZ"), format='%Y/%m/%d'))			
 		colnames(hist) = gsub(paste('.', base.cur, sep=''), '', colnames(hist))
 		
 	return( hist[!is.na(hist[,1]),] )
@@ -653,7 +657,8 @@ getSymbols.PI <- function
 		filename = paste(temp.folder, '/', Symbols[i], '.txt', sep='')
 		
 		temp = read.delim(filename, header=TRUE, sep=',')		
-		out = make.xts(temp[,-1], as.Date(temp[,1],'%m/%d/%Y'))
+		#out = make.xts(temp[,-1], as.Date(temp[,1],'%m/%d/%Y'))
+		out = make.xts(temp[,-1], as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%m/%d/%Y'))		
 			out$Adjusted = out$Close
 			
 cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')					
@@ -785,7 +790,7 @@ getSymbols.TB <- function(
 		filename = paste(temp.folder, '/', def[i,3], '/', def[i,4], sep='')
 		if(file.exists(filename)) {										
 			fr <- read.csv(filename, header = FALSE) 
-			fr <- make.xts(fr[,-1], as.Date(as.character(fr[,1]),'%Y%m%d'))
+			fr <- make.xts(fr[,-1], as.Date(as.character(fr[,1]),'%Y%m%d'))			
 			colnames(fr) <- spl('Open,High,Low,Close,Volume,OpenInterest,DeliveryMonth,Unadjusted')[1:ncol(fr)]
 			fr$Adjusted = fr$Close
 			if (auto.assign) assign(symbol, fr, env)
