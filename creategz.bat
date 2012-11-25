@@ -1,6 +1,9 @@
 :: http://www.computing.net/answers/programming/batch-file-to-join-files-into-one-file/19150.html
 @echo off
 
+:: clean up
+rmdir /S /Q SIT
+
 :: delete code.r if present
 if exist c:\temp\code.r del c:\temp\code.r
 
