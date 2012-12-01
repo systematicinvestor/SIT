@@ -2,7 +2,7 @@
 @echo off
 
 :: clean up
-rmdir /S /Q SIT
+::rmdir /S /Q SIT
 
 :: delete code.r if present
 if exist c:\temp\code.r del c:\temp\code.r
@@ -13,7 +13,7 @@ echo. >c:\temp\code.r
 ::copy/b c:\temp\code.r+Readme.txt c:\temp\code.r
 
 :: merge all R\*.r files
-for /r %%a in (R\*.r) do (
+for %%a in (R\*.r) do (
 	echo. >>c:\temp\code.r
 	copy/b c:\temp\code.r+"%%a" c:\temp\code.r
 )

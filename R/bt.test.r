@@ -6762,4 +6762,52 @@ dev.off()
 
 
 
-			
+###############################################################################
+# Financial Turbulence Index example based on the
+# Skulls, Financial Turbulence, and Risk Management by M. Kritzman, Y. Li
+# http://www.cfapubs.org/doi/abs/10.2469/faj.v66.n5.3
+#
+# Timely Portfolio series of posts:
+# http://timelyportfolio.blogspot.ca/2011/04/great-faj-article-on-statistical.html
+# http://timelyportfolio.blogspot.ca/2011/04/great-faj-article-on-statistical_26.html
+# http://timelyportfolio.blogspot.ca/2011/04/great-faj-article-on-statistical_6197.html
+###############################################################################
+bt.financial.turbulence.test <- function() 
+{	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+
+	fx = get.G10()
+		nperiods = nrow(fx)
+
+	#*****************************************************************
+	# Rolling estimate of the Financial Turbulence for G10 Currencies
+	#****************************************************************** 
+	turbulence = fx[,1] * NA
+	ret = coredata(fx / mlag(fx) - 1)
+	
+	look.back = 252
+	
+	for( i in (look.back+1) : nperiods ) {
+		temp = ret[(i - look.back + 1):(i-1), ]
+				
+		# measures turbulence for the current observation
+		turbulence[i] = mahalanobis(ret[i,], colMeans(temp), cov(temp))
+		
+		if( i %% 200 == 0) cat(i, 'out of', nperiods, '\n')
+	}	
+	
+	#*****************************************************************
+	# Plot 30 day average of the Financial Turbulence for G10 Currencies
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										    			
+	plota(EMA( turbulence, 30), type='l', 
+		main='30 day average of the Financial Turbulence for G10 Currencies')
+dev.off()	
+	
+	
+}	
+	
+					

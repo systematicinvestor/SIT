@@ -729,6 +729,74 @@ cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')
 
 
 
+
+
+###############################################################################
+# Download historical data for G10
+# The PowerShares DB G10 Currency Harvest Fund
+# http://www.invescopowershares.com/products/overview.aspx?ticker=DBV
+#
+# The G10 currency universe from which the Index selects currently includes 
+# U.S. dollars, 
+# euros, 
+# Japanese yen, 
+# Canadian dollars, 
+# Swiss francs, 
+# British pounds, 
+# Australian dollars, 
+# New Zealand dollars, 
+# Norwegian krone and 
+# Swedish krona
+###############################################################################
+get.G10 <- function
+(
+	type = spl('currency')
+)
+{
+	if( type[1] != 'currency') {
+		cat('Warning:', type[1], 'is not yet implemented in getG10 function\n')
+		return()
+	}
+
+	# FRED acronyms for daily FX rates
+map = '
+FX          FX.NAME        
+DEXUSAL     U.S./Australia 
+DEXUSUK     U.S./U.K.      
+DEXCAUS     Canada/U.S.    
+DEXNOUS     Norway/U.S.    
+DEXUSEU     U.S./Euro      
+DEXJPUS     Japan/U.S.     
+DEXUSNZ     U.S./NewZealand
+DEXSDUS     Sweden/U.S.    
+DEXSZUS     Switzerland/U.S.
+'
+	
+	map = matrix(scan(text = map, what='', quiet=T), nc=2, byrow=T)
+		colnames(map) = map[1,]
+		map = data.frame(map[-1,], stringsAsFactors=F)
+
+	# convert all quotes to be vs U.S.
+	convert.index = grep('DEXUS',map$FX, value=T)	
+
+    #*****************************************************************
+    # Load historical data
+    #****************************************************************** 
+    load.packages('quantmod')
+
+	# load fx from fred
+	data.fx <- new.env()
+	quantmod::getSymbols(map$FX, src = 'FRED', from = '1970-01-01', env = data.fx, auto.assign = T)		
+		for(i in convert.index) data.fx[[i]] = 1 / data.fx[[i]]
+
+	# extract fx where all currencies are available
+	bt.prep(data.fx, align='remove.na')
+	fx = bt.apply(data.fx, '[')
+	
+	return(fx)
+}
+
+
  
 
 ###############################################################################
