@@ -555,7 +555,7 @@ make.xts <- function
 
     x = structure(.Data = x, 
     	index = structure(index, tzone = tzone, tclass = orderBy), 
-    	class = c('xts', 'zoo'), .indexCLASS = orderBy, .indexTZ = tzone)
+    	class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
 	return( x )
 }
 
@@ -586,12 +586,15 @@ read.xts <- function
 (
 	filename,	# file name
 	date.fn = paste,
+	index.class = 'Date',
 	...
 )
 {
 	out = read.csv(filename, stringsAsFactors=F)
 	#return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
-	return( make.xts(out[,-1,drop=F], as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv("TZ"), ...)) )
+	out = make.xts(out[,-1,drop=F], as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...))
+		indexClass(out) = index.class
+	return( out )
 	
 # getSymbols.yahoo: as.POSIXct - to avoid Dates problems
 # fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())

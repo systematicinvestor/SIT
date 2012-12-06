@@ -247,8 +247,9 @@ get.CRB <- function(...)
    		colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
    		out[, 'Volume'] = 0
 	#out = make.xts( out, as.Date(temp[,1], '%m/%d/%y'))
-	out = make.xts( out, as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%m/%d/%y'))	
-		
+	out = make.xts( out, as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%m/%d/%y'))	
+		indexClass(out) = 'Date'	
+	
 	return(out)
 } 	
 	
@@ -540,7 +541,8 @@ KITCO.data <- function
 	temp = read.csv(url, skip=4, header=TRUE, stringsAsFactors=F)
 		
 	#hist = make.xts(as.double(temp[,symbol]), as.Date(temp[,1], '%d-%b-%Y'))
-	hist = make.xts(as.double(temp[,symbol]), as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%d-%b-%Y'))	
+	hist = make.xts(as.double(temp[,symbol]), as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%d-%b-%Y'))	
+		indexClass(hist) = 'Date'
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
@@ -561,11 +563,10 @@ extend.data <- function
 
 	if(scale) {
 		# find first common observation in current and hist series
-		map = match(index(current), index(hist))
-		common = which.min(map)
+		common = merge(Cl(current), hist[,close.index], join='inner')
 		
-		scale = as.numeric(Cl(current)[common]) / as.numeric(hist[map[common],close.index])
-		
+		scale = as.numeric(common[1,1]) / as.numeric(common[1,2])
+							
 		hist = hist * scale
 	}
 	
@@ -591,7 +592,8 @@ bundes.bank.data <- function(symbol) {
 	temp = read.csv(url, skip=5, header=F, stringsAsFactors=F)
 
 	#hist = make.xts(as.double(temp[,2]), as.Date(temp[,1], '%Y-%m-%d'))		
-	hist = make.xts(as.double(temp[,2]), as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%Y-%m-%d'))			
+	hist = make.xts(as.double(temp[,2]), as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%Y-%m-%d'))
+		indexClass(hist) = 'Date'			
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
@@ -619,7 +621,8 @@ fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
 	temp = read.csv(url, skip=1, header=T, stringsAsFactors=F)
 
 	#hist = make.xts(as.matrix(temp[,-c(1:3)]), as.Date(temp[,2], '%Y/%m/%d'))		
-	hist = make.xts(as.matrix(temp[,-c(1:3)]), as.POSIXct(temp[,2], tz = Sys.getenv("TZ"), format='%Y/%m/%d'))			
+	hist = make.xts(as.matrix(temp[,-c(1:3)]), as.POSIXct(temp[,2], tz = Sys.getenv('TZ'), format='%Y/%m/%d'))
+		indexClass(hist) = 'Date'
 		colnames(hist) = gsub(paste('.', base.cur, sep=''), '', colnames(hist))
 		
 	return( hist[!is.na(hist[,1]),] )
@@ -658,7 +661,8 @@ getSymbols.PI <- function
 		
 		temp = read.delim(filename, header=TRUE, sep=',')		
 		#out = make.xts(temp[,-1], as.Date(temp[,1],'%m/%d/%Y'))
-		out = make.xts(temp[,-1], as.POSIXct(temp[,1], tz = Sys.getenv("TZ"), format='%m/%d/%Y'))		
+		out = make.xts(temp[,-1], as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%m/%d/%Y'))
+			indexClass(out) = 'Date'
 			out$Adjusted = out$Close
 			
 cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')					
