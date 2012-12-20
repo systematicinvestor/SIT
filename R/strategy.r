@@ -77,14 +77,13 @@ strategy.load.historical.data <- function
 
 
 
-
 ###############################################################################
 # Helper function to create Barplot with strategy stats
 ###############################################################################
-performance.barchart.helper <- function(out, names, custom.order) 
+performance.barchart.helper <- function(out, names, custom.order, nplots.page = len(spl(names))) 
 {
 	# Bar chart
-	layout(mat=matrix(1:4, 2, 2, byrow=FALSE)) 	
+	layout(mat=matrix(1:nplots.page, nc=2, byrow=FALSE))
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 	
@@ -112,16 +111,15 @@ performance.barchart.helper <- function(out, names, custom.order)
 
 
 
-
 ###############################################################################
 # Summary snapshoot of strategy perfroamnce
 ###############################################################################
-strategy.performance.snapshoot <- function(models, one.page = F) {
+strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 					
 	layout(1:2)
-	plotbt(models, plotX = T, log = 'y', LeftMargin = 3)	    	
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main = title)	    	
 		mtext('Cumulative Performance', side = 2, line = 1)
 		
 	out = plotbt.strategy.sidebyside(models, return.table=T)
@@ -639,14 +637,139 @@ rotation.strategy.test <- function()
 	}
 
 	ledoit.wolf.shrinkage <- function( hist, hist.all ) {
-		requier(BurStFin)
+		require(BurStFin)
 		var.shrink.eqcor(hist, 1, compatible = T)
 	}
 		
 	factor.model.shrinkage <- function( hist, hist.all ) {
-		requier(BurStFin)
+		require(BurStFin)
 		factor.model.stat(hist, 1)
 	}
+	
+	#*****************************************************************
+	# Shrinkage functions
+	#*****************************************************************	
+	# OAS
+	# http://tbayes.eecs.umich.edu/_media/yilun/covestimation/demo.m
+	# http://www.ledoit.net/ole2_abstract.htm
+	# http://www.ledoit.net/honey_abstract.htm
+	#
+	# Matlab
+	# x=randn(2000,30);
+	# [sigma,shrinkage]=covCor(x,-1)
+	# csvwrite('test.csv',x)
+	#
+	# Shrinks towards constant correlation matrix, Ledoit and Wolf (2004)
+	#
+	# x = as.matrix(read.csv('c:/Michael_Kapler/Soft/R/ira/test.csv', header =F))
+	# x=matrix(rnorm(3*200),200,3)
+	# covCor(x)
+	#
+	# http://www.jasonhsu.org/uploads/1/0/0/7/10075125/covariance_estimations.pdf
+	# http://code.google.com/p/pmtk3/source/browse/trunk/toolbox/ProbDist/sub/shrink2para.m?r=1669
+	#
+	# http://www.ledoit.net/honey_abstract.htm
+	# http://www.ledoit.net/honey.pdf  ,  page  14
+	#*****************************************************************	
+	
+	# based on the cov_shrink in tawny package
+	cov.shrink <- function(h, prior = NULL, shrinkage = NULL, roff.method = 1) {	
+		require(tawny)
+		#class(h) = c('AssetReturns', class(h)) 
+	
+		T = nrow(h)
+		S = cov.sample(h)
+	  	
+		if( is.function(prior) ) prior = prior(h)
+		if( is.null(prior) ) prior = tawny::cov.prior.cc(S)
+	  
+	  	if( is.null(shrinkage) ) {
+	  		# shrinkage.intensity
+			p = tawny::shrinkage.p(h, S)
+		
+			if( roff.method == 0 )
+				r = sum(p$diags, na.rm=TRUE) 
+			else			
+		  		r = tawny::shrinkage.r(h, S, p)
+		  		
+		  	c = tawny::shrinkage.c(prior, S)
+	  		k = (p$sum - r) / c
+			shrinkage = max(0, min(k/T, 1))
+		}	  		
+		return(list(sigma = shrinkage * prior + (1 - shrinkage) * S, shrinkage = shrinkage))  
+	}
+	
+	
+	# cov(h, use='complete.obs', method='pearson') *(T - 1)/T
+	cov.sample <- function(h) {		
+		# center x, de-mean returns
+		T = nrow(h)
+		x = h - repRow(colMeans(h), T)
+		
+		# compute sample covariance matrix
+		(t(x) %*% x) / T
+	}
+	
+	
+	cov.const.cor <- function(h) {		
+		sample = cov.sample(h)
+	
+		# compute average correlation
+		n = ncol(h)
+		var = diag(sample)
+		cov.mat = sqrt(var) %*% t(sqrt(var))	
+		avg.rho = (sum(sample / cov.mat)-n)/(n*(n-1))
+		
+		# compute prior
+		prior = avg.rho * cov.mat
+		diag(prior) = var
+		
+		prior
+	}
+	
+	cov.diag <- function(h) {		
+		S = cov.sample(h)
+		diag(diag(S))
+	}
+	
+	
+	cov.market <- function(h) {		
+		# center x, de-mean returns
+		T = nrow(h)
+		x = h - repRow(colMeans(h), T)
+		xmkt = rowMeans(x)
+		
+		# compute sample covariance matrix and prior
+		n = ncol(h)	
+		sample=cov(cbind(x, xmkt))*(T - 1)/T
+		covmkt=sample[1:n,n+1]
+		varmkt=sample[n+1,n+1]	
+		prior=covmkt %*% t(covmkt) / varmkt
+		diag(prior) = diag(sample[1:n,1:n])
+		
+		prior
+	}	
+		
+	cov.2param <- function(h) {
+		sample = cov.sample(h)		
+	
+		# compute prior
+		n = ncol(h)
+		meanvar=mean(diag(sample))
+		meancov=(sum(sample) -  sum(diag(sample)))/(n*(n-1))
+		meanvar*diag(n) + meancov*(1-diag(n))
+	}
+	
+	
+	# Shrinkage adaptors for above functions
+	shrink.diag <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.diag, s, 0)$sigma }}
+	shrink.const.cor <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.const.cor, s, 1)$sigma }}
+	shrink.single.index <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.market, s, 1)$sigma }}
+	shrink.two.parameter <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.2param, s, 1)$sigma }}
+
+
+
+
 	
 	
 #*****************************************************************
