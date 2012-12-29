@@ -6909,4 +6909,116 @@ dev.off()
     # - using PCA for spread trading 
     # http://matlab-trading.blogspot.ca/2012/12/using-pca-for-spread-trading.html
 }    
-				
+	
+###############################################################################
+# Link between svd and eigen
+# https://stat.ethz.ch/pipermail/r-help/2001-September/014982.html
+# http://r.789695.n4.nabble.com/eigen-and-svd-td2550210.html
+# X is a matrix of de-mean returns, cov(X) = (t(x) %*% x) / T
+# (svd) X = U D V'   ## D are the singular values of X
+# (eigen) X'X = V D^2 V'  ## D^2 are the eigenvalues of X'X
+# V is the same in both factorizations. 
+###############################################################################
+
+
+###############################################################################
+# The "Absorption Ratio" as defined in the "Principal Components as a Measure of Systemic Risk" 
+# by M. Kritzman,Y. Li, S. Page, R. Rigobon paper
+# http://papers.ssrn.com/sol3/papers.cfm?abstract_id=1633027
+#
+# The "Absorption Ratio" is define as the fraction of the total variance explained or absorbed by 
+# a finite set of eigenvectors. Let’s, for example, compute the "Absorption Ratio" using 
+# the first 3 eigenvectors.
+# sum( p$sdev[1:3]^2 ) / sum( sd(na.omit(ret))^2 )
+###############################################################################
+
+
+
+###############################################################################    
+# maximum Sharpe ratio or tangency  portfolio
+# http://faculty.washington.edu/ezivot/econ424/portfolio_noshorts.r
+# http://stackoverflow.com/questions/10526243/quadprog-optimization
+# http://comisef.wikidot.com/tutorial:tangencyportfolio
+#
+# It work with solve.QP only for constraints that are homogeneous of degree 0
+# i.e. if we multiply w by a number, the constraint is unchanged
+#
+# Dmat <- 2*cov.mat
+# dvec <- rep.int(0, N)
+# er.excess <- er - risk.free
+# Amat <- cbind(er.excess, diag(1,N))
+# bvec <- c(1, rep(0,N))
+# result <- solve.QP(Dmat=Dmat,dvec=dvec,Amat=Amat,bvec=bvec,meq=1)
+# w.t <- round(result$solution/sum(result$solution), 6)
+#
+# R Tools for Portfolio Optimization by Guy Yollin - R/Finance
+# http://www.rinfinance.com/RinFinance2009/presentations/yollin_slides.pdf
+# In more general case we can use the non linear solver
+# V <- cov(mData)
+# library(Rsolnp)
+# r <- solnp(
+#  rep(1/length(mu), length(mu)),
+#  function(w) - t(w) %*% mu2 / sqrt( t(w) %*% V %*% w ),
+#  eqfun = function(w) sum(w),
+#  eqB   = 0,
+#  LB = rep(-1, length(mu))
+# )
+###############################################################################
+
+
+
+###############################################################################
+# Clustering based on the selected Principal components
+###############################################################################		
+bt.clustering.test <- function()
+{		
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	
+	# load data saved in the bt.pca.test() function
+	load(file='bt.pca.test.Rdata')
+
+	#*****************************************************************
+	# Principal component analysis (PCA), for interesting discussion
+	# http://machine-master.blogspot.ca/2012/08/pca-or-polluting-your-clever-analysis.html
+	#****************************************************************** 
+	prices = data$prices	
+	ret = prices / mlag(prices) - 1
+	
+	p = princomp(na.omit(ret))
+	
+	loadings = p$loadings[]
+	
+	x = loadings[,1]
+	y = loadings[,2]
+	z = loadings[,3]	
+	    
+	#*****************************************************************
+	# Create clusters
+	#****************************************************************** 		
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')				
+	# create and plot clusters based on the first and second principal components
+	hc = hclust(dist(cbind(x,y)), method = 'ward')
+	plot(hc, axes=F,xlab='', ylab='',sub ='', main='Comp 1/2')
+	rect.hclust(hc, k=3, border='red')
+dev.off()
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	# create and plot clusters based on the first, second, and third principal components
+	hc = hclust(dist(cbind(x,y,z)), method = 'ward')
+	plot(hc, axes=F,xlab='', ylab='',sub ='', main='Comp 1/2/3')
+	rect.hclust(hc, k=3, border='red')
+dev.off()
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	# create and plot clusters based on the correlation among companies
+	hc = hclust(as.dist(1-cor(na.omit(ret))), method = 'ward')
+	plot(hc, axes=F,xlab='', ylab='',sub ='', main='Correlation')
+	rect.hclust(hc, k=3, border='red')
+dev.off()
+}
+	
+	
+			
