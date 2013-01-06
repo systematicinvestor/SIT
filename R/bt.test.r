@@ -7021,4 +7021,102 @@ dev.off()
 }
 	
 	
+###############################################################################
+# Using Principal component analysis (PCA) for spread trading 
+# http://matlab-trading.blogspot.ca/2012/12/using-pca-for-spread-trading.html
+# http://www.r-bloggers.com/cointegration-r-irish-mortgage-debt-and-property-prices/
+###############################################################################		
+bt.pca.trading.test <- function()
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	tickers = dow.jones.components()
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '2009-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Principal component analysis (PCA), for interesting discussion
+	# http://machine-master.blogspot.ca/2012/08/pca-or-polluting-your-clever-analysis.html
+	#****************************************************************** 
+	prices = last(data$prices, 1000)
+		n = len(tickers)  		
+	ret = prices / mlag(prices) - 1
+	
+	p = princomp(na.omit(ret[1:250,]))
+	
+	loadings = p$loadings[]
+
+	# look at the first 4 principal components 	
+	components = loadings[,1:4]
+	
+	# normalize all selected components to have total weight = 1
+	components = components / repRow(colSums(abs(components)),len(tickers))
+	
+	# note that first component is market, and all components are orthogonal i.e. not correlated to market
+	market = ret[1:250,] %*% rep(1/n,n)
+	temp = cbind(market, -ret[1:250,] %*% components)
+		colnames(temp)[1] = 'Market'	
+		
+	round(cor(temp, use='complete.obs',method='pearson'),1)
+
+	# the variance of each component is decreasing
+	round(100*sd(temp,na.rm=T),1)
+	
+	#*****************************************************************	
+	# examples of stationarity ( mean-reversion )
+	# p.value - small => stationary
+	# p.value - large => not stationary
+	#*****************************************************************	
+	library(tseries)
+	
+	layout(1:2)
+	temp = rnorm(100)
+	plot(temp, type='b', main=adf.test(temp)$p.value)
+	plot(cumsum(temp), type='b', main=adf.test(cumsum(temp))$p.value)
 			
+	#*****************************************************************
+	# Find stationary components, Augmented Dickey-Fuller test
+	# library(fUnitRoots)
+	# adfTest(as.numeric(equity[,1]), type="ct")@test$p.value	
+	#****************************************************************** 	
+	library(tseries)
+	equity = bt.apply.matrix(1 + ifna(-ret %*% components,0), cumprod)
+		equity = make.xts(equity, index(prices))
+	
+	# test for stationarity ( mean-reversion )
+	adf.test(as.numeric(equity[,1]))$p.value
+	adf.test(as.numeric(equity[,2]))$p.value
+	adf.test(as.numeric(equity[,3]))$p.value
+	adf.test(as.numeric(equity[,4]))$p.value
+
+
+			
+	#*****************************************************************
+	# Plot securities and components
+	#*****************************************************************
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	layout(1:2)
+	# add Bollinger Bands
+	i.comp = 4	
+	bbands1 = BBands(repCol(equity[,i.comp],3), n=200, sd=1)
+	bbands2 = BBands(repCol(equity[,i.comp],3), n=200, sd=2)
+	temp = cbind(equity[,i.comp], bbands1[,'up'], bbands1[,'dn'], bbands1[,'mavg'],
+				bbands2[,'up'], bbands2[,'dn'])
+		colnames(temp) = spl('Comp. 4,1SD Up,1SD Down,200 SMA,2SD Up,2SD Down')
+	
+	plota.matplot(temp, main=paste(i.comp, 'Principal component'))
+	
+	barplot.with.labels(sort(components[,i.comp]), 'weights')
+dev.off()
+		
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	layout(1:2)
+	plota.matplot(prices, plotX=F)
+	plota.matplot(equity)
+dev.off()
+			
+}

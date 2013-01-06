@@ -429,6 +429,7 @@ rotation.strategy.test <- function()
 
 	# allocate only among assets with risk > 0, ignore cash (i.e. risk = 0)
 	get.risky.asset.index <- function(ia) {
+		if(is.null(ia$risk)) ia$risk = sqrt(diag(ia$cov))
 		(ia$risk > 0) & !is.na(ia$risk)
 	}
 	set.risky.asset <- function(x, risk.index) {
@@ -445,6 +446,7 @@ rotation.strategy.test <- function()
 		constraints		# constraints
 	)
 	{
+		if(is.null(ia$risk)) ia$risk = sqrt(diag(ia$cov))
 		risk.index = get.risky.asset.index(ia)
 				
 		# re-scale weights to penalize for risk		
