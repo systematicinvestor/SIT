@@ -7120,3 +7120,69 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()
 			
 }
+
+
+
+	
+###############################################################################
+# Details for the Visual of Current Major Market Clusters post by David Varadi
+# http://cssanalytics.wordpress.com/2013/01/10/a-visual-of-current-major-market-clusters/
+###############################################################################		
+bt.cluster.visual.test <- function()
+{
+    #*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	bt.prep(data, align='remove.na')
+
+    #*****************************************************************
+	# Create Clusters
+	#****************************************************************** 
+	# compute returns
+	ret = data$prices / mlag(data$prices) - 1
+		ret = na.omit(ret)		
+
+	# setup period and method to compute correlations
+	dates = '2012::2012'
+	method = 'pearson'	# kendall, spearman
+	
+	correlation = cor(ret[dates], method = method)    
+        dissimilarity = 1 - (correlation)
+        distance = as.dist(dissimilarity)
+        	
+	# find 4 clusters      
+	xy = cmdscale(distance)
+	fit = kmeans(xy, 4, iter.max=100, nstart=100)
+	
+	fit$cluster
+	
+    #*****************************************************************
+	# Create Plot
+	#****************************************************************** 	
+	load.packages('cluster')
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	clusplot(xy, fit$cluster, color=TRUE, shade=TRUE, labels=3, lines=0, plotchar=F, 
+		main = paste('Major Market Clusters over', dates), sub='')
+dev.off()	
+
+
+png(filename = 'plot2.png', width = 800, height = 800, units = 'px', pointsize = 12, bg = 'white')			
+	layout(matrix(1:8,nc=2))
+	par( mar = c(2, 2, 2, 2) )
+
+	for(icluster in 2:8)
+	clusplot(xy, kmeans(xy, icluster, iter.max=100, nstart=100)$cluster, color=TRUE, shade=F,   
+		labels=3, lines=0, plotchar=F, main=icluster, sub='')
+dev.off()	
+
+
+	
+}
