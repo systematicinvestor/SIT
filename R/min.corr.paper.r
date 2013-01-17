@@ -354,34 +354,39 @@ custom.composite.diversification.indicator <- function
 	obj,	# portfolio.backtest object
 	avg.flag = T,
 	avg.len = 10,
+	plot.main = T,
 	plot.table = T
 ) 
 {
-	avg.name = iif(avg.flag, paste(avg.len,'period EMA') , '')
+	cdi = 0.5 * obj$risk.gini + 0.5 * obj$degree.diversification
+		if(avg.flag) cdi = bt.apply.matrix(cdi, EMA, avg.len)
 
-	layout(1:3)
-	out = obj$degree.diversification
-		if(avg.flag) out = bt.apply.matrix(out, EMA, avg.len)
-	plota.matplot(out, cex.main = 1, 
-		main=paste('D = 1 - Portfolio Risk/Weighted Average of asset vols in the portfolio', avg.name))
-				
-	out = obj$risk.gini
-		if(avg.flag) out = bt.apply.matrix(out, EMA, avg.len)
-	plota.matplot(out, cex.main = 1, 
-		main=paste('1 - Gini(Risk Contributions)', avg.name))
-		
-	out = 0.5 * obj$risk.gini + 0.5 * obj$degree.diversification
-		if(avg.flag) out = bt.apply.matrix(out, EMA, avg.len)
-	plota.matplot(out, cex.main = 1, 
-		main=paste('Composite Diversification Indicator (CDI) = 50/50 Gini/D', avg.name))
+	if(plot.main) {	
+		avg.name = iif(avg.flag, paste(avg.len,'period EMA') , '')
+
+		layout(1:3)
+		out = obj$degree.diversification
+			if(avg.flag) out = bt.apply.matrix(out, EMA, avg.len)
+		plota.matplot(out, cex.main = 1, 
+			main=paste('D = 1 - Portfolio Risk/Weighted Average of asset vols in the portfolio', avg.name))
+					
+		out = obj$risk.gini
+			if(avg.flag) out = bt.apply.matrix(out, EMA, avg.len)
+		plota.matplot(out, cex.main = 1, 
+			main=paste('1 - Gini(Risk Contributions)', avg.name))
+			
+		plota.matplot(cdi, cex.main = 1, 
+			main=paste('Composite Diversification Indicator (CDI) = 50/50 Gini/D', avg.name))
+	}
+
 
 	# create sensitivity plot		
 	if(plot.table) {	
 		weights = seq(0,1,0.1)
 		# create temp matrix with data you want to plot
-		temp = matrix(NA, nc=len(weights), nr=ncol(out))
+		temp = matrix(NA, nc=len(weights), nr=ncol(cdi))
 			colnames(temp) = paste(weights)
-			rownames(temp) = colnames(out)
+			rownames(temp) = colnames(cdi)
 			
 		for(j in 1:len(weights)) {
 			i = weights[j]
@@ -398,8 +403,8 @@ custom.composite.diversification.indicator <- function
 		plot.table(temp, smain = 'CDI Rank\nAlgo vs %D',highlight = highlight, colorbar = TRUE)
 	}	
 
-	return(out)
-}
+	return(cdi)
+} 
 			
 
 

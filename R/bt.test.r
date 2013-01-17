@@ -5418,6 +5418,77 @@ dev.off()
 }
 	
 
+bt.aaa.test.new <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+	
+	tickers = spl('SPY,EFA,EWJ,EEM,IYR,RWX,IEF,TLT,DBC,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='keep.all', dates='2004:12::')
+ 
+   
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices  
+    n = ncol(prices)
+   
+    models = list()
+   
+ 	#*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    # find period ends
+    period.ends = endpoints(prices, 'months')
+    #period.ends = endpoints(prices, 'weeks')
+        period.ends = period.ends[period.ends > 0]
+
+        
+n.mom = 180
+n.vol = 60
+n.top = 4
+        
+	momentum = prices / mlag(prices, n.mom)         
+        
+	models$combo = bt.aaa.combo(data, period.ends, n.top = n.top,
+					n.mom = n.mom, n.vol = n.vol)
+					
+	# bt.aaa.minrisk is equivalent to MV=min.var.portfolio below
+	models$aaa = bt.aaa.minrisk(data, period.ends, n.top = n.top,
+					n.mom = n.mom, n.vol = n.vol)
+			
+					
+	obj = portfolio.allocation.helper(data$prices, period.ends=period.ends,
+		lookback.len = n.vol, universe = ntop(momentum[period.ends,], n.top) > 0,
+		min.risk.fns = list(EW=equal.weight.portfolio,
+						RP=risk.parity.portfolio,
+						MV=min.var.portfolio,
+						MD=max.div.portfolio,
+						MC=min.corr.portfolio,
+						MC2=min.corr2.portfolio,
+						MS=max.sharpe.portfolio())
+	) 
+	
+	models = c(models, create.strategies(obj, data)$models)
+					
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+    # put all reports into one pdf file
+	pdf(file = 'filename.pdf', width=8.5, height=11)
+
+		strategy.performance.snapshoot(models)
+		
+	# close pdf file
+    dev.off()	
+}
+
 
 ###############################################################################
 # Merging Current Stock Quotes with Historical Prices
@@ -6934,38 +7005,6 @@ dev.off()
 
 
 
-###############################################################################    
-# maximum Sharpe ratio or tangency  portfolio
-# http://faculty.washington.edu/ezivot/econ424/portfolio_noshorts.r
-# http://stackoverflow.com/questions/10526243/quadprog-optimization
-# http://comisef.wikidot.com/tutorial:tangencyportfolio
-#
-# It work with solve.QP only for constraints that are homogeneous of degree 0
-# i.e. if we multiply w by a number, the constraint is unchanged
-#
-# Dmat <- 2*cov.mat
-# dvec <- rep.int(0, N)
-# er.excess <- er - risk.free
-# Amat <- cbind(er.excess, diag(1,N))
-# bvec <- c(1, rep(0,N))
-# result <- solve.QP(Dmat=Dmat,dvec=dvec,Amat=Amat,bvec=bvec,meq=1)
-# w.t <- round(result$solution/sum(result$solution), 6)
-#
-# R Tools for Portfolio Optimization by Guy Yollin - R/Finance
-# http://www.rinfinance.com/RinFinance2009/presentations/yollin_slides.pdf
-# In more general case we can use the non linear solver
-# V <- cov(mData)
-# library(Rsolnp)
-# r <- solnp(
-#  rep(1/length(mu), length(mu)),
-#  function(w) - t(w) %*% mu2 / sqrt( t(w) %*% V %*% w ),
-#  eqfun = function(w) sum(w),
-#  eqB   = 0,
-#  LB = rep(-1, length(mu))
-# )
-###############################################################################
-
-
 
 ###############################################################################
 # Clustering based on the selected Principal components
@@ -7018,6 +7057,12 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 	plot(hc, axes=F,xlab='', ylab='',sub ='', main='Correlation')
 	rect.hclust(hc, k=3, border='red')
 dev.off()
+
+	# cor(ret, method="pearson")
+	# cor(ret, method="kendall")
+	# cor(ret, method="spearman")
+	
+
 }
 	
 	
@@ -7032,6 +7077,7 @@ bt.pca.trading.test <- function()
 	# Load historical data
 	#****************************************************************** 
 	load.packages('quantmod')
+	# tickers = spl('XLE,USO,XES,XOP')
 	tickers = dow.jones.components()
 
 	data <- new.env()
@@ -7112,7 +7158,16 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 	
 	barplot.with.labels(sort(components[,i.comp]), 'weights')
 dev.off()
-		
+	
+
+	
+    # http://www.wekaleamstudios.co.uk/posts/seasonal-trend-decomposition-in-r/
+    ts.sample = ts(as.numeric(equity[,i.comp]), frequency = 252)
+    fit.stl = stl(ts.sample, s.window="periodic")
+    plot(fit.stl) 
+    
+    
+
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
 	layout(1:2)
 	plota.matplot(prices, plotX=F)
@@ -7183,6 +7238,114 @@ png(filename = 'plot2.png', width = 800, height = 800, units = 'px', pointsize =
 		labels=3, lines=0, plotchar=F, main=icluster, sub='')
 dev.off()	
 
-
-	
 }
+
+
+
+###############################################################################
+# Optimal number of clusters
+# http://en.wikipedia.org/wiki/Determining_the_number_of_clusters_in_a_data_set
+#
+# R and Data Mining: Examples and Case Studies by Y. Zhao, Chapter 6, Clustering
+# http://cran.r-project.org/doc/contrib/Zhao_R_and_data_mining.pdf
+#
+# http://blog.echen.me/2011/03/19/counting-clusters/
+#
+# Clustergram: visualization and diagnostics for cluster analysis (R code)
+# http://www.r-statistics.com/tag/parallel-coordinates/
+#
+# http://tr8dr.wordpress.com/2009/12/30/equity-clusters/
+# http://www.starklab.org/members/kazmar/2012/01/09/Optimal-number-of-clusters/
+#
+# Morphometrics with R  By Julien Claude
+# http://books.google.ca/books?id=hA9ANHMPm14C&pg=PA123&lpg=PA123&dq=optimal+number+of+clusters+elbow+method&source=bl&ots=7P2bnNf5VL&sig=GEgiSL7CfOEU8gsalSsWHbDhGVc&hl=en&sa=X&ei=wmfwUIOtM_Ls2AW2k4FY&ved=0CFQQ6AEwBg#v=onepage&q=optimal%20number%20of%20clusters%20elbow%20method&f=false
+#
+# Choosing the number of clusters
+# http://geomblog.blogspot.ca/2010/03/this-is-part-of-occasional-series-of.html
+# http://geomblog.blogspot.ca/2010/03/choosing-number-of-clusters-ii.html
+###############################################################################		
+bt.cluster.optimal.number.test <- function()
+{
+    #*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	bt.prep(data, align='remove.na')
+
+    #*****************************************************************
+	# Create Clusters
+	#****************************************************************** 
+	# compute returns
+	ret = data$prices / mlag(data$prices) - 1
+		ret = na.omit(ret)		
+
+	# setup period and method to compute correlations
+	dates = '2012::2012'
+	method = 'pearson'	# kendall, spearman
+	
+	correlation = cor(ret[dates], method = method)    
+        dissimilarity = 1 - (correlation)
+        distance = as.dist(dissimilarity)
+        	
+	# get first 2 pricipal componenets
+	xy = cmdscale(distance)
+	
+    #*****************************************************************
+	# Determine number of clusters
+	#****************************************************************** 
+	n = ncol(data$prices)
+		n1 = ceiling(n*2/3)
+
+	# percentage of variance explained by clusters
+	p.exp = rep(0,n1)
+		
+	# minimum correlation among all components in each cluster	
+	min.cor = matrix(1,n1,n1)  
+	
+	for (i in 2:n1) {
+		fit = kmeans(xy, centers=i, iter.max=100, nstart=100)
+		p.exp[i] = 1- fit$tot.withinss / fit$totss
+		
+		for (j in 1:i) {
+			index = fit$cluster == j
+			min.cor[i,j] = min(correlation[index,index])
+		}
+	}
+	
+	# minimum number of clusters that explain at least 90% of variance
+	min(which(p.exp > 0.9))
+			
+	# minimum number of clusters such that correlation among all components in each cluster is at least 40%
+	# will not always work
+	min(which(apply(min.cor[-1,],1,min,na.rm=T) > 0.4)) + 1
+
+	# number of clusters based on elbow method
+	find.maximum.distance.point(p.exp[-1]) + 1
+
+		
+    #*****************************************************************
+	# Create Plot
+	#****************************************************************** 	
+	load.packages('cluster')
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	fit = kmeans(xy, 4, iter.max=100, nstart=100)
+	clusplot(xy, fit$cluster, color=TRUE, shade=TRUE, labels=3, lines=0, plotchar=F, 
+		main = paste('Major Market Clusters over', dates, ', 4 Clusters'), sub='')
+dev.off()	
+
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+	fit = kmeans(xy, 5, iter.max=100, nstart=100)
+	clusplot(xy, fit$cluster, color=TRUE, shade=TRUE, labels=3, lines=0, plotchar=F, 
+		main = paste('Major Market Clusters over', dates, ', 5 Clusters'), sub='')
+dev.off()	
+
+
+}		
+	

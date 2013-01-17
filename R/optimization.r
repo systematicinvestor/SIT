@@ -803,3 +803,30 @@ inv.test <- function() {
 	inv(m) %*% m
 		
 }
+
+
+###############################################################################
+# Maximum Distance Point on the curve
+# http://stackoverflow.com/questions/2018178/finding-the-best-trade-off-point-on-a-curve		
+###############################################################################
+find.maximum.distance.point <- function
+(
+	y, 
+	x=1:len(y)
+)
+{		
+	allCoord = rbind(y, x)
+		
+	firstPoint = allCoord[,1]
+	lineVec = allCoord[,len(y)] - firstPoint
+	lineVecN = lineVec / sqrt(sum(lineVec^2))
+		
+	vecFromFirst = allCoord - firstPoint
+	scalarProduct = lineVecN %*% vecFromFirst
+		
+	vecFromFirstParallel = t(scalarProduct) %*% lineVecN
+	vecToLine = t(vecFromFirst) - vecFromFirstParallel
+	distToLine = sqrt(rowSums(vecToLine^2,2))
+	which.max(distToLine)
+}
+	

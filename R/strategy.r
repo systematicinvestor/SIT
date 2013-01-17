@@ -83,7 +83,7 @@ strategy.load.historical.data <- function
 performance.barchart.helper <- function(out, names, custom.order, nplots.page = len(spl(names))) 
 {
 	# Bar chart
-	layout(mat=matrix(1:nplots.page, nc=2, byrow=FALSE))
+	layout(mat=matrix(1:(nplots.page + nplots.page %% 2), nc=2, byrow=FALSE))
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 	
@@ -107,6 +107,7 @@ performance.barchart.helper <- function(out, names, custom.order, nplots.page = 
 		mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
 	}				
 }
+
 
 
 
@@ -469,7 +470,7 @@ rotation.strategy.test <- function()
 		Dmat = cov.matrix[risk.index, risk.index]		
 		sol = try(solve.QP(Dmat=Dmat, 
 						dvec=rep(0, sum(risk.index)), 
-						Amat=constraints$A[risk.index,], 
+						Amat=constraints$A[risk.index,,drop=F], 
 						bvec=constraints$b, 
 						meq=constraints$meq), silent = TRUE)
 						
@@ -477,12 +478,13 @@ rotation.strategy.test <- function()
 		if(inherits(sol, 'try-error'))
 			sol = solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
 						dvec=rep(0, sum(risk.index)), 
-						Amat=constraints$A[risk.index,], 
+						Amat=constraints$A[risk.index,,drop=F], 
 						bvec=constraints$b, 
 						meq=constraints$meq)
 						
 		set.risky.asset(sol$solution, risk.index)
-	}
+	}	
+
 	
 	# Toward Maximum Diversification by Y. Choueifaty, Y. Coignard
 	# The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51
