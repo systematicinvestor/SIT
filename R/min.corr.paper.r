@@ -225,7 +225,7 @@ custom.input.report.helper <- function(filename, data) {
 		
 	# plot correlations
 	ret.log = bt.apply.matrix(data$prices, ROC, type='continuous')
-	temp = compute.cor(ret.log, 'pearson')
+	temp = cor(ret.log, use='complete.obs', method='pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 	plot.table(temp, smain='Correlation', highlight = TRUE, colorbar = TRUE)	
 

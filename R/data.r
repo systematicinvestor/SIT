@@ -280,7 +280,7 @@ get.CRB.test <- function()
 		plota.lines(temp[,3],col=3)
 	plota.legend(colnames(temp),1:3)
 			
-	temp = compute.cor(temp / mlag(temp)- 1, 'pearson')
+	temp = cor(temp / mlag(temp)- 1, use='complete.obs', method='pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 	plot.table(temp)	
 	

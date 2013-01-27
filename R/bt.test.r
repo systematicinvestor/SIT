@@ -5571,8 +5571,8 @@ png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize =
 		plota.lines(temp[,3],col=3)
 	plota.legend(colnames(temp),1:3)
 			
-	# Plot correlation table	
-	temp = compute.cor(temp / mlag(temp)- 1, 'pearson')
+	# Plot correlation table
+	temp = cor(temp / mlag(temp)- 1, use='complete.obs', method='pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 	plot.table(temp)	
 dev.off()		
@@ -7347,5 +7347,87 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()	
 
 
+# http://en.wikibooks.org/wiki/Data_Mining_Algorithms_In_R/Clustering/Expectation_Maximization_(EM)
+	load.packages('mclust')
+	fitBIC = mclustBIC(xy)
+	plot(fitBIC, legendArgs = list(x = "topleft"))
+	
+	fit <- summary(fitBIC, data = xy)
+	mclust2Dplot(data = xy, what = "density", identify = TRUE, parameters = fit$parameters, z = fit$z)	
+
 }		
 	
+
+###############################################################################
+# Historical Optimal number of clusters
+# based on the bt.cluster.optimal.number.test function
+###############################################################################
+bt.cluster.optimal.number.historical.test <- function()
+{
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	bt.prep(data, align='remove.na')
+
+	
+	#*****************************************************************
+	# Use following 3 methods to determine number of clusters
+	# * Minimum number of clusters that explain at least 90% of variance
+	#   cluster.group.kmeans.90
+	# * Elbow method
+	#   cluster.group.kmeans.elbow
+	# * Hierarchical clustering tree cut at 1/3 height
+	#   cluster.group.hclust
+	#****************************************************************** 
+
+	# helper function to compute portfolio allocation additional stats
+	portfolio.allocation.custom.stats.clusters <- function(x,ia) {
+		return(list(
+			ncluster.90 = max(cluster.group.kmeans.90(ia)),
+			ncluster.elbow = max(cluster.group.kmeans.elbow(ia)),
+			ncluster.hclust = max(cluster.group.hclust(ia))
+		))
+	}
+
+	
+	#*****************************************************************
+	# Compute # Clusters
+	#****************************************************************** 		
+	periodicity = 'weeks'
+	lookback.len = 250
+		
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = periodicity, lookback.len = lookback.len,
+		min.risk.fns = list(EW=equal.weight.portfolio),
+		custom.stats.fn = portfolio.allocation.custom.stats.clusters
+	) 			
+	
+	#*****************************************************************
+	# Create Reports
+	#****************************************************************** 		
+	temp = list(ncluster.90 = 'Kmeans 90% variance',
+		 ncluster.elbow = 'Kmeans Elbow',
+		 ncluster.hclust = 'Hierarchical clustering at 1/3 height')	
+	
+	for(i in 1:len(temp)) {
+		hist.cluster = obj[[ names(temp)[i] ]]
+		title = temp[[ i ]]
+	
+png(filename = paste('plot',i,'.png',sep=''), width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')						
+		plota(hist.cluster, type='l', col='gray', main=title)
+			plota.lines(SMA(hist.cluster,10), type='l', col='red',lwd=5)
+		plota.legend('Number of Clusters,10 period moving average', 'gray,red', x = 'bottomleft')			
+dev.off()		
+	}
+	
+
+
+}

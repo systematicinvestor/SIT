@@ -24,6 +24,27 @@
 ###############################################################################
 # Global Plota Control Parameters & Themes
 ###############################################################################
+###############################################################################
+#' Plota Control Parameters & Themes
+#'
+#' Set the color theme, the defaul theme is plota.theme.green.orange()
+#'
+#' @param col.border border color
+#' @param col.up up color
+#' @param col.dn down color
+#' @param col.x.highlight x highlight color
+#' @param col.y.highlight y highlight color
+#' @param alpha alpha level
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' plota.theme.blue.red()
+#' }
+#' @export 
+#' @rdname PlotaColorTheme
+###############################################################################
 plota.theme <- function
 (
 	col.border = 'black',
@@ -44,6 +65,9 @@ plota.theme <- function
 	plota.control$col.y.highlight = col[5]
 }
 
+
+#' @export 
+#' @rdname PlotaColorTheme
 plota.theme.blue.red <- function(alpha=NA) 
 {
 	plota.theme(
@@ -54,6 +78,9 @@ plota.theme.blue.red <- function(alpha=NA)
 		)
 }
 
+
+#' @export 
+#' @rdname PlotaColorTheme
 plota.theme.green.orange <- function(alpha=NA) 
 {
 	plota.theme(
@@ -64,6 +91,9 @@ plota.theme.green.orange <- function(alpha=NA)
 		)		
 }
 
+
+#' @export 
+#' @rdname PlotaColorTheme
 plota.theme.gray.orange <- function(alpha=NA) 
 {
 	plota.theme(
@@ -85,10 +115,21 @@ plota.control = new.env()
 # set default theme	
 plota.theme.green.orange();
 
+
 ###############################################################################
-# Work with colors
+#' Make color semi-transparent
+#'
+#' @param col color(s)
+#' @param alpha alpha, \strong{defaults to 150}, for more info please see \code{\link{rgb}}
+#'
+#' @return new color
+#'
+#' @examples
+#' \dontrun{ 
+#' col.add.alpha('gray')
+#' }
+#' @export 
 ###############################################################################
-# make color semi-transparent
 col.add.alpha <- function
 (
 	col, 		# color(s)
@@ -98,8 +139,43 @@ col.add.alpha <- function
 	rgb(t(col2rgb(col)), alpha=alpha, maxColorValue = 255)	
 }
 
+
 ###############################################################################
-# plota - plot for time series
+#' Plot function for time series
+#'
+#' @param y \code{\link{xts}} object
+#' @param main plot title
+#' @param plotX flag to display X axis
+#' @param LeftMargin to plot second Y axis, set LeftMargin=3, \strong{defaults to 0}
+#' @param x.highlight segments to highlight along X axis, \strong{defaults to NULL}
+#' @param y.highlight segments to highlight along Y axis, \strong{defaults to NULL}
+#' @param las rotation of Y axis labels, \strong{defaults to 1}, for more info see \code{\link{par}}
+#' @param type plot type, \strong{defaults to 'n'}, for more info see \code{\link{plot}}
+#'			also support 'ohlc', 'hl', 'candle', 'volume' types
+#' @param xlab X label, \strong{defaults to ''}, for more info see \code{\link{plot}}
+#' @param ylab Y label, \strong{defaults to ''}, for more info see \code{\link{plot}}
+#' @param ylim range on Y values, \strong{defaults to NULL}
+#' @param log log scale x, y, xy axes, \strong{defaults to ''}
+#' @param ... additional parameters to the \code{\link{plot}}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' # download data
+#' data.spy = getSymbols('SPY', auto.assign = FALSE)
+#' 	
+#' # simple example candles and volume	
+#' y = data.spy['2011:01:01::2011:02:01']
+#' highlight = which(Cl(y) < 127)
+#' 
+#' # plot
+#' layout(c(1,1,2))		
+#' plota(y, type = 'candle', main = 'SPY', plotX = F, x.highlight = highlight)
+#'   y = plota.scale.volume(y)
+#' plota(y, type = 'volume', x.highlight = highlight)
+#' }
+#' @export 
 ###############################################################################
 plota <- function
 (
@@ -167,8 +243,37 @@ plota <- function
 	box();
 }
 
+
 ###############################################################################
-# plota2Y - add second Y axis to existing plot
+#' Plot time series with second Y axis
+#'
+#' @param y \code{\link{xts}} object
+#' @param las rotation of Y axis labels, \strong{defaults to 1}, for more info see \code{\link{par}}
+#' @param type plot type, \strong{defaults to 'n'}, for more info see \code{\link{plot}}
+#'			also support 'ohlc', 'hl', 'candle', 'volume' types
+#' @param ... additional parameters to the \code{\link{plot}}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' # download data
+#' data.spy = getSymbols('SPY', auto.assign = FALSE)
+#' data.ibm = getSymbols('IBM', auto.assign = FALSE)
+#' 	
+#' # two Y axis example
+#' y = data.spy['2010:01:01::2011:02:01']
+#' 				
+#' # to plot second Y axis, free some space on left side, set LeftMargin=3
+#' plota(y, type = 'ohlc', LeftMargin=3)
+#' 			
+#' y0 = y			
+#' y = data.ibm['2010:10:15::2011:02:01']		
+#' plota2Y(y, ylim = range(OHLC(y)),las=1, col='red', col.axis = 'red')
+#'   plota.ohlc(y, col = 'red')		
+#' plota.legend('SPY(rhs),IBM(lhs)', 'blue,red', list(y0,y))
+#' }
+#' @export 
 ###############################################################################
 plota2Y <- function(
 	y,			# xts object to plot
@@ -195,8 +300,13 @@ plota2Y <- function(
 		axis(2, las = las, ...) 
 }
 
+
 ###############################################################################
-# plota.grid - plot grid
+#' Add grid to time series plot
+#'
+#' @return nothing
+#'
+#' @export 
 ###############################################################################
 plota.grid <- function() 
 {
@@ -204,8 +314,18 @@ plota.grid <- function()
 	abline( v = plota.control$xaxis.ticks, col = 'lightgray', lty = 'dotted')
 }
 
+
 ###############################################################################
-# plota.lines - plot lines
+#' Add lines to time series plot
+#'
+#' @param y \code{\link{xts}} object
+#' @param type line type, \strong{defaults to 'l'}, for more info see \code{\link{lines}}
+#' @param col color, \strong{defaults to par('col')}
+#' @param ... additional parameters to the \code{\link{lines}}
+#'
+#' @return nothing
+#'
+#' @export 
 ###############################################################################
 plota.lines <- function(
 	y,					# xts object to plot
@@ -226,9 +346,19 @@ plota.lines <- function(
 		lines(temp.x, y1, type = type, col = col, ...)
 	}
 }
-	
+
+
 ###############################################################################
-# plota.format - format numbers using 1000 separator
+#' Format numbers using 1000 separator
+#'
+#' @param temp numbers
+#' @param nround number of rounding digits, \strong{defaults to '2'}
+#' @param sprefix start prefix string, \strong{defaults to ''}
+#' @param eprefix end postfix string, \strong{defaults to ''}
+#'
+#' @return formated numbers
+#'
+#' @export 
 ###############################################################################
 plota.format <- function(
 	temp,			# numbers
@@ -242,8 +372,22 @@ plota.format <- function(
 			eprefix ,sep='') )
 }
 
+
 ###############################################################################
-# plota.legend - plot legend
+#' Plot legend - shortcut to the \code{\link{legend}} function
+#'
+#' @param labels legend labels
+#' @param fill fill colors, \strong{defaults to NULL}
+#' @param lastobs list of last observations, \strong{defaults to NULL}
+#' @param x location of legend, \strong{defaults to 'topleft'}
+#' @param merge merge, \strong{defaults to FALSE}, see \code{\link{legend}} function for more info
+#' @param bty box, \strong{defaults to 'n'}, see \code{\link{legend}} function for more info
+#' @param yformat format Y values function, \strong{defaults to \code{\link{plota.format}}}
+#' @param ... other parameters to legend, see \code{\link{legend}} function for more info
+#'
+#' @return nothing
+#'
+#' @export 
 ###############################################################################
 plota.legend <- function
 (
@@ -276,8 +420,28 @@ plota.legend <- function
 	legend(x, legend = labels, fill = fill, merge = merge, bty = bty, ...)
 }	
 
+
 ###############################################################################
-# plota.layout - create layout
+#' Create layout
+#'
+#' @param ilayout matrix stored as a string 
+#' @param delim delimiter, \strong{defaults to ','}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' # create layout	
+#' ilayout = 
+#' '1,1
+#' 2,2
+#' 2,2
+#' 3,4
+#' 3,4
+#' 3,4'
+#' plota.layout(ilayout)
+#' }
+#' @export 
 ###############################################################################
 plota.layout <- function(
 	ilayout,	# matrix stored as a string 
@@ -288,6 +452,9 @@ plota.layout <- function(
 				nrow = len(spl(ilayout, '\n')), byrow=TRUE)
 	layout(mat = ilayout)
 }	
+
+
+
 
 ###############################################################################
 # plota.dx - determine data spacing along X axis
@@ -311,8 +478,17 @@ plota.dx <- function
 	return( xportion * diff(xlim) / ( 2* nrow(y1)  ) )
 }
 
+
 ###############################################################################
-# plota.x.highlight - highlight vertical segments
+#' Highlight vertical segments
+#'
+#' @param y \code{\link{xts}} object
+#' @param highlight segments to highlight along X axis
+#' @param col highlight color, \strong{defaults to plota.control$col.x.highlight}
+#'
+#' @return nothing
+#'
+#' @export 
 ###############################################################################
 plota.x.highlight <- function
 (
@@ -362,8 +538,40 @@ plota.x.highlight.helper <- function
 	box();		
 }
 
+
 ###############################################################################
-# plota.y.highlight - highlight horizontal segments
+#' Highlight horizontal segments
+#'
+#' @param y \code{\link{xts}} object
+#' @param highlight segments to highlight along Y axis
+#' @param col highlight color, \strong{defaults to plota.control$col.y.highlight}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' # download data
+#' data.spy = getSymbols('SPY', auto.assign = FALSE)
+#' rsi = RSI(Cl(data.spy), 20)
+#'  	
+#' #set up two regions for graphs candlestick price data on top 2/3 of the plot
+#' #and rsi on the bottom 1/3 of the plot
+#' layout(c(1,1,2))  
+#' 	
+#' plota(data.spy, type = 'candle', plotX = F)
+#'   plota.legend('SPY', 'grey70', data.spy)
+#' plota(rsi, type = 'l')
+#' 
+#' col = col.add.alpha(spl('green,red'),80)
+#' plota.y.highlight(col=col[1], highlight=c(50,100))	
+#' plota.y.highlight(col=col[2], highlight=c(0,50))	
+#' 	
+#' abline(h = 50, col = 'gray20')
+#' 
+#'   col = iif(last(rsi)>50,'black','red')
+#' plota.legend('RSI(20)', col, rsi, text.col=col)
+#' }
+#' @export 
 ###############################################################################
 plota.y.highlight <- function
 (
@@ -670,7 +878,7 @@ plota.test <- function() {
 
 
 ###############################################################################
-# plota.staccked - staccked plot
+# plota.colors - generate distinct colors, todo switch to ColorBrewer
 ###############################################################################
 #col = rainbow(N, start=0, end=.9)
 plota.colors <- function(N) {
@@ -716,8 +924,25 @@ plota.colors <- function(N) {
 }
 
 
-
-
+###############################################################################
+#' Create Staccked plot
+#'
+#' @param x dates object
+#' @param y matrix with weights
+#' @param xlab X label, \strong{defaults to ''}, for more info see \code{\link{plot}}
+#' @param col colors, \strong{defaults to \code{\link{plota.colors(ncol(y))}}}
+#' @param type plot type: lines, step stairs c('l','s')
+#' @param ... additional parameters to the \code{\link{plot}}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{
+#' # plot allocation weights
+#' plota.stacked(index.xts(weight), weight)	
+#' }
+#' @export 
+###############################################################################
 plota.stacked <- function
 (
 	x,				# x data
@@ -792,9 +1017,23 @@ plota.stacked <- function
 }
 
 
-
 ###############################################################################
-# plota.matplot plot lines stored in the matrix
+#' \code{\link{matplot}} version for \code{\link{xts}} object
+#'
+#' @param y \code{\link{xts}} object
+#' @param dates subset of dates\strong{defaults to NULL}
+#' @param ylim range on Y values, \strong{defaults to NULL}
+#' @param type plot type, \strong{defaults to 'l'}, see \code{\link{plot}} for details
+#' @param ... additional parameters to the \code{\link{matplot}}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{
+#' # plot all prices
+#' plota.matplot(data$prices)	
+#' }
+#' @export 
 ###############################################################################
 plota.matplot <- function
 (
@@ -841,18 +1080,34 @@ plota.matplot <- function
 
 
 ###############################################################################
-# Add recession bars 
-# contributed by Judson Bishop <judson.bishop@gmail.com>
-#
-# SPY = getSymbols('SPY', auto.assign = F)
-# plota(SPY, type='l')
-# plota.recession()
+#' Add recession bars to the existing plot
+#'
+#' This function will add recession bars to the existing plot
+#'
+#' @param col highlight color for recession periods, \strong{defaults to \code{\link{col.add.alpha}}('gray', 50) - alpha = 50 so it's relatively transparent }
+#' @param ylim y-range to highlight recession periods, \strong{defaults to \code{\link{par}}('usr')[3:4] - extremes y coordinates of the plotting region }
+#' @param ... additional parameters for the \code{\link{rect}} fucntion
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' SPY = getSymbols('SPY', auto.assign = F)
+#' plota(SPY, type='l')
+#' plota.recession()
+#' plota.legend('SPY','black',SPY)
+#' }
+#' @author Judson Bishop
+#' @export 
 ###############################################################################
 plota.recession <- function
 (
-	ylim = par('usr')[3:4]
+	col = col.add.alpha('gray', 50),	# Set alpha = 50 so it's relatively transparent
+	ylim = par('usr')[3:4],
+	...
 )
 {
+	# http://www.nber.org/cycles.html
 	recessions.df = read.table(textConnection(
     "Peak, Trough
 1857-06-01, 1858-12-01
@@ -899,14 +1154,11 @@ plota.recession <- function
   	# Trim the recession dataframe to the same time length of the data
   	recessions.trim = subset(recessions.df, Peak >= as.Date(min(plota.control$xaxis.ticks)) )
 
-  	# Set alpha = 50 so it's relatively transparent
-  	color <- rgb(190, 190, 190, alpha=50, maxColorValue=255)
-
   	# Create the rectanble for recession
   	for(i in 1:length(recessions.trim$Peak)){
       	rect(xleft = as.POSIXct(recessions.trim$Peak[[i]]), 
       		xright = as.POSIXct(recessions.trim$Trough[[i]]), 
-      		ybottom = chart.min, ytop = chart.max, col=color, border=color)
+      		ybottom = chart.min, ytop = chart.max, col=col, border=col, ...)
   	}
 }
 

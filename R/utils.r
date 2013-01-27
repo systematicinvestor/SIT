@@ -13,7 +13,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ###############################################################################
 # Collection of General Utilities
-# Copyright (C) 2011  Michael Kapler
+# Copyright (C) 2012  Michael Kapler
 #
 # For more information please visit my blog at www.SystematicInvestor.wordpress.com
 # or drop me a line at TheSystematicInvestor at gmail
@@ -28,17 +28,15 @@
 #' This function will split given string into tokens using delim
 #'
 #' @param s input string
-#'
 #' @param delim delimiter, \strong{defaults to ","}
 #'
 #' @return array of tokens
 #'
-#' @export 
-#'
 #' @examples
-#'
+#' \dontrun{ 
 #' spl('a,b,c')
-#'
+#' }
+#' @export 
 ###############################################################################
 spl <- function 
 (
@@ -50,7 +48,20 @@ spl <- function
 }
 
 ###############################################################################
-# Join vector of strings into one string using delim
+#' Join vector of strings into one string using delim
+#'
+#' This function will join vector of strings into one string using delim
+#'
+#' @param v vector of strings
+#' @param delim delimiter, \strong{defaults to ","}
+#'
+#' @return resulting string
+#'
+#' @examples
+#' \dontrun{ 
+#' join(c('a','b','c'), ',')
+#' }
+#' @export 
 ###############################################################################
 join <- function
 (
@@ -62,7 +73,19 @@ join <- function
 }
 
 ###############################################################################
-# Remnove any leading and trailing spaces
+#' Remnove any leading and trailing spaces
+#'
+#' This function will remnove any leading and trailing spaces
+#'
+#' @param s string
+#'
+#' @return resulting string
+#'
+#' @examples
+#' \dontrun{ 
+#' trim('  a b c  ')
+#' }
+#' @export 
 ###############################################################################
 trim <- function
 (
@@ -75,8 +98,20 @@ trim <- function
 }
 
 ###############################################################################
-# Get the length of vectors
-############################################################################### 
+#' Shortcut for length function
+#'
+#' This function is a shortcut for length function
+#'
+#' @param x vector / string / matrix
+#'
+#' @return number of elements in x
+#'
+#' @examples
+#' \dontrun{ 
+#' len(1:10)
+#' }
+#' @export 
+###############################################################################
 len <- function
 (
 	x	# vector
@@ -86,8 +121,22 @@ len <- function
 }
 
 ###############################################################################
-# Fast version of ifelse
-############################################################################### 
+#' Faster version of ifelse function
+#'
+#' This function is a faster version of ifelse function
+#'
+#' @param cond true / false condition
+#' @param truepart resulting value(s) if condition is true
+#' @param falsepart resulting value(s) if condition is false
+#'
+#' @return number of elements in x
+#'
+#' @examples
+#' \dontrun{ 
+#' iif(1:10 > 5, 1, 1:10)
+#' }
+#' @export 
+###############################################################################
 iif <- function
 (
 	cond,		# condition
@@ -117,8 +166,21 @@ iif <- function
 } 
 
 ###############################################################################
-# Check for NA, NaN, Inf
-############################################################################### 
+#' Replace NA, NaN, Inf values
+#'
+#' This function will replace all NA, NaN, Inf with given values
+#'
+#' @param x data to check for NA, NaN, Inf
+#' @param y values(s) to be used in place of NA, NaN, Inf
+#'
+#' @return updated data
+#'
+#' @examples
+#' \dontrun{ 
+#' ifna(c(1,NA,2,Inf,3), 4)
+#' }
+#' @export 
+###############################################################################
 ifna <- function
 (
 	x,	# check x for NA, NaN, Inf
@@ -127,9 +189,50 @@ ifna <- function
 	return(iif(is.na(x) | is.nan(x) | is.infinite(x), y, x))
 }
 
+
 ###############################################################################
-# Faster version of rep fucntion
+#' Replace NULL values
+#'
+#' This function will replace all NULL with given value
+#'
+#' @param x data to check for NULL
+#' @param y values to be used in place of NULL
+#'
+#' @return updated data
+#'
+#' @examples
+#' \dontrun{ 
+#' temp = list()
+#' temp$val1 = ifnull(temp$val1, 4)
+#' }
+#' @export 
 ############################################################################### 
+ifnull <- function
+(
+	x,	# check x for NULL
+	y	# if found replace with y
+) { 	
+	return(iif(is.null(x), y, x))
+}
+
+
+
+###############################################################################
+#' Faster version of rep fucntion
+#'
+#' This function is a faster version of rep fucntion
+#'
+#' @param x data to be repeated
+#' @param times number of times to repeat the data
+#'
+#' @return new data
+#'
+#' @examples
+#' \dontrun{ 
+#' fast.rep(c(1,NA,2,Inf,3), 4)
+#' }
+#' @export 
+###############################################################################
 fast.rep <- function(x, times) { 
 	length(x) = times
 	x[] = x[1]		
@@ -156,21 +259,23 @@ fast.rep.test.speed <- function() {
 	 )
 }	
 
-###############################################################################
-# Check for NULL
-############################################################################### 
-ifnull <- function
-(
-	x,	# check x for NULL
-	y	# if found replace with y
-) { 	
-	return(iif(is.null(x), y, x))
-}
-
 
 ###############################################################################
-# Count number of non NA elements
-############################################################################### 
+#' Count number of non NA elements
+#'
+#' This function will count number of non NA elements in the given matrix
+#'
+#' @param x data matrix
+#' @param side margin along which to count
+#'
+#' @return counts
+#'
+#' @examples
+#' \dontrun{ 
+#' count(matrix(c(1,NA,2,3),2,2))
+#' }
+#' @export 
+###############################################################################
 count <- function(
 	x,			# matrix with data
 	side = 2	# margin along which to count
@@ -184,8 +289,21 @@ count <- function(
 }  
 
 ###############################################################################
-# Running over window Count of non NA elements
-############################################################################### 
+#' Running Count over given window
+#'
+#' This function will count number of non NA elements over given window
+#'
+#' @param x data matrix
+#' @param window.len window length
+#'
+#' @return counts
+#'
+#' @examples
+#' \dontrun{ 
+#' run.count(matrix(1:9,3,3),2)
+#' }
+#' @export 
+###############################################################################
 run.count <- function
 (
 	x, 			# vector with data
@@ -199,50 +317,103 @@ run.count <- function
 }
 
 ###############################################################################
-# Day of Week
-############################################################################### 
+#' Dates Functions
+#'
+#' @param dates collection of dates
+#'
+#' @return transformed dates
+#'
+#' @examples
+#' \dontrun{ 
+#' date.dayofweek(Sys.Date())
+#' }
+#' @export 
+#' @rdname DateFunctions
+###############################################################################
 date.dayofweek <- function(dates) 
 {	
 	return(as.double(format(dates, '%w')))
 }
 
+#' @export 
+#' @rdname DateFunctions
 date.day <- function(dates) 
 {	
 	return(as.double(format(dates, '%d')))
 }
 
+#' @export 
+#' @rdname DateFunctions
 date.week <- function(dates) 
 {	
 	return(as.double(format(dates, '%U')))
 }
  
+#' @export 
+#' @rdname DateFunctions
 date.month <- function(dates) 
 {	
 	return(as.double(format(dates, '%m')))
 }
 
+#' @export 
+#' @rdname DateFunctions
 date.year <- function(dates) 
 {	
 	return(as.double(format(dates, '%Y')))
 }
 
 
+###############################################################################
+#' Dates Index Functions
+#'
+#' @param dates collection of dates
+#'
+#' @return location of the week/month/year ends
+#'
+#' @examples
+#' \dontrun{ 
+#' date.week.ends(seq(Sys.Date()-100, Sys.Date(), 1))
+#' }
+#' @export 
+#' @rdname DateFunctionsIndex
+###############################################################################
 date.week.ends <- function(dates) 
 {	
 	return( unique(c(which(diff( 100*date.year(dates) + date.week(dates) ) != 0), len(dates))) )
 }
 
+#' @export 
+#' @rdname DateFunctionsIndex
 date.month.ends <- function(dates) 
 {	
 	return( unique(c(which(diff( 100*date.year(dates) + date.month(dates) ) != 0), len(dates))) )
 }
 
+#' @export 
+#' @rdname DateFunctionsIndex
 date.year.ends <- function(dates) 
 {	
 	return( unique(c(which(diff( date.year(dates) ) != 0), len(dates))) )
 }
 
-# map any time series to monthly
+
+###############################################################################
+#' Map given time series to monthly
+#'
+#' If frequency of observations in the given time series is less than monthly,
+#' i.e. quaterly or annually, properly align this time series to monthly
+#'
+#' @param equity time series
+#'
+#' @return xts object 
+#'
+#' @examples
+#' \dontrun{ 
+#' map2monthly(equity) 
+#' }
+#' @export 
+###############################################################################
 map2monthly <- function(equity) 
 {
 	#a = coredata(Cl(to.monthly(equal.weight$equity)))
@@ -265,7 +436,21 @@ map2monthly <- function(equity)
 }
 
 
-# create monthly table
+###############################################################################
+#' Create monthly table
+#'
+#' Transform given monthly time series into matrix with Months as columns and Years as rows
+#'
+#' @param monthly.data monthly time series
+#'
+#' @return matrix with Months as columns and Years as rows
+#'
+#' @examples
+#' \dontrun{ 
+#' create.monthly.table(monthly.ret)
+#' }
+#' @export 
+###############################################################################
 create.monthly.table <- function(monthly.data) 
 {
 	nperiods = nrow(monthly.data)
@@ -286,14 +471,30 @@ create.monthly.table <- function(monthly.data)
 }
 		
 
-# http://www.mysmp.com/options/options-expiration-week.html
-# The week beginning on Monday prior to the Saturday of options expiration is referred to as options expiration week. 
-# Since the markets are closed on Saturday, the third Friday of each month represents options expiration.
-# If the third Friday of the month is a holiday, all trading dates are moved forward; meaning that Thursday will be the last trading day to exercise options.
-# http://www.cboe.com/TradTool/ExpirationCalendar.aspx
-
-# The expiration date of stock options (3rd Friday of the month)
-# http://bytes.com/topic/python/answers/161147-find-day-week-month-year
+###############################################################################
+#' Compute the expiration date of stock options (3rd Friday of the month)
+#'
+#' @param year year
+#' @param month month
+#'
+#' @return date for the third Friday of the given month and year
+#'
+#' @references 
+#' \url{http://bytes.com/topic/python/answers/161147-find-day-week-month-year}
+#'
+#' \url{http://www.mysmp.com/options/options-expiration-week.html}
+#' The week beginning on Monday prior to the Saturday of options expiration is referred to as options expiration week. 
+#' Since the markets are closed on Saturday, the third Friday of each month represents options expiration.
+#' If the third Friday of the month is a holiday, all trading dates are moved forward; meaning that Thursday will be the last trading day to exercise options.
+#'
+#' \url{http://www.cboe.com/TradTool/ExpirationCalendar.aspx}
+#'
+#' @examples
+#' \dontrun{ 
+#' third.friday.month(2012,1)
+#' }
+#' @export 
+###############################################################################
 third.friday.month <- function(year, month)
 {
 	day = date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )
@@ -302,8 +503,20 @@ third.friday.month <- function(year, month)
 }
 
 
-
-# convert dates to dates.index
+###############################################################################
+#' Determine the index of subset of dates in the time series
+#'
+#' @param x xts time series
+#' @param dates string represnting subset of dates i.e. '2010::2012'
+#'
+#' @return index of subset of dates in the time series
+#'
+#' @examples
+#' \dontrun{ 
+#' dates2index(data$prices, '2010::2012') 
+#' }
+#' @export 
+###############################################################################
 dates2index <- function( x, dates = 1:nrow(x) ) {
 	dates.index = dates
 	if(!is.numeric(dates)) {
@@ -314,8 +527,24 @@ dates2index <- function( x, dates = 1:nrow(x) ) {
 	return(dates.index)
 } 
 
+
 ###############################################################################
-# Load Packages that are available and install ones that are not available.
+#' Load Packages that are available and install ones that are not available
+#'
+#' This function a convience wrapper for install.packages() function
+#'
+#' @param packages names of the packages separated by comma
+#' @param repos default repository
+#' @param dependencies type of dependencies to install
+#' @param ... additional parameters for the \code{\link{install.packages}} function
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' load.packages('quantmod')
+#' }
+#' @export 
 ############################################################################### 
 load.packages <- function
 (
@@ -339,10 +568,19 @@ load.packages <- function
 
 
 ###############################################################################
-# Timing Utilities
-###############################################################################
-# Begin timing
-###############################################################################
+#' Begin Timing
+#'
+#' @param identifier name for this timing session
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' tic(1)
+#' }
+#' @export 
+#' @rdname TimingFunctions
+############################################################################### 
 tic <- function
 (
 	identifier	# integer value
@@ -351,9 +589,21 @@ tic <- function
 	assign(paste('saved.time', identifier, sep=''), proc.time()[3], envir = .GlobalEnv)
 }
 
+
 ###############################################################################
-# End timing
-###############################################################################
+#' End Timing and report elapsed time
+#'
+#' @param identifier name for this timing session
+#'
+#' @return elapsed time
+#'
+#' @examples
+#' \dontrun{ 
+#' toc(1)
+#' }
+#' @export 
+#' @rdname TimingFunctions
+############################################################################### 
 toc <- function
 (
 	identifier	# integer value
@@ -369,9 +619,6 @@ toc <- function
     return (paste('Elapsed time is', round(diffTimeSecs,2), 'seconds', sep=' '))
 }
 
-###############################################################################
-# Test for timing functions
-###############################################################################
 test.tic.toc <- function()
 {
 	tic(10)
@@ -382,12 +629,28 @@ test.tic.toc <- function()
 }
 
 
+
+
+
+
+
 ###############################################################################
-# Matrix Utilities
-###############################################################################
-# Lag matrix or vector
-#  mlag(x,1) - use yesterday's values
-#  mlag(x,-1) - use tomorrow's values
+#' Lag matrix or vector
+#'
+#' This function shifts elemnts in a vector or a mtrix by a given lag.
+#' For example: mlag(x,1) - use yesterday's values and
+#'  mlag(x,-1) - use tomorrow's values
+#'
+#' @param x vector / matrix
+#' @param nlag number of lags, \strong{defaults to 1}
+#'
+#' @return modified object
+#'
+#' @examples
+#' \dontrun{ 
+#' mlag(1:10)
+#' }
+#' @export 
 ###############################################################################
 mlag <- function
 (
@@ -420,23 +683,51 @@ mlag <- function
 	return(m);
 }
 
+
 ###############################################################################
-# Replicate and tile an array
-# http://www.mathworks.com/help/techdoc/ref/repmat.html
+#' Replicate and tile a given vector
+#'
+#' @param v vector
+#' @param n number of copies along rows
+#' @param m number of copies along columns
+#'
+#' @return new matrix
+#' 
+#' @references 
+#' \url{http://www.mathworks.com/help/techdoc/ref/repmat.html}
+#'
+#' @examples
+#' \dontrun{ 
+#' repmat(1:10,1,2)
+#' }
+#' @export 
 ###############################################################################
 repmat <- function
 (
-	a,	# array
+	v,	# vector
 	n,	# number of copies along rows
 	m	# number of copies along columns
 )
 {
-	kronecker( matrix(1, n, m), a )
+	kronecker( matrix(1, n, m), v )
 }
 
 
-#matrix(1:3, nr=5, nc=3, byrow=T)
-#repRow(1:3, 5)
+###############################################################################
+#' Repeat Rows
+#'
+#' @param m vector (row)
+#' @param nr number of copies along rows
+#'
+#' @return new matrix
+#' 
+#' @examples
+#' \dontrun{ 
+#' matrix(1:3, nr=5, nc=3, byrow=T)
+#' repRow(1:3, 5)
+#' }
+#' @export 
+###############################################################################
 repRow <- function
 (
 	m, # vector (row)
@@ -446,8 +737,22 @@ repRow <- function
 	matrix(m, nr=nr, nc=len(m), byrow=T)
 }
 
-#matrix(1:5, nr=5, nc=3, byrow=F)
-#repCol(1:5, 3)
+
+###############################################################################
+#' Repeat Rows
+#'
+#' @param m vector (column)
+#' @param nc number of copies along columns
+#'
+#' @return new matrix
+#' 
+#' @examples
+#' \dontrun{ 
+#' matrix(1:5, nr=5, nc=3, byrow=F)
+#' repCol(1:5, 3)
+#' }
+#' @export 
+###############################################################################
 repCol <- function
 (
 	m,	# vector (column)
@@ -458,39 +763,33 @@ repCol <- function
 }
 
 
-###############################################################################
-# Compute correlations
-###############################################################################
-compute.cor <- function
-(
-	data, 		# matrix with data
-	method = c("pearson", "kendall", "spearman")
-)
-{
-	nc = ncol(data) 	
-	corm = matrix(NA,nc,nc)
-		colnames(corm) = rownames(corm) = colnames(data)
-		
-	for( i in 1:(nc-1) ) {
-		temp = data[,i]
-		for( j in (i+1):nc ) {
-			corm[i,j] = cor(temp, data[,j], use='complete.obs', method[1])	
-		}
-	}
-	return(corm)
-}
 
 
 ###############################################################################
-# Find location: row, col in the matrix, given index of of observation
-#
-# lookup.index(factors$TV$BP, which(factors$TV$BP > 8)) 		
-# plot(factors$TV$BP$BAC)
-###############################################################################
+#' Find location: row, col in the matrix, given index of of observation
+#'
+#' @param data matrix
+#' @param i index of observations
+#' @param details flag to provide details, \strong{defaults to FALSE}
+#'
+#' @return new matrix
+#' 
+#' @examples
+#' \dontrun{ 
+#' data = matrix(1:16,4,4)
+#' lookup.index(data, which(data > 4))
+#' }
+#' @export 
 # play with following example: update 1 %% 4	
 ###############################################################################
-lookup.index <- function(data, i, details=F) {
-	nrow(data) = n
+lookup.index <- function
+(
+	data, 	# matrix
+	i, 		# index of observations
+	details = F	# flag to return additional details
+) 
+{
+	n = nrow(data)
 	irow = ((i - 1) %% n) + 1	
 	icol = ((i - 1) %/% n) +1 
 	if(details)
@@ -501,8 +800,20 @@ lookup.index <- function(data, i, details=F) {
 
 
 ###############################################################################
-# Convert beta or slope (coefficient of x) to degrees
-# http://r.789695.n4.nabble.com/slope-calculation-td858652.html	
+#' Convert beta (slope of reggression line) to degrees
+#'
+#' @param beta slope of regression line
+#'
+#' @return angle
+#' 
+#' @references 
+#' \url{http://r.789695.n4.nabble.com/slope-calculation-td858652.html	}
+#'
+#' @examples
+#' \dontrun{ 
+#' beta.degree(1)
+#' }
+#' @export 
 ###############################################################################
 beta.degree <- function(beta) 
 { 
@@ -513,32 +824,56 @@ beta.degree <- function(beta)
 ###############################################################################
 # XTS helper functions
 ###############################################################################
-# Create XTS object
-###############################################################################
 
 # must set timezone before any calls to xts
 Sys.setenv(TZ = 'GMT')
 #Sys.setenv(TZ = 'EST')
+
+###############################################################################
+#' The timezone is set to 'GMT' by defult
+#'
+#' The reason for setting the default timezone is because the following code 
+#' produces different results if the timezone is NOT set and if timezone has a value.
+#' 
+#' @examples
+#' \dontrun{ 
 # 
-# We want to set the timezone, so that following code produces expected results
-# Sys.getenv('TZ')
-# test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
-#	as.numeric(test)
-#	as.numeric(as.POSIXct(as.Date(test)))
-# as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
-# test == as.POSIXct(as.Date(test))
-#
-# Set Time Zone
-# Sys.setenv(TZ = 'GMT')
-# Sys.getenv('TZ')
-# test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
-#	as.numeric(test)
-#	as.numeric(as.POSIXct(as.Date(test)))
-# as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
-# test == as.POSIXct(as.Date(test))
-#
+#' # We want to set the timezone, so that following code produces expected results
+#' Sys.getenv('TZ')
+#' test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
+#'	as.numeric(test)
+#'	as.numeric(as.POSIXct(as.Date(test)))
+#' as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
+#' test == as.POSIXct(as.Date(test))
+#'
+#' # Set Time Zone
+#' Sys.setenv(TZ = 'GMT')
+#' Sys.getenv('TZ')
+#' test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
+#'	as.numeric(test)
+#'	as.numeric(as.POSIXct(as.Date(test)))
+#' as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
+#' test == as.POSIXct(as.Date(test))
+#'
+#' }
+#' @export 
+###############################################################################
 
 
+###############################################################################
+#' Create \code{\link{xts}} object, faster version of \code{\link{xts}} fucntion
+#'
+#' @param x vector / matrix / data frame
+#' @param order.by dates that correspond to rows of x
+#'
+#' @return \code{\link{xts}} object
+#' 
+#' @examples
+#' \dontrun{ 
+#' make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1))
+#' }
+#' @export 
+###############################################################################
 make.xts <- function
 (
 	x,			# data
@@ -559,8 +894,22 @@ make.xts <- function
 	return( x )
 }
 
+
 ###############################################################################
-# Write XTS object to file
+#' Write \code{\link{xts}} object to file
+#'
+#' @param x \code{\link{xts}} object
+#' @param filename file name
+#' @param append flag to inidicate if file is overwritten or appended, \strong{defaults to FALSE}
+#' @param ... additional paramaeters to the \code{\link{format}} function
+#'
+#' @return nothing
+#' 
+#' @examples
+#' \dontrun{ 
+#' write.xts(make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1)), 'temp.csv')
+#' }
+#' @export 
 ###############################################################################
 write.xts <- function
 (
@@ -578,9 +927,22 @@ write.xts <- function
 }
 
 
-
 ###############################################################################
-# Read XTS object to file
+#' Read \code{\link{xts}} object from file
+#'
+#' @param filename file name
+#' @param date.fn function to preprocess string dates, \strong{defaults to \code{\link{paste}} - i.e. no preprocessing}
+#' @param index.class class of the date object, \strong{defaults to 'Date'}
+#' @param ... additional paramaeters to the \code{\link{as.POSIXct}} function
+#'
+#' @return \code{\link{xts}} object
+#' 
+#' @examples
+#' \dontrun{ 
+#' write.xts(make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1)), 'temp.csv')
+#' read.xts('temp.csv')
+#' }
+#' @export 
 ###############################################################################
 read.xts <- function
 (
@@ -595,31 +957,28 @@ read.xts <- function
 	out = make.xts(out[,-1,drop=F], as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...))
 		indexClass(out) = index.class
 	return( out )
-	
-# getSymbols.yahoo: as.POSIXct - to avoid Dates problems
+
+# Example code from	getSymbols.yahoo (quantmod): as.POSIXct is used to avoid Dates conversion problems
 # fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())
 # indexClass(fr) = "Date"	
 }
 
 
-
-	
-	
 ###############################################################################
-# Fast alternative to index(x) for XTS object
-# NOTE index.xts is the same name as the index function in the XTS package
+#' Fast alternative to index() function for \code{\link{xts}} object
+#'
+#' NOTE index.xts is the same name as the index function in the XTS package
+#'
+#' @param x \code{\link{xts}} object
+#'
+#' @return dates
+#' 
+#' @examples
+#' \dontrun{ 
+#' index.xts(make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1)))
+#' }
+#' @export 
 ###############################################################################
-index4xts <- function
-(
-	x			# XTS object
-)
-{
-	temp = attr(x, 'index')
-	class(temp)='POSIXct' 
-	
-	return(temp)
-}
-	
 # maybe rename to bt.index.xts
 index.xts <- function
 (
@@ -635,6 +994,19 @@ index.xts <- function
 	return(temp)
 }
 
+
+# other variants that are not currently used
+index4xts <- function
+(
+	x			# XTS object
+)
+{
+	temp = attr(x, 'index')
+	class(temp)='POSIXct' 
+	
+	return(temp)
+}
+
 index2date.time <- function(temp) {
 	class(temp)='POSIXct' 
 	
@@ -646,20 +1018,34 @@ index2date.time <- function(temp) {
 }
 
 
-
 ###############################################################################
-# Work with file names
+#' File name Functions
+#'
+#' @param x file name
+#'
+#' @return part of the file name
+#'
+#' @examples
+#' \dontrun{ 
+#' get.extension('test.csv')
+#' }
+#' @export 
+#' @rdname FilenameFunctions
 ###############################################################################
 get.extension <- function(x) 
 { 
 	trim( tail(spl(x,'\\.'),1) ) 
 }	
 
+#' @export 
+#' @rdname FilenameFunctions
 get.full.filename <- function(x) 
 { 
 	trim( tail(spl(gsub('\\\\','/',x),'/'),1) ) 
 }
 
+#' @export 
+#' @rdname FilenameFunctions
 get.filename <- function(x) 
 { 
 	temp = spl(get.full.filename(x),'\\.')
@@ -667,20 +1053,41 @@ get.filename <- function(x)
 }
 
 
-
-
-#all possible combinations of list elements
-# expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
-
-
 ###############################################################################
-# Helper function to read data saved by Seasonality tool program
-###############################################################################
-getSymbols.sit <- function(Symbols = NULL, env = .GlobalEnv, src = 'yahoo', auto.assign = TRUE, ...) {
+#' Helper function to read historical stock prices saved by Seasonality tool
+#'
+#' @param Symbols vector of symbols
+#' @param env enviroment to store prices, \strong{defaults to .GlobalEnv}
+#' @param auto.assign flag to auto assign symbols, \strong{defaults to TRUE}
+#' @param stock.folder stock folder, \strong{defaults to 'c:/temp/Seasonality/stocks'}
+#' @param stock.date.format stock date format, \strong{defaults to '\%Y-\%m-\%d'}
+#' @param ... other parameters for getSymbols function
+#'
+#' @return nothing is auto.assign = TRUE, prices are stored in the env enviroment
+#' if auto.assign = FALSE, returns first symbol
+#' 
+#' @references 
+#' \url{http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod}
+#'
+#' @examples
+#' \dontrun{ 
+#' data <- new.env()
+#' getSymbols.sit(spl('SPY,IBM'), env = data, auto.assign = T)
+#' }
+#' @export 
+######################################################################x#########
+getSymbols.sit <- function
+(
+	Symbols, 
+	env = .GlobalEnv, 
+	auto.assign = TRUE, 
+	stock.folder = 'c:/temp/Seasonality/stocks',
+	stock.date.format = '%Y-%m-%d',
+	...
+) 
+{
 	require(quantmod)	
-	stock.folder = 'c:/temp/Seasonality/stocks'
-	stock.date.format = '%Y-%m-%d'
-
+	
 	# http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod
 	for(i in 1:len(Symbols)) {
 		s = Symbols[i]
@@ -699,7 +1106,15 @@ getSymbols.sit <- function(Symbols = NULL, env = .GlobalEnv, src = 'yahoo', auto
 		else
 			cat(i, 'out of', len(Symbols), 'Missing', s, '\n', sep='\t')	
 	}
-
-	#quantmod::getSymbols(Symbols, env = env, auto.assign = auto.assign)
-	 	
 }
+
+
+
+#all possible combinations of list elements
+# expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
+
+
+
+
+
+

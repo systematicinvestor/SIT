@@ -64,51 +64,6 @@ draw.cell <- function
     }
 }
 
-###############################################################################
-# Public table drawing routines
-###############################################################################
-# plot.table.param - plot table with user specified parameters
-###############################################################################
-plot.table.param <- function
-(
-	plot.matrix, 				# matrix to plot
-	smain = '', 				# text to draw in top,left cell
-	plot.matrix.cex, 			# text size
-	plot.matrix_bg.col, 		# background color
-	frame.cell = T, 			# flag to draw border
-	keep.all.same.cex = FALSE	# flag to auto-adjust text size
-)
-{	
-	n = nrow(plot.matrix) 
-	pages = unique(c(seq(0, n, by = 120), n))
-	
-	for(p in 1:(len(pages)-1)) {	
-		rindex = (pages[p]+1) : pages[p+1]
-		
-		temp.table = matrix('', nr = len(rindex)+1, nc = ncol(plot.matrix)+1)
-			temp.table[-1, -1] = plot.matrix[rindex,]
-			temp.table[1, -1] = colnames(plot.matrix)
-			temp.table[-1, 1] = rownames(plot.matrix)[rindex]
-			temp.table[1, 1] = smain
-				
-		nr = nrow(temp.table) 
-		nc = ncol(temp.table)
-		
-		par(mar = c(0, 0, 0, 0), cex = 0.5) 
-		oldpar = make.table(nr, nc)
-
-		text.cex = plot.matrix.cex[c(1, 1 + rindex), ]		
-			text.cex = plot.table.helper.auto.adjust.cex(temp.table, keep.all.same.cex)
-		bg.col = plot.matrix_bg.col[c(1, 1 + rindex), ]
-
-		for(r in 1:nr) {
-			for(c in 1:nc) {
-				draw.cell( paste('', temp.table[r,c], '', sep=' '), r, c, 
-					text.cex = text.cex[r,c], bg.col = bg.col[r,c], frame.cell = frame.cell)
-			}
-		}
-	}	
-}
 
 ###############################################################################
 # plot.table.helper.auto.adjust.cex - determine how to auto-adjust text size
@@ -157,7 +112,137 @@ plot.table.helper.auto.adjust.cex <- function
 
 
 ###############################################################################
-# plot.table - plot table
+# plot.table.param - plot table with user specified parameters
+###############################################################################
+plot.table.param <- function
+(
+	plot.matrix, 				# matrix to plot
+	smain = '', 				# text to draw in top,left cell
+	plot.matrix.cex, 			# text size
+	plot.matrix_bg.col, 		# background color
+	frame.cell = T, 			# flag to draw border
+	keep.all.same.cex = FALSE	# flag to auto-adjust text size
+)
+{	
+	n = nrow(plot.matrix) 
+	pages = unique(c(seq(0, n, by = 120), n))
+	
+	for(p in 1:(len(pages)-1)) {	
+		rindex = (pages[p]+1) : pages[p+1]
+		
+		temp.table = matrix('', nr = len(rindex)+1, nc = ncol(plot.matrix)+1)
+			temp.table[-1, -1] = plot.matrix[rindex,]
+			temp.table[1, -1] = colnames(plot.matrix)
+			temp.table[-1, 1] = rownames(plot.matrix)[rindex]
+			temp.table[1, 1] = smain
+				
+		nr = nrow(temp.table) 
+		nc = ncol(temp.table)
+		
+		par(mar = c(0, 0, 0, 0), cex = 0.5) 
+		oldpar = make.table(nr, nc)
+
+		text.cex = plot.matrix.cex[c(1, 1 + rindex), ]		
+			text.cex = plot.table.helper.auto.adjust.cex(temp.table, keep.all.same.cex)
+		bg.col = plot.matrix_bg.col[c(1, 1 + rindex), ]
+
+		for(r in 1:nr) {
+			for(c in 1:nc) {
+				draw.cell( paste('', temp.table[r,c], '', sep=' '), r, c, 
+					text.cex = text.cex[r,c], bg.col = bg.col[r,c], frame.cell = frame.cell)
+			}
+		}
+	}	
+}
+
+
+###############################################################################
+# plot.table.helper.color - default coloring scheme for highlight
+###############################################################################
+plot.table.helper.color <- function
+(
+	temp	# matrix to plot 
+){
+	# convert temp to numerical matrix
+	temp = matrix(as.double(gsub('[%,$]', '', temp)), nrow(temp), ncol(temp))
+
+	highlight = as.vector(temp)
+	cols = rep(NA, len(highlight))
+		ncols = len(highlight[!is.na(highlight)])
+		cols[1:ncols] = rainbow(ncols, start = 0, end = 0.3)			
+		
+	o = sort.list(highlight, na.last = TRUE, decreasing = FALSE)
+		o1 = sort.list(o, na.last = TRUE, decreasing = FALSE)
+		highlight = matrix(cols[o1], nrow = nrow(temp))
+		highlight[is.na(temp)] = NA
+	return(highlight)
+}
+
+
+
+###############################################################################
+# plot.table.helper.colorbar - plot colorbar
+###############################################################################
+plot.table.helper.colorbar <- function
+(
+	plot.matrix		# matrix to plot 
+)
+{
+	nr = nrow(plot.matrix) + 1
+	nc = ncol(plot.matrix) + 1
+	
+	c = nc
+	r1 = 1
+	r2 = nr
+	
+    rect((2*(c - 1) + .5), -(r1 - .5), (2*c + .5), -(r2 + .5), col='white', border='white')
+   	rect((2*(c - 1) + .5), -(r1 - .5), (2*(c - 1) + .5), -(r2 + .5), col='black', border='black')
+    
+	y1= c( -(r2) : -(r1) )
+	
+	graphics::image(x = c(  (2*(c - 1) + 1.5) : (2*c + 0.5) ),
+		y   = y1,
+        z   = t(matrix(  y1  , ncol = 1)),
+        col = t(matrix( rainbow(len( y1  ), start = 0, end = 0.3) , ncol = 1)),
+        add = T)
+}
+
+
+
+
+
+
+###############################################################################
+# Public table drawing routines
+###############################################################################
+#' Plot Table
+#'
+#' Create Plot of the given matrix
+#'
+#' @param plot.matrix matrix to plot
+#' @param smain text to draw in top,left cell
+#' @param text.cex text size, \strong{defaults to 1}
+#' @param frame.cell flag to draw border, \strong{defaults to TRUE}
+#' @param highlight flag to highlight data, \strong{defaults to FALSE}
+#' @param colorbar flag to draw colorbar, \strong{defaults to FALSE}
+#' @param keep_all.same.cex flag to auto-adjust text size, \strong{defaults to FALSE}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' # generate 1,000 random numbers from Normal(0,1) distribution 
+#' data =  matrix(rnorm(1000), nc=10)
+#'   colnames(data) = paste('data', 1:10, sep='')
+#' 		
+#' # compute Pearson correlation of data and format it nicely
+#' temp = cor(data, use='complete.obs', method='pearson')
+#'   temp[] = plota.format(100 * temp, 0, '', '%')
+#' 		
+#' # plot temp with colorbar, display Correlation in (top, left) cell	
+#' plot.table(temp, smain='Correlation', highlight = TRUE, colorbar = TRUE)	
+#' }
+#' @export 
 ###############################################################################
 plot.table <- function
 (
@@ -244,57 +329,11 @@ plot.table <- function
 }
 
 
-###############################################################################
-# plot.table.helper.color - default coloring scheme for highlight
-###############################################################################
-plot.table.helper.color <- function
-(
-	temp	# matrix to plot 
-){
-	# convert temp to numerical matrix
-	temp = matrix(as.double(gsub('[%,$]', '', temp)), nrow(temp), ncol(temp))
 
-	highlight = as.vector(temp)
-	cols = rep(NA, len(highlight))
-		ncols = len(highlight[!is.na(highlight)])
-		cols[1:ncols] = rainbow(ncols, start = 0, end = 0.3)			
-		
-	o = sort.list(highlight, na.last = TRUE, decreasing = FALSE)
-		o1 = sort.list(o, na.last = TRUE, decreasing = FALSE)
-		highlight = matrix(cols[o1], nrow = nrow(temp))
-		highlight[is.na(temp)] = NA
-	return(highlight)
-}
+
 
 ###############################################################################
-# plot.table.helper.colorbar - plot colorbar
-###############################################################################
-plot.table.helper.colorbar <- function
-(
-	plot.matrix		# matrix to plot 
-)
-{
-	nr = nrow(plot.matrix) + 1
-	nc = ncol(plot.matrix) + 1
-	
-	c = nc
-	r1 = 1
-	r2 = nr
-	
-    rect((2*(c - 1) + .5), -(r1 - .5), (2*c + .5), -(r2 + .5), col='white', border='white')
-   	rect((2*(c - 1) + .5), -(r1 - .5), (2*(c - 1) + .5), -(r2 + .5), col='black', border='black')
-    
-	y1= c( -(r2) : -(r1) )
-	
-	graphics::image(x = c(  (2*(c - 1) + 1.5) : (2*c + 0.5) ),
-		y   = y1,
-        z   = t(matrix(  y1  , ncol = 1)),
-        col = t(matrix( rainbow(len( y1  ), start = 0, end = 0.3) , ncol = 1)),
-        add = T)
-}
-
-###############################################################################
-# plot.table.test - test for plot.table function
+# Examples of plot.table function
 ###############################################################################
 plot.table.test <- function()
 {
@@ -322,7 +361,7 @@ plot.table.test <- function()
 			colnames(data) = paste('data', 1:10, sep='')
 		
 		# compute Pearson correlation of data and format it nicely
-		temp = compute.cor(data, 'pearson')
+		temp = cor(data, use='complete.obs', method='pearson')
 			temp[] = plota.format(100 * temp, 0, '', '%')
 
 		png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')		
@@ -334,8 +373,9 @@ plot.table.test <- function()
 }
 
 
+
+
 ###############################################################################
-# plot.periodic.table - test for plot.table function
 # Construct Periodic table, like in Single Country Index Returns
 # http://us.ishares.com/content/stream.jsp?url=/content/en_us/repository/resource/single_country_periodic_table.pdf&mimeType=application/pdf
 ###############################################################################

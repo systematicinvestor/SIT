@@ -771,7 +771,98 @@ rotation.strategy.test <- function()
 	shrink.single.index <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.market, s, 1)$sigma }}
 	shrink.two.parameter <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.2param, s, 1)$sigma }}
 
+	
+	#*****************************************************************
+	# Group Methods
+	#*****************************************************************
+	empty.group <- function
+	(
+		ia				# input assumptions
+	)
+	{
+		return( rep(1,ia$n) )
+	}		
 
+	
+	# Find groups using clustering algorithm
+	cluster.group.hclust <- function
+	(
+		ia				# input assumptions
+	)
+	{		
+		dissimilarity = 1 - ia$correlation
+    	distance = as.dist(dissimilarity)
+    	
+    	fit =  hclust(distance, method='ward')
+    	minh = min(fit$height)
+    	maxh = max(fit$height)
+		group = cutree(fit, h=minh + (maxh - minh) /3)			
+		return( group )		
+		
+		#plot(fit, axes=F,xlab='', ylab='',sub ='')
+		#rect.hclust(fit, h=minh + (maxh - minh) /3 , border='red') 	
+			
+		# alternative		
+		#group = cutree(fit, h=max(fit$height)/2)			
+		#group = cutree(fit, k=3)			
+	}		
+	
+	
+
+	# Find groups using clustering algorithm
+	cluster.group.kmeans.90 <- function
+	(
+		ia				# input assumptions
+	)
+	{		
+		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
+    	distance = as.dist(dissimilarity)
+    	
+		n = ncol(ia$correlation)
+			n = ceiling(n*2/3)
+		xy = cmdscale(distance)
+
+		for (i in 2:n) {
+			fit = kmeans(xy, centers=i, iter.max=100, nstart=100)
+			# percentage of variance explained by clusters
+			p.exp = 1- fit$tot.withinss / fit$totss
+			if(p.exp > 0.9) break			
+		}
+
+    	group = fit$cluster
+		return( group )
+	}		
+
+	
+	# Find groups using clustering algorithm
+	cluster.group.kmeans.elbow <- function
+	(
+		ia				# input assumptions
+	)
+	{		
+		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
+    	distance = as.dist(dissimilarity)
+    	
+		n = ncol(ia$correlation)
+			n = ceiling(n*2/3)
+		xy = cmdscale(distance)
+
+		p.exp = rep(NA, n)
+		for (i in 2:n) {
+			fit = kmeans(xy, centers=i, iter.max=100, nstart=100)
+			# percentage of variance explained by clusters
+			p.exp[i] = 1- fit$tot.withinss / fit$totss
+		}
+
+		# http://stackoverflow.com/questions/2018178/finding-the-best-trade-off-point-on-a-curve
+		icluster = find.maximum.distance.point(p.exp[-1]) + 1
+		
+		fit = kmeans(xy, centers=icluster, iter.max=100, nstart=100)
+    	group = fit$cluster
+		return( group )
+	}		
+
+	
 
 
 	
