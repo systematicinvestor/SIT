@@ -1153,6 +1153,8 @@ plota.recession <- function
 
   	# Trim the recession dataframe to the same time length of the data
   	recessions.trim = subset(recessions.df, Peak >= as.Date(min(plota.control$xaxis.ticks)) )
+  	
+  	if(len(recessions.trim) < 1) return
 
   	# Create the rectanble for recession
   	for(i in 1:length(recessions.trim$Peak)){

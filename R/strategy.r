@@ -505,6 +505,48 @@ rotation.strategy.test <- function()
 		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
+	
+	# MinCorr by David Varadi	
+	# http://cssanalytics.files.wordpress.com/2012/10/minimum-correlation-mincorr-spreadsheet.xlsx
+	min.corr.excel.portfolio <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+			n = sum(risk.index)
+		
+		cor.matrix = ia$correlation[risk.index, risk.index]
+		
+		upper.index = upper.tri(cor.matrix)
+		cor.m = cor.matrix[upper.index]
+			cor.mu = mean(cor.m)
+			cor.sd = sd(cor.m)
+			
+		avg.corr.contribution = (rowSums(cor.matrix) - 1) / (n - 1)
+		avg.rank = rank(avg.corr.contribution)
+		rr.adjustment = avg.rank / sum(avg.rank)
+						
+		norm.dist.m = 0 * cor.matrix
+			diag(norm.dist.m) = 0
+			norm.dist.m[upper.index] = 1-pnorm(cor.m, cor.mu, cor.sd)
+		norm.dist.m = (norm.dist.m + t(norm.dist.m))
+		
+		rr.norm.dist.m = repCol(rr.adjustment,n) * norm.dist.m
+		rr.norm.dist = colSums(rr.norm.dist.m)
+		
+		rr.weighted = rr.norm.dist / sum(rr.norm.dist)
+		
+		inverse.volatility.weight = (1 / ia$risk[risk.index]) / sum(1 / ia$risk[risk.index])
+		
+		x = rr.weighted * inverse.volatility.weight / sum(rr.weighted * inverse.volatility.weight)
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)		
+	}		
+	
+	
 	# MinCorr by David Varadi
 	min.corr.portfolio <- function
 	(
@@ -816,6 +858,7 @@ rotation.strategy.test <- function()
 	)
 	{		
 		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
+		#dissimilarity = 1 - cor(ia$hist.returns, use='pairwise.complete.obs',method='spearman')		
     	distance = as.dist(dissimilarity)
     	
 		n = ncol(ia$correlation)
@@ -841,6 +884,7 @@ rotation.strategy.test <- function()
 	)
 	{		
 		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
+		#dissimilarity = 1 - cor(ia$hist.returns, use='pairwise.complete.obs',method='spearman')
     	distance = as.dist(dissimilarity)
     	
 		n = ncol(ia$correlation)
@@ -974,7 +1018,8 @@ portfolio.allocation.helper <- function
 			colnames(dummy) = names(weights)
 			dummy = make.xts(dummy, dates)	
 			
-   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
+   		#temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
+   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(matrix(rnorm(prod(dim(ret))),dim(ret)), 252))
    		
    		for(ci in names(temp)) {
    			temp1 = NA * dummy

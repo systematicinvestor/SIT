@@ -2122,6 +2122,7 @@ create.historical.ia <- function
 	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
 	
 	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
+	#ia$correlation = cor(hist.returns, use = 'pairwise.complete.obs', method = 'pearson')			
 	
 	# convert ia to annual		
 		#ia$arithmetic.return = ia$annual.factor * ia$arithmetic.return

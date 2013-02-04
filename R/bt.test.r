@@ -6210,6 +6210,8 @@ png(filename = 'plot6.png', width = 600, height = 1000, units = 'px', pointsize 
 	}
 dev.off()	
 	
+	# plot the most recent weights
+	plot.table(  sapply(models, function(m) round(100*last(m$weight),1))  )
 	
 }	
 
@@ -7370,12 +7372,21 @@ bt.cluster.optimal.number.historical.test <- function()
 	load.packages('quantmod')
 
 	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+		dates='2007:03::'
+	tickers = dow.jones.components()
+		dates='1970::'
+	
+	tickers = sp500.components()$tickers
+		dates='1994::'	
+	
+	
+	
 
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
 		
-	bt.prep(data, align='remove.na')
+	bt.prep(data, align='keep.all', dates=dates)
 
 	
 	#*****************************************************************
@@ -7430,4 +7441,62 @@ dev.off()
 	
 
 
+}
+
+
+
+
+###############################################################################
+# Seasonality Examples
+# Find January's with return > 4%
+# http://www.avondaleam.com/2013/02/s-annual-performance-after-big-january.html
+###############################################################################
+bt.seasonality.january.test <- function()
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	price = getSymbols('^GSPC', src = 'yahoo', from = '1900-01-01', auto.assign = F)
+		price = Cl(to.monthly(price, indexAt='endof'))
+				
+	ret = price / mlag(price) - 1
+
+	#*****************************************************************
+	# http://www.avondaleam.com/2013/02/s-annual-performance-after-big-january.html
+	# Find January's with return > 4%
+	#****************************************************************** 
+	index =  which( date.month(index(ret)) == 1 & ret > 4/100 )
+	
+	temp = c(coredata(ret),rep(0,12))
+	out = cbind(ret[index], sapply(index, function(i) prod(1 + temp[i:(i+11)])-1))
+		colnames(out) = spl('January,Year')
+
+	#*****************************************************************
+	# Create Plot
+	#****************************************************************** 
+
+png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+
+	col=col.add.alpha(spl('black,gray'),200)
+	# https://stat.ethz.ch/pipermail/r-help/2002-October/025879.html
+	pos = barplot(100*out, border=NA, beside=T, axisnames = F, axes = FALSE,
+		col=col, main='Annual Return When S&P500 Rises More than 4% in January')
+		axis(1, at = colMeans(pos), labels = date.year(index(out)), las=2)
+		axis(2, las=1)
+	grid(NA, NULL)
+	abline(h= 100*mean(out$Year), col='red', lwd=2)		
+	plota.legend(spl('January,Annual,Average'),  c(col,'red'))
+
+	
+	
+dev.off()	
+png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	
+	# plot table
+	plot.table(round(100*as.matrix(out),1))
+	
+dev.off()	
+	
 }
