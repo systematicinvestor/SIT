@@ -840,6 +840,25 @@ bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
 }
 
 
+###############################################################################
+# Enforce minimum holding period before taking another signal
+###############################################################################
+bt.min.holding.period <- function(x, nlen) {
+	x = coredata(x)
+	
+	enter = x != 0
+    enter[is.na(enter)] = FALSE
+    enter.index = which(enter)
+    
+    for(t in enter.index)
+	    if( enter[ t ] ) {
+			index = t + nlen
+			enter[ t : index ] = FALSE
+		    x[ t : index ] = x[t]
+		}
+	return(x)
+}
+
 
 
 ###############################################################################
