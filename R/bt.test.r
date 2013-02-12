@@ -4815,7 +4815,7 @@ forecast.plot <- function(data, forecast, ...) {
  			ylim = range(data,out,na.rm=T), ...) 		
  	
  	# highligh sections
-	new.dates = index(out)
+	new.dates = index4xts(out)
 		temp = coredata(out)
 
 	n = (ncol(out) %/% 2)
@@ -7500,3 +7500,112 @@ png(filename = 'plot2.png', width = 500, height = 500, units = 'px', pointsize =
 dev.off()	
 	
 }
+
+
+###############################################################################
+# Example of the Cluster Portfolio Allocation method
+############################################################################### 
+bt.cluster.portfolio.allocation.test <- function()
+{
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 
+	# compute returns
+	ret = data$prices / mlag(data$prices) - 1
+
+	# setup period
+	dates = '2012::2012'
+	ret = ret[dates]
+	
+	#*****************************************************************
+	# Create Portfolio
+	#****************************************************************** 		
+	fn.name = 'risk.parity.portfolio'	
+	fn.name = 'equal.weight.portfolio'	
+			
+	
+	names = c('risk.parity.portfolio', 'equal.weight.portfolio')
+		
+for(fn.name in names) {
+	fn = match.fun(fn.name)
+
+	# create input assumptions
+	ia = create.historical.ia(ret, 252) 
+	
+	# compute allocation without cluster, for comparison
+	weight = fn(ia)
+	
+	# create clusters
+	group = cluster.group.kmeans.90(ia)
+	ngroups = max(group)
+
+	weight0 = rep(NA, ia$n)
+			
+	# store returns for each cluster
+	hist.g = NA * ia$hist.returns[,1:ngroups]
+			
+	# compute weights within each group	
+	for(g in 1:ngroups) {
+		if( sum(group == g) == 1 ) {
+			weight0[group == g] = 1
+			hist.g[,g] = ia$hist.returns[, group == g, drop=F]
+		} else {
+			# create input assumptions for the assets in this cluster
+			ia.temp = create.historical.ia(ia$hist.returns[, group == g, drop=F], 252) 
+
+			# compute allocation within cluster
+			w0 = fn(ia.temp)
+			
+			# set appropriate weights
+			weight0[group == g] = w0
+			
+			# compute historical returns for this cluster
+			hist.g[,g] = ia.temp$hist.returns %*% w0
+		}
+	}
+			
+	# create GROUP input assumptions
+	ia.g = create.historical.ia(hist.g, 252) 
+			
+	# compute allocation across clusters
+	group.weights = fn(ia.g)
+				
+	# mutliply out group.weights by within group weights
+	for(g in 1:ngroups)
+		weight0[group == g] = weight0[group == g] * group.weights[g]
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 			
+	load.packages('RColorBrewer')
+	col = colorRampPalette(brewer.pal(9,'Set1'))(ia$n)
+
+png(filename = paste(fn.name,'.plot.png',sep=''), width = 600, height = 800, units = 'px', pointsize = 12, bg = 'white')				
+
+	layout(matrix(1:2,nr=2,nc=1))
+	par(mar = c(0,0,2,0))
+	index = order(group)
+	pie(weight[index], labels = paste(colnames(ret), round(100*weight,1),'%')[index], col=col, main=fn.name)
+	pie(weight0[index], labels = paste(colnames(ret), round(100*weight0,1),'%')[index], col=col, main=paste('Cluster',fn.name))
+	
+dev.off()	
+	
+	
+}
+
+
+}	
+	

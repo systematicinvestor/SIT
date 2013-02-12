@@ -998,6 +998,7 @@ index.xts <- function
 
 
 # other variants that are not currently used
+# this function is used in plota for X axis
 index4xts <- function
 (
 	x			# XTS object
