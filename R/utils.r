@@ -1112,6 +1112,25 @@ getSymbols.sit <- function
 }
 
 
+###############################################################################
+#' Normilize all timeseries to start at one
+#'
+#' @param x \code{\link{xts}} time series 
+#'
+#' @return scaled \code{\link{xts}} time series, so that each timeseries starts at one
+#'
+#' @examples
+#' \dontrun{ 
+#' plota.matplot(scale.one(data$prices))
+#' }
+#' @export 
+############################################################################### 
+# scale.one <- function(x) x / repRow(as.numeric(x[1,]), nrow(x))	
+scale.one <- function(x) {
+	index = 1:nrow(x)
+	x / repRow(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
+}
+
 
 #all possible combinations of list elements
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)

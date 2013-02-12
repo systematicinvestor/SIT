@@ -1079,6 +1079,21 @@ plota.matplot <- function
 }
 
 
+
+###############################################################################
+#' Add Copyright message to the plot
+#'
+#' @param copyright copyright message
+#'
+#' @return nothing
+#'
+#' @export 
+############################################################################### 
+plota.add.copyright <- function(copyright = 'Systematic Investor') {		
+	mtext(paste(copyright,'\uA9'), side = 1,line = -1, outer = T, adj = 1, font = 1, cex = 0.7, col='blue')
+}
+
+
 ###############################################################################
 #' Add recession bars to the existing plot
 #'
