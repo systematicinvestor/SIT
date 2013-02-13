@@ -48,8 +48,8 @@ tableColor <- function(data, header.col='LightGray', row.col='yellow', negative.
 
     # get HTML table
 	temp = reactiveTable(function() data, add.to.row=add.to.row, ...)    
-	temp = extractReactiveFunction(temp)()
-
+	temp = temp()
+	
     # negative numbers
     if(!is.na(negative.col) && !is.null(negative.col))
     	temp = gsub("(-\\d*\\.\\d*)", paste("<font color=", negative.col, ">\\1</font>"), temp)
@@ -68,18 +68,11 @@ tableColor <- function(data, header.col='LightGray', row.col='yellow', negative.
 
 
 ###############################################################################
-#' Extract function from the \code{\link{reactive}} function
-#'
-#' @param temp \code{\link{reactive}} function
-#'
-#' @return function
-#'
-#' @export 
-############################################################################### 
 # take reactive function and extract underlying function
-extractReactiveFunction <- function(temp) {
-	environment(temp@.Data)[[".func"]]
-}
+###############################################################################
+#extractReactiveFunction <- function(temp) {
+#	environment(temp@.Data)[["func"]]
+#}
 
 
 ###############################################################################
