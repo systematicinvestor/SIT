@@ -27,7 +27,7 @@ shinyServer(function(input, output) {
 		max(1,nrow(data) - input$dateRange) : nrow(data)
 	})
 		
-	# Make correlation table
+	# Make table
 	makeStatsTable <- reactive(function() {  	
 	tryCatch({
 		# download Key Statistics from yahoo
@@ -85,7 +85,7 @@ shinyServer(function(input, output) {
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$corTable <- reactive(function() {
+  	output$statsTable <- reactive(function() {
 		temp = makeStatsTable()	
 		tableColor(as.matrix(temp),include.rownames=FALSE)		
 	})

@@ -25,7 +25,7 @@ shinyUI(pageWithSidebar(
           		selectInput("smaLen", strong("Moving Average:"), choices =  seq(20,200,by=10),selected=100),
           		HTML('</td></tr></table>'),
           		br(),
-				tableOutput("corTable"),
+				tableOutput("statsTable"),
 				downloadButton("downloadReport", "Download Report"),
 				downloadButton("downloadData", "Download Data")	
 			),			
