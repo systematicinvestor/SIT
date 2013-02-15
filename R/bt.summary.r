@@ -413,7 +413,7 @@ plotbt.holdings.time <- function(weight)
 ###############################################################################
 # Plot monthly return table
 ###############################################################################
-plotbt.monthly.table <- function(equity) 
+plotbt.monthly.table <- function(equity, make.plot = TRUE) 
 {
 	equity = map2monthly(equity)
 
@@ -468,16 +468,20 @@ if(T) {
 	temp = ifna(temp, NA)
 	temp[nr,] = apply(temp[-nr,], 2, mean, na.rm = T)		
 
-	#higlight
-	highlight = temp
-		highlight[] = iif(temp > 0, 'lightgreen', iif(temp < 0, 'red', 'white'))
-		highlight[nr,] = iif(temp[nr,] > 0, 'green', iif(temp[nr,] < 0, 'orange', 'white'))
-		highlight[,13] = iif(temp[,13] > 0, 'green', iif(temp[,13] < 0, 'orange', 'white'))
-		highlight[,14] = 'yellow'
+	if(make.plot) {
+		#higlight
+		highlight = temp
+			highlight[] = iif(temp > 0, 'lightgreen', iif(temp < 0, 'red', 'white'))
+			highlight[nr,] = iif(temp[nr,] > 0, 'green', iif(temp[nr,] < 0, 'orange', 'white'))
+			highlight[,13] = iif(temp[,13] > 0, 'green', iif(temp[,13] < 0, 'orange', 'white'))
+			highlight[,14] = 'yellow'
+	}
+	
+	
+	temp[] = plota.format(100 * temp, 1, '', '')
 	
 	# plot
-	temp[] = plota.format(100 * temp, 1, '', '')
-	plot.table(temp, highlight = highlight)
+	if(make.plot) plot.table(temp, highlight = highlight)
 	
 	return(temp)
 }	
