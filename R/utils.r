@@ -1132,6 +1132,26 @@ scale.one <- function(x) {
 }
 
 
+###############################################################################
+#' Compute correlations
+#'
+#' @param data matrix with data
+#' @method method used to compute correlations, please see \code{\link{cor}} for more details
+#'
+#' @return correlation matrix
+#'
+#' @export 
+############################################################################### 
+compute.cor <- function
+(
+	data, 		# matrix with data
+	method = c("pearson", "kendall", "spearman")
+)
+{
+	cor(data, use='complete.obs',method=method[1])
+}
+
+
 #all possible combinations of list elements
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
 
