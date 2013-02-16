@@ -6156,6 +6156,7 @@ bt.mca.test <- function()
 		custom.stats.fn = 'portfolio.allocation.custom.stats'
 	) 
 	
+	
 	models = create.strategies(obj, data)$models
 	
     #*****************************************************************

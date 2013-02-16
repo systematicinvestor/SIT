@@ -127,7 +127,7 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 
 	if(one.page) return()
 		
-	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,F))
+	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
 
 	# Plot transition maps
 	layout(1:len(models))
@@ -1019,7 +1019,9 @@ portfolio.allocation.helper <- function
 			dummy = make.xts(dummy, dates)	
 			
    		#temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
-   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(matrix(rnorm(prod(dim(ret))),dim(ret)), 252))
+   		temp = ret
+   			temp[] = rnorm(prod(dim(ret)))
+   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(temp, 252))
    		
    		for(ci in names(temp)) {
    			temp1 = NA * dummy
@@ -1095,7 +1097,7 @@ portfolio.allocation.helper <- function
 						constraints$x0 = weights[[ fname ]][(j-1),index]			
 						weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
 					}
-				}			
+				}							
 			} else {
 				for(c in names(shrinkage.fns)) {
 					for(f in names(min.risk.fns)) {
