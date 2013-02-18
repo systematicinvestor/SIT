@@ -1136,7 +1136,7 @@ scale.one <- function(x) {
 #' Compute correlations
 #'
 #' @param data matrix with data
-#' @method method used to compute correlations, please see \code{\link{cor}} for more details
+#' @param method method used to compute correlations, please see \code{\link{cor}} for more details
 #'
 #' @return correlation matrix
 #'

@@ -549,6 +549,7 @@ dev.off()
 ###############################################################################
 # Rotational Trading Strategies : ETF Sector Strategy
 # http://www.etfscreen.com/sectorstrategy.php
+# http://www.etfscreen.com/intlstrategy.php
 ###############################################################################
 bt.rotational.trading.test <- function() 
 {
@@ -561,7 +562,7 @@ bt.rotational.trading.test <- function()
 	data <- new.env()
 	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
-	bt.prep(data, align='keep.all', dates='1970::2011')
+	bt.prep(data, align='keep.all', dates='1970::')
 
 	#*****************************************************************
 	# Code Strategies
@@ -572,13 +573,19 @@ bt.rotational.trading.test <- function()
 	# find month ends
 	month.ends = endpoints(prices, 'months')
 		month.ends = month.ends[month.ends > 0]		
-		
+
+	models = list()
+				
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	dates = '2001::'
+				
 	# Equal Weight
 	data$weight[] = NA
 		data$weight[month.ends,] = ntop(prices, n)[month.ends,]	
-	equal.weight = bt.run.share(data, clean.signal=F)
-		
-	
+	models$equal.weight = bt.run.share(data, clean.signal=F, dates=dates)
+			
 	
 	# Rank on 6 month return
 	position.score = prices / mlag(prices, 126)	
@@ -586,37 +593,40 @@ bt.rotational.trading.test <- function()
 	# Select Top 2 funds
 	data$weight[] = NA
 		data$weight[month.ends,] = ntop(position.score[month.ends,], 2)	
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
-	top2 = bt.run(data, type='share', trade.summary=T, capital=capital)
+	models$top2 = bt.run.share(data, trade.summary=T, dates=dates)
 
 	# Seletop Top 2 funds,  and Keep then till they are in 1:6 rank
 	data$weight[] = NA
 		data$weight[month.ends,] = ntop.keep(position.score[month.ends,], 2, 6)	
-		capital = 100000
-		data$weight[] = (capital / prices) * bt.exrem(data$weight)		
-	top2.keep6 = bt.run(data, type='share', trade.summary=T, capital=capital)
+	models$top2.keep6 = bt.run.share(data, trade.summary=T, dates=dates)
 	
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 
 				
+	strategy.performance.snapshoot(models, T)
+	
+	# Plot Portfolio Turnover for each strategy
+	layout(1)
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+
+		
 	# put all reports into one pdf file
 	pdf(file = 'report.pdf', width=8.5, height=11)
-		plotbt.custom.report(top2.keep6, top2, equal.weight, trade.summary=T)
+		plotbt.custom.report(models, trade.summary=T)
 	dev.off()	
 	
 
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')										
-	plotbt.custom.report.part1(top2.keep6, top2, equal.weight, trade.summary=T)
+	plotbt.custom.report.part1(models)
 dev.off()	
 
 png(filename = 'plot2.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')	
-	plotbt.custom.report.part2(top2.keep6, top2, equal.weight, trade.summary=T)
+	plotbt.custom.report.part2(models)
 dev.off()	
 
 png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
-	plotbt.custom.report.part3(top2.keep6, top2, equal.weight, trade.summary=T)
+	plotbt.custom.report.part3(models, trade.summary=T)
 dev.off()	
 
 	
@@ -1068,7 +1078,7 @@ bt.min.var.test <- function()
 		hist = ret[ (i- 63 +1):i, ]
 		
 		# create historical input assumptions
-		ia = create.historical.ia(hist, 252)
+		ia = create.ia(hist)
 			s0 = apply(coredata(hist),2,sd)		
 			ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 			
@@ -1097,7 +1107,7 @@ bt.min.var.test <- function()
 		hist = retw[ (j- 13 +1):j, ]
 		
 		# create historical input assumptions
-		ia = create.historical.ia(hist, 52)
+		ia = create.ia(hist)
 			s0 = apply(coredata(hist),2,sd)		
 			ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 
@@ -1217,7 +1227,7 @@ bt.aa.test <- function()
 
 		
 		# create historical input assumptions
-		ia = create.historical.ia(hist, 252)
+		ia = create.ia(hist)
 			s0 = apply(coredata(hist),2,sd)		
 			ia$correlation = cor(coredata(hist), use='complete.obs',method='pearson')
 			ia$cov = ia$correlation * (s0 %*% t(s0))
@@ -1333,20 +1343,6 @@ dev.off()
 # 2. Maximum Deviation Rebalancing: rebalance to the target mix when asset weights deviate more than a given percentage from the target mix.
 # 3. Same as 2, but rebalance half-way to target
 ###############################################################################
-
-
-# helper function to create barplot with labels
-barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name','both')) {
-	par(mar=c( iif(plotX, 6, 2), 4, 2, 2))
-	x = barplot(100 * data, main = main, las = 2, names.arg = iif(plotX, names(data), ''))
-	
-	if(label[1] == 'level') text(x, 100 * data, round(100 * data,1), adj=c(0.5,1), xpd = TRUE)
-	if(label[1] == 'name') text(x, 0 * data, names(data), adj=c(-0.1,1), srt=90, xpd = TRUE)	
-	if(label[1] == 'both') 
-		text(x, 0 * data, paste(round(100 * data), '% ', names(data), sep=''), adj=c(-0.1,1), srt=90, xpd = TRUE)
-}
-
-
 bt.rebalancing.test <- function() 
 {
 	#*****************************************************************
@@ -5086,7 +5082,7 @@ bt.aaa.minrisk <- function
 			hist = hist[ , index]
         
 	        # create historical input assumptions
-	        ia = create.historical.ia(hist, 252)
+	        ia = create.ia(hist)
 	            s0 = apply(coredata(hist),2,sd)       
 	            ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 	       
@@ -5371,7 +5367,7 @@ bt.aaa.test <- function()
 			hist = hist[ , index]
         
 	        # create historical input assumptions
-	        ia = create.historical.ia(hist, 252)
+	        ia = create.ia(hist)
 	            s0 = apply(coredata(hist),2,sd)       
 	            ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 	       
@@ -6152,7 +6148,8 @@ bt.mca.test <- function()
 						MV=min.var.portfolio,
 						MD=max.div.portfolio,
 						MC=min.corr.portfolio,
-						MC2=min.corr2.portfolio),
+						MC2=min.corr2.portfolio,
+						MCE=min.corr.excel.portfolio),
 		custom.stats.fn = 'portfolio.allocation.custom.stats'
 	) 
 	
@@ -7544,7 +7541,7 @@ for(fn.name in names) {
 	fn = match.fun(fn.name)
 
 	# create input assumptions
-	ia = create.historical.ia(ret, 252) 
+	ia = create.ia(ret) 
 	
 	# compute allocation without cluster, for comparison
 	weight = fn(ia)
@@ -7565,7 +7562,7 @@ for(fn.name in names) {
 			hist.g[,g] = ia$hist.returns[, group == g, drop=F]
 		} else {
 			# create input assumptions for the assets in this cluster
-			ia.temp = create.historical.ia(ia$hist.returns[, group == g, drop=F], 252) 
+			ia.temp = create.ia(ia$hist.returns[, group == g, drop=F]) 
 
 			# compute allocation within cluster
 			w0 = fn(ia.temp)
@@ -7579,7 +7576,7 @@ for(fn.name in names) {
 	}
 			
 	# create GROUP input assumptions
-	ia.g = create.historical.ia(hist.g, 252) 
+	ia.g = create.ia(hist.g) 
 			
 	# compute allocation across clusters
 	group.weights = fn(ia.g)

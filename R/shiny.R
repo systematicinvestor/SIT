@@ -121,8 +121,49 @@ else
 	)
 	)	
 }
+
+
+
+############################################################################### 
+# createNonReactiveTextInputCustom("symbol1", "Yahoo Ticker:", "input", "Update",  opts=list(value = "GOOG", type = "text")),
+# createNonReactiveTextInputCustom("symbol2", "Yahoo Ticker:", "textarea", "Update", opts=list(rows=10, cols=10, "GOOG")),
+# createNonReactiveTextInputCustom("symbol3", "Yahoo Ticker:", "textarea", "Update", enableEnter=F, opts=list(rows=10, cols=10, "GOOG")),
+############################################################################### 	
+createNonReactiveTextInputCustom <- function(id, label, tag.label = 'input', button.label='', enableEnter=TRUE,
+	 opts) {
+onkeypress = ''
+
+if(button.label != '') {
+	if(enableEnter)
+		onkeypress = paste("{if (event.keyCode==13) $('#", id, "TempChange').click()}",sep='')
+
+	list(
+	tagList(tags$label(label), 
+		tag(tag.label, c(id = id, style="display:none;", opts)),
+		tag(tag.label, c(id = paste(id,"Temp",sep=''), style="display:inline;",
+			onkeypress = onkeypress,
+			opts))
+	),
+	div(tags$button(id = paste(id, "TempChange",sep=''), type = "button", class = "btn btn-primary",
+    	onclick = paste("$('#",id,"').val($('#", id, "Temp').val()).change();",sep=''),
+        button.label))
+	)
+} else {
+	if(enableEnter)
+		onkeypress = paste("{if (event.keyCode==13) $('#",id,"').val($('#", id, "Temp').val()).change()}",sep='')
 	
-		
-   
-   
+	list(
+	tagList(tags$label(label), 
+		tag(tag.label, c(id = id, style="display:none;", opts)),
+		tag(tag.label, c(id = paste(id,"Temp",sep=''), style="display:inline;",
+			onkeypress = onkeypress,
+			opts))
+	)
+	)	
+}	
+}
+
+
+
+
    

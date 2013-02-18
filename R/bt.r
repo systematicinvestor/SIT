@@ -632,7 +632,8 @@ bt.trade.summary <- function
 	# find trades
 	weight1 = mlag(weight, -1)
 	tstart = weight != weight1 & weight1 != 0
-	tend = weight != 0 & weight != weight1
+	tend = weight != 0 & weight != weight1	
+		tstart[1, weight[1,] != 0] = T
 		trade = ifna(tstart | tend, FALSE)
 	
 	# prices
@@ -663,6 +664,7 @@ bt.trade.summary <- function
 			
 			if( len(tstarti) > 0 ) {
 				if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
+				#if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
 				
 				trades = rbind(trades, 
 								cbind(i, weight[(tstarti+1), i], 

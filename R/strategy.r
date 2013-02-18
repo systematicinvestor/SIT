@@ -108,6 +108,19 @@ performance.barchart.helper <- function(out, names, custom.order, nplots.page = 
 	}				
 }
 
+###############################################################################
+# helper function to create barplot with labels
+###############################################################################
+barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name','both')) {
+	par(mar=c( iif(plotX, 6, 2), 4, 2, 2))
+	x = barplot(100 * data, main = main, las = 2, names.arg = iif(plotX, names(data), ''))
+	
+	if(label[1] == 'level') text(x, 100 * data, round(100 * data,1), adj=c(0.5,1), xpd = TRUE)
+	if(label[1] == 'name') text(x, 0 * data, names(data), adj=c(-0.1,1), srt=90, xpd = TRUE)	
+	if(label[1] == 'both') 
+		text(x, 0 * data, paste(round(100 * data), '% ', names(data), sep=''), adj=c(-0.1,1), srt=90, xpd = TRUE)
+}
+
 
 
 
@@ -409,6 +422,30 @@ rotation.strategy.test <- function()
 	
 }
 
+
+
+
+
+###############################################################################
+# Create historical input assumptions
+###############################################################################
+create.ia <- function(hist.returns)
+{	
+	# setup input assumptions
+	ia = list()	
+		ia$hist.returns = hist.returns
+		ia$n = ncol(ia$hist.returns)
+		ia$index = 1:ia$n
+		ia$symbols = colnames(ia$hist.returns)
+		
+		ia$risk = apply(ia$hist.returns, 2, sd, na.rm = T)
+		ia$correlation = cor(ia$hist.returns, use='complete.obs',method='pearson')
+		ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+		
+	ia$expected.return = apply(ia$hist.returns, 2, mean, na.rm = T)
+							
+	return(ia)
+}
 
 
 
@@ -1018,10 +1055,10 @@ portfolio.allocation.helper <- function
 			colnames(dummy) = names(weights)
 			dummy = make.xts(dummy, dates)	
 			
-   		#temp = custom.stats.fn(1:ncol(ret), create.historical.ia(ret, 252))
+   		#temp = custom.stats.fn(1:ncol(ret), create.ia(ret))
    		temp = ret
    			temp[] = rnorm(prod(dim(ret)))
-   		temp = custom.stats.fn(1:ncol(ret), create.historical.ia(temp, 252))
+   		temp = custom.stats.fn(1:ncol(ret), create.ia(temp))
    		
    		for(ci in names(temp)) {
    			temp1 = NA * dummy
