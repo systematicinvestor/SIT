@@ -21,7 +21,7 @@ shinyUI(pageWithSidebar(
 			tabPanel("Main", 
 				h3("Big January", align="center"), 
   					
-				plotOutput("seasonalityPlot", height="100%"),
+				plotOutput("seasonalityPlot"),
 				tableOutput("seasonalityTable"),
 				
 				downloadButton("downloadReport", "Download Report"),

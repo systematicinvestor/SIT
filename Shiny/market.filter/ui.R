@@ -20,13 +20,13 @@ shinyUI(pageWithSidebar(
 	mainPanel(
 		tabsetPanel(
 			tabPanel("Main", 
-				plotOutput("strategyPlot", height="100%"),
+				plotOutput("strategyPlot"),
 				br(),
 				tableOutput("sidebysideTable"),
 				h4("Annual Perfromance"),
 				tableOutput("annualTable"),
 				h4("Transition Map"),
-				plotOutput("transitionPlot", height="100%"),
+				plotOutput("transitionPlot"),
 				h4("Last 20 Trades"),
 				tableOutput("tradesTable"),				
 				downloadButton("downloadReport", "Download Report"),

@@ -17,7 +17,7 @@ shinyUI(pageWithSidebar(
 	mainPanel(
 		tabsetPanel(
 			tabPanel("Main", 
-				plotOutput("stockPlot", height="100%"),
+				plotOutput("stockPlot"),
 				HTML('<table border=0 width="100%"><tr bgcolor="#f5f5f5"><td>'), 
 				div(style="width:80%;max-width:300px;",  	   				
           			sliderInput(inputId="dateRange", label=strong('Date Range(# days): '), min=100, max=5000, value=2000, step=100)

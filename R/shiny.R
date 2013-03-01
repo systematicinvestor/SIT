@@ -47,7 +47,7 @@ tableColor <- function(data, header.col='LightGray', row.col='yellow', negative.
     }
 
     # get HTML table
-	temp = reactiveTable(function() data, add.to.row=add.to.row, ...)    
+	temp = renderTable(data, add.to.row=add.to.row, ...)    
 	temp = temp()
 	
     # negative numbers
