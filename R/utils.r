@@ -1156,7 +1156,18 @@ compute.cor <- function
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
 
 
+###############################################################################
+# Log (feedback) functions
+###############################################################################
+log.fn <- function() {
+	function(...) { cat(..., '\n') }
+}
 
+log.fn.msg <- function(msg, log = log.fn()) {
+	log = log
+    msg = msg
+    function(...) { log(paste(msg, ...)) }
+}  
 
 
 

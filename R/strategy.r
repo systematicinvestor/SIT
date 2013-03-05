@@ -943,9 +943,97 @@ create.ia <- function(hist.returns)
 		return( group )
 	}		
 
+	###############################################################################
+	# Distribute Weights according to Weighting Scheme and Group Method(clusters)
+	###############################################################################
+	# min.risk.fns = list(G0.MV = distribute.weights(min.risk.portfolio, empty.group),					
+	# 					G2.MV = distribute.weights(min.risk.portfolio, cluster.group))
+	distribute.weights <- function
+	(
+		fn,				# function that dictates how to distribute weights
+		group.fn = NA		# group factor
+	)
+	{
+		fn = match.fun(fn)
+		if(!is.function(group.fn)) if(!is.na(group.fn)) group.fn = match.fun(group.fn)
 	
-
-
+		function
+		(
+			ia,			# input assumptions
+			constraints	# constraints
+		)
+		{
+		
+			if(!is.function(group.fn)) {
+				return(fn(ia, constraints))
+			} else {
+				group = group.fn(ia)
+				
+				ngroups = max(group)
+				if(ngroups == 1) return(fn(ia, constraints))
+	
+				
+				weight0 = rep(NA, ia$n)
+				
+				# returns for each group			
+				hist.g = NA * ia$hist.returns[,1:ngroups]
+				
+				# compute weights within each group	
+				for(g in 1:ngroups) {
+					if( sum(group == g) == 1 ) {
+						weight0[group == g] = 1
+						hist.g[,g] = ia$hist.returns[, group == g, drop=F]
+					} else {
+		
+					ia.temp = list()
+						ia.temp$hist.returns = ia$hist.returns[, group == g, drop=F]
+						ia.temp$n = ncol(ia.temp$hist.returns)
+						ia.temp$cov = cov(ia.temp$hist.returns, use='complete.obs',method='pearson')
+						ia.temp$risk = sqrt(diag(ia.temp$cov))
+							
+					constraints.temp = new.constraints(ia.temp$n, lb = 0, ub = 1)
+						constraints.temp = add.constraints(diag(ia.temp$n), type='>=', b=0, constraints.temp)
+						constraints.temp = add.constraints(diag(ia.temp$n), type='<=', b=1, constraints.temp)
+					constraints.temp = add.constraints(rep(1, ia.temp$n), 1, type = '=', constraints.temp)
+					
+	
+					w0 = match.fun(fn)(ia.temp, constraints.temp)
+						weight0[group == g] = w0
+						# Note that: sd(return0) = portfolio.risk(weight0, ia)	
+						# return0 = ia$hist.returns	%*% weight0
+						hist.g[,g] = ia.temp$hist.returns %*% w0
+					}
+				}
+				
+				# create GROUP input assumptions
+				ia.g = list()
+					ia.g$hist.returns = hist.g
+					ia.g$n = ncol(hist.g)
+					ia.g$cov = cov(hist.g, use='complete.obs',method='pearson')
+					ia.g$risk = sqrt(diag(ia.g$cov))
+							
+				constraints.g = new.constraints(ngroups, lb = 0, ub = 1)
+					constraints.g = add.constraints(diag(ngroups), type='>=', b=0, constraints.g)
+					constraints.g = add.constraints(diag(ngroups), type='<=', b=1, constraints.g)	
+				constraints.g = add.constraints(rep(1, ngroups), 1, type = '=', constraints.g)		
+				
+				# find group weights
+				group.weights = match.fun(fn)(ia.g, constraints.g)
+					
+						
+					
+				# mutliply out group.weights by within group weights
+				for(g in 1:ngroups) {
+					weight0[group == g] = weight0[group == g] * group.weights[g]
+				}
+				return(weight0)
+			}
+		}
+	}
+	
+	
+	
+	
 	
 	
 #*****************************************************************
@@ -969,6 +1057,8 @@ portfolio.allocation.helper <- function
 	
 	adjust2positive.definite = T,
 	silent = F,
+	
+	log = log.fn(),	
 	
 	const.lb = 0, 
 	const.ub = 1,
@@ -1161,7 +1251,7 @@ portfolio.allocation.helper <- function
 			
 		}
 			
-		if( j %% 10 == 0) if(!silent) cat(j, '\n')		
+		if( j %% 10 == 0) if(!silent) log(j, '\n')		
 	}
 	
 	if( len(shrinkage.fns) == 1 ) {

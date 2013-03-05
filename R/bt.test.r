@@ -7606,4 +7606,56 @@ dev.off()
 
 
 }	
+
+
+###############################################################################
+# Example of the Cluster Portfolio Allocation method
+############################################################################### 
+bt.cluster.portfolio.allocation.test1 <- function()
+{
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+		
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	periodicity = 'months'
+	lookback.len = 250
+	cluster.group = cluster.group.kmeans.90
+	
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = periodicity, lookback.len = lookback.len,
+		min.risk.fns = list(
+						EW=equal.weight.portfolio,
+						RP=risk.parity.portfolio,
+						
+						C.EW = distribute.weights(equal.weight.portfolio, cluster.group),
+						C.RP=distribute.weights(risk.parity.portfolio, cluster.group)
+			)
+	) 		
+	
+	models = create.strategies(obj, data)$models
+	
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	
+	strategy.performance.snapshoot(models, T)
+	
+dev.off()
+	
+
+}
 	
