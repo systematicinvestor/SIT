@@ -545,14 +545,22 @@ create.ia <- function(hist.returns)
 	
 	# MinCorr by David Varadi	
 	# http://cssanalytics.files.wordpress.com/2012/10/minimum-correlation-mincorr-spreadsheet.xlsx
-	min.corr.excel.portfolio <- function
+min.corr.excel <- function(power.function = 1)
+{
+	power.function = as.numeric(power.function)
+	
+	function
 	(
 		ia,				# input assumptions
 		constraints		# constraints
 	)
-	{
+	{					
 		risk.index = get.risky.asset.index(ia)
 			n = sum(risk.index)
+		
+		x = min.corr.special.case(ia$risk[risk.index])
+		if(!is.null(x)) return( set.risky.asset(x / sum(x), risk.index) )
+		
 		
 		cor.matrix = ia$correlation[risk.index, risk.index]
 		
@@ -563,6 +571,8 @@ create.ia <- function(hist.returns)
 			
 		avg.corr.contribution = (rowSums(cor.matrix) - 1) / (n - 1)
 		avg.rank = rank(avg.corr.contribution)
+		avg.rank = avg.rank ^ power.function
+		
 		rr.adjustment = avg.rank / sum(avg.rank)
 						
 		norm.dist.m = 0 * cor.matrix
@@ -581,17 +591,32 @@ create.ia <- function(hist.returns)
 		
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)		
-	}		
+	}	
+}	
 	
+min.corr.special.case <- function(risk) {
+	n = len(risk)
+	if(n == 1) 1
+	else if(n == 2) 1/risk
+	else NULL
+}
+
+# MinCorr by David Varadi
+min.corr <- function(power.function = 1)
+{
+	power.function = as.numeric(power.function)
 	
-	# MinCorr by David Varadi
-	min.corr.portfolio <- function
+	function
 	(
 		ia,				# input assumptions
 		constraints		# constraints
 	)
-	{
+	{					
 		risk.index = get.risky.asset.index(ia)
+		
+		x = min.corr.special.case(ia$risk[risk.index])
+		if(!is.null(x)) return( set.risky.asset(x / sum(x), risk.index) )
+		
 		
 		cor.matrix = ia$correlation[risk.index, risk.index]
 		
@@ -608,7 +633,8 @@ create.ia <- function(hist.returns)
 		norm.dist.avg = rowMeans(norm.dist.m, na.rm=T)
 		
 		norm.dist.rank = rank(-norm.dist.avg)
-				
+		norm.dist.rank = norm.dist.rank ^ power.function
+
 		norm.dist.weight = norm.dist.rank / sum(norm.dist.rank)
 		
 			diag(norm.dist.m) = 0
@@ -624,20 +650,27 @@ create.ia <- function(hist.returns)
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)		
 	}		
+}	
 	
+# MinCorr2 by David Varadi
+min.corr2 <- function(power.function = 1)
+{
+	power.function = as.numeric(power.function)
 	
-	# MinCorr2 by David Varadi
-	min.corr2.portfolio <- function
+	function
 	(
 		ia,				# input assumptions
 		constraints		# constraints
 	)
-	{
+	{					
 		risk.index = get.risky.asset.index(ia)
 		
-		cor.matrix = ia$correlation[risk.index, risk.index]
+		x = min.corr.special.case(ia$risk[risk.index])
+		if(!is.null(x)) return( set.risky.asset(x / sum(x), risk.index) )
 		
-	
+		
+		cor.matrix = ia$correlation[risk.index, risk.index]
+			
 		cor.m = cor.matrix
 			diag(cor.m) = 0
 			
@@ -647,6 +680,8 @@ create.ia <- function(hist.returns)
 		norm.dist.avg = 1-pnorm(avg, cor.mu, cor.sd)
 		
 		norm.dist.rank = rank(-norm.dist.avg)
+		norm.dist.rank = norm.dist.rank ^ power.function
+		
 		
 		norm.dist.weight = norm.dist.rank / sum(norm.dist.rank)
 				
@@ -661,6 +696,12 @@ create.ia <- function(hist.returns)
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)		
 	}		
+}
+	
+	# Shrinkage adaptors for above functions
+	min.corr.excel.portfolio <- function(ia,constraints) { min.corr.excel()(ia,constraints) }
+	min.corr.portfolio <- function(ia,constraints) { min.corr()(ia,constraints) }
+	min.corr2.portfolio <- function(ia,constraints) { min.corr2()(ia,constraints) }
 	
 	#*****************************************************************
 	# Shrinkage functions - maybe instead provide full input assumptions
@@ -1251,7 +1292,8 @@ portfolio.allocation.helper <- function
 			
 		}
 			
-		if( j %% 10 == 0) if(!silent) log(j, '\n')		
+		if( j %% 10 == 0) if(!silent) log(j, percent = (j - start.i) / (len(period.ends) - start.i))
+		
 	}
 	
 	if( len(shrinkage.fns) == 1 ) {
@@ -1388,6 +1430,10 @@ create.strategies <- function
 	obj,	# portfolio.allocation object: list(weights = weights, period.ends = period.ends)
 	data,	# historical prices
 	leverage = 1,	
+	
+	silent = F,	
+	log = log.fn(),	
+	
 	...		
 ) 
 {
@@ -1401,7 +1447,12 @@ create.strategies <- function
 	# Create strategies
 	#****************************************************************** 		
 	models = list()
-	for(i in names(obj$weights)) {
+	n = len(names(obj$weights))
+	for(j in 1:n) {
+		i = names(obj$weights)[j]
+	
+if(!silent) log(j, percent = j / n)
+	
 		data$weight[] = NA
 			data$weight[obj$period.ends,] = obj$weights[[i]]	
 		models[[i]] = bt.run.share(data, clean.signal = F, ...)

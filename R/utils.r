@@ -1156,18 +1156,22 @@ compute.cor <- function
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
 
 
+
 ###############################################################################
 # Log (feedback) functions
 ###############################################################################
-log.fn <- function() {
-	function(...) { cat(..., '\n') }
+log.fn <- function(p.start=0, p.end=1) {
+	p.start = p.start
+  	p.end = p.end
+	function(..., percent=NULL) { 
+		cat(..., iif(is.null(percent),'',paste(', percent = ', round(100 * (p.start + percent * (p.end - p.start)), 1), '%', sep='')), '\n') 
+	}
 }
 
 log.fn.msg <- function(msg, log = log.fn()) {
 	log = log
     msg = msg
-    function(...) { log(paste(msg, ...)) }
+    function(..., percent=NULL) { log(paste(msg, ...), percent=percent) }
 }  
 
-
-
+    
