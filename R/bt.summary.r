@@ -413,7 +413,7 @@ plotbt.holdings.time <- function(weight)
 ###############################################################################
 # Plot monthly return table
 ###############################################################################
-plotbt.monthly.table <- function(equity, make.plot = TRUE) 
+plotbt.monthly.table <- function(equity, make.plot = TRUE, smain = '') 
 {
 	equity = map2monthly(equity)
 
@@ -481,7 +481,7 @@ if(T) {
 	temp[] = plota.format(100 * temp, 1, '', '')
 	
 	# plot
-	if(make.plot) plot.table(temp, highlight = highlight)
+	if(make.plot) plot.table(temp, highlight = highlight, smain = smain)
 	
 	return(temp)
 }	

@@ -542,6 +542,153 @@ create.ia <- function(hist.returns)
 		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
+###############################################################################    
+# maximum Sharpe ratio or tangency  portfolio
+# http://faculty.washington.edu/ezivot/econ424/portfolio_noshorts.r
+# http://stackoverflow.com/questions/10526243/quadprog-optimization
+# http://comisef.wikidot.com/tutorial:tangencyportfolio
+#
+# It work with solve.QP only for constraints that are homogeneous of degree 0
+# i.e. if we multiply w by a number, the constraint is unchanged
+#
+# Dmat <- 2*cov.mat
+# dvec <- rep.int(0, N)
+# er.excess <- er - risk.free
+# Amat <- cbind(er.excess, diag(1,N))
+# bvec <- c(1, rep(0,N))
+# result <- solve.QP(Dmat=Dmat,dvec=dvec,Amat=Amat,bvec=bvec,meq=1)
+# w.t <- round(result$solution/sum(result$solution), 6)
+#
+# R Tools for Portfolio Optimization by Guy Yollin - R/Finance
+# http://www.rinfinance.com/RinFinance2009/presentations/yollin_slides.pdf
+# In more general case we can use the non linear solver
+# V <- cov(mData)
+# library(Rsolnp)
+# r <- solnp(
+#  rep(1/length(mu), length(mu)),
+#  function(w) - t(w) %*% mu2 / sqrt( t(w) %*% V %*% w ),
+#  eqfun = function(w) sum(w),
+#  eqB   = 0,
+#  LB = rep(-1, length(mu))
+# )
+###############################################################################	
+	# only works for constraints that are homogeneous of degree 0
+	# i.e. if we multiply solution weight by a number, the constraint is unchanged
+	max.sharpe.portfolio.helper <- function
+	(
+		ia,				# input assumptions
+		const = spl('long-only,long-short,market-neutral'),
+		const.sum = 1
+	)
+	{
+		const = const[1]
+		n = ia$n
+		constraints = new.constraints(n)
+		if( const == 'long-only' )
+			constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+			
+		# SUM x.i * expected.return = 1
+		if( all(ia$expected.return < 0) )
+			constraints = add.constraints(ia$expected.return, -1 , type = '=', constraints)		
+		else
+			constraints = add.constraints(ia$expected.return, 1 , type = '=', constraints)		
+		
+		if( const == 'market-neutral' )
+			constraints = add.constraints(rep(1,n), 0 , type = '=', constraints)		
+			
+		weight = min.var.portfolio(ia,constraints)	
+		
+		if( const == 'market-neutral' )
+			return(2*const.sum * weight / sum(abs(weight)))
+		else
+			return(const.sum * weight / sum(weight))
+	}	
+	
+	max.sharpe.portfolio <- function
+	(
+		const = spl('long-only,long-short,market-neutral'),
+		const.sum = 1
+	)
+	{
+		const = const[1]
+		const.sum = const.sum
+		function(ia, constraints) { max.sharpe.portfolio.helper(ia, const, const.sum) }
+	}
+	
+	
+max.sharpe.portfolio.test <- function() 
+{
+	#*****************************************************************
+	# Create Efficient Frontier
+	#****************************************************************** 	
+	# create sample historical input assumptions
+	ia = aa.test.create.ia()
+	
+	# create long-only, fully invested efficient frontier
+	n = ia$n		
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+		constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+		
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	
+	# create efficient frontier
+	ef = portopt(ia, constraints, 50, 'Efficient Frontier') 
+	
+	#*****************************************************************
+	# Create Plot
+	#****************************************************************** 	
+png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	
+	# plot efficient frontier
+	plot.ef(ia, list(ef), transition.map=F)	 
+	
+	# find maximum sharpe portfolio
+	max(portfolio.return(ef$weight,ia) /  portfolio.risk(ef$weight,ia))
+	
+	# plot minimum variance portfolio
+	weight = min.var.portfolio(ia,constraints)	
+	points(100 * portfolio.risk(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='red')
+	portfolio.return(weight,ia) /  portfolio.risk(weight,ia)
+		
+	# plot maximum Sharpe or tangency portfolio
+	weight = max.sharpe.portfolio()(ia,constraints)	
+	points(100 * portfolio.risk(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
+	portfolio.return(weight,ia) /  portfolio.risk(weight,ia)
+		
+	plota.legend('Minimum Variance,Maximum Sharpe','red,orange', x='topright')
+	
+dev.off()	
+	
+	#*****************************************************************
+	# Examples of Maximum Sharpe or Tangency portfolios construction
+	#****************************************************************** 	
+	weight = max.sharpe.portfolio('long-only')(ia,constraints)	
+		round(weight,2)
+		round(c(sum(weight[weight<0]), sum(weight[weight>0])),2)
+		
+	weight = max.sharpe.portfolio('long-short')(ia,constraints)			
+		round(weight,2)
+		round(c(sum(weight[weight<0]), sum(weight[weight>0])),2)
+
+	weight = max.sharpe.portfolio('long-short', -1)(ia,constraints)			
+		round(weight,2)
+		round(c(sum(weight[weight<0]), sum(weight[weight>0])),2)
+		
+				
+	weight = max.sharpe.portfolio('market-neutral')(ia,constraints)			
+		round(weight,2)
+		round(c(sum(weight[weight<0]), sum(weight[weight>0])),2)
+		
+}
+
+
+
+
+
 	
 	# MinCorr by David Varadi	
 	# http://cssanalytics.files.wordpress.com/2012/10/minimum-correlation-mincorr-spreadsheet.xlsx

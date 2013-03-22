@@ -5468,21 +5468,38 @@ n.top = 4
 						MD=max.div.portfolio,
 						MC=min.corr.portfolio,
 						MC2=min.corr2.portfolio,
+						MCE=min.corr.excel.portfolio,
 						MS=max.sharpe.portfolio())
 	) 
 	
-	models = c(models, create.strategies(obj, data)$models)
+	#models = c(models, create.strategies(obj, data)$models)
+	models = create.strategies(obj, data)$models
 					
     #*****************************************************************
     # Create Report
     #******************************************************************    
     # put all reports into one pdf file
-	pdf(file = 'filename.pdf', width=8.5, height=11)
+	#pdf(file = 'filename.pdf', width=8.5, height=11)
 
-		strategy.performance.snapshoot(models)
+png(filename = 'plot2.png', width = 800, height = 800, units = 'px', pointsize = 12, bg = 'white')	
+		strategy.performance.snapshoot(models, T)
+dev.off()
+	
+png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		
+	plotbt.custom.report.part2(models$MS)
+dev.off()	
+			
+		
+png(filename = 'plot4.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+		# Plot Portfolio Turnover for each strategy
+		layout(1)
+		barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()	
+
+			
 		
 	# close pdf file
-    dev.off()	
+    #dev.off()	
 }
 
 
