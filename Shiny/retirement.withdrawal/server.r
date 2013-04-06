@@ -106,7 +106,9 @@ shinyServer(function(input, output) {
 	# plot distribution of final wealth
 	final.nav = nav[last.period, ]
 		final.nav = final.nav[!is.na(final.nav)]
-			
+	
+	if(length(final.nav) ==  0) return()		
+	
 	plot(density(final.nav, from=0, to=max(final.nav)), las = 1, xlab = 'Final Capital', 
 		main = paste('Distribution of Final Capital,', 100 * p.alive[last.period], '% are still paying'))
 	grid()	
