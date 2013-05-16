@@ -21,6 +21,7 @@
 
 ###############################################################################
 # extract.table.from.webpage
+#' @export 
 ###############################################################################
 extract.table.from.webpage <- function
 (
@@ -122,6 +123,7 @@ extract.table.from.webpage.test <- function()
 ###############################################################################
 # Pricing Zero Coupon Bond (i.e. yield to price)
 # http://thinkanddone.com/finance/valuation-of-zero-coupon-bonds.html
+#' @export 
 ###############################################################################
 PricingZeroCouponBond <- function
 ( 
@@ -137,6 +139,7 @@ PricingZeroCouponBond <- function
 # Convert Historical TBills rates to Total Returns
 # http://timelyportfolio.blogspot.com/2011/04/historical-sources-of-bond-returns_17.html
 # http://timelyportfolio.blogspot.ca/2012/11/cashopportunity-lost-or-opportunity.html
+#' @export 
 ###############################################################################
 processTBill <- function 
 ( 
@@ -232,6 +235,7 @@ processTBill.test <- function()
 ###############################################################################
 # ... parameters for read.xls function
 # i.e. CRB = get.CRB(perl = 'c:/perl/bin/perl.exe')
+#' @export 
 ###############################################################################
 get.CRB <- function(...)
 {
@@ -304,6 +308,7 @@ get.CRB.test <- function()
 ###############################################################################
 # Get Dow Jones Components
 # http://finance.yahoo.com/q/cp?s=^DJI+Components
+#' @export 
 ###############################################################################
 dow.jones.components <- function()
 {
@@ -320,6 +325,7 @@ dow.jones.components <- function()
 ###############################################################################
 # Get NASDAQ 100 Components
 # http://www.nasdaq.com/markets/indices/nasdaq-100.aspx
+#' @export 
 ###############################################################################
 nasdaq.100.components <- function()
 {
@@ -339,6 +345,7 @@ nasdaq.100.components <- function()
 # http://www.sectorspdr.com/spdr/composition/?symbol=XLE
 # tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
 # tickers.desc = spl('ConsumerCyclicals,ConsumerStaples,Energy,Financials,HealthCare,Industrials,Materials,Technology,Utilities')
+#' @export 
 ###############################################################################
 sector.spdr.components <- function(sector.etf = 'XLE')
 {
@@ -356,6 +363,7 @@ sector.spdr.components <- function(sector.etf = 'XLE')
 ###############################################################################
 # S&P 500 Components
 # http://en.wikipedia.org/wiki/List_of_S%26P_500_companies
+#' @export 
 ###############################################################################
 sp500.components <- function()
 {
@@ -381,6 +389,7 @@ sp500.components <- function()
 ###############################################################################
 # S&P 100 Components
 # http://www.barchart.com/stocks/sp100.php
+#' @export 
 ###############################################################################
 sp100.components <- function()
 {
@@ -401,6 +410,7 @@ sp100.components <- function()
 # http://uk.ishares.com/en/rc/products/ISF/all-holdings/
 # http://www.londonstockexchange.com/exchange/prices-and-markets/stocks/indices/constituents-indices.html?index=UKX
 # Yahoo ticker for UK stocks ABF.L
+#' @export 
 ###############################################################################
 ftse100.components <- function()
 {
@@ -465,6 +475,7 @@ ftse100.components <- function()
 # Get the latest prices from the Google finance:
 # http://digitalpbk.com/stock/google-finance-get-stock-quote-realtime
 #  http://finance.google.com/finance/info?client=ig&q=MSFT,AAPL,NYSE:RY
+#' @export 
 ###############################################################################
 #getQuote.google(spl('MSFT,AAPL,IBM'))
 getQuote.google <- function(tickers) {
@@ -489,6 +500,7 @@ getQuote.google <- function(tickers) {
 # http://www.jarloo.com/google-stock-api/	
 #  http://www.google.com/ig/api?stock=AAPL&stock=GOOG
 #getQuote.google.xml(spl('MSFT,AAPL,NYSE:RY'))
+#' @export 
 getQuote.google.xml <- function(tickers) {
 	url = paste('http://www.google.com/ig/api?', paste('stock=',tickers, '&', sep='', collapse=''), sep='')
 	txt = join(readLines(url))	
@@ -523,15 +535,18 @@ getQuote.google.xml <- function(tickers) {
 # extend GLD and SLV historical prices with data from KITCO
 # http://wikiposit.org/w?filter=Finance/Commodities/
 # http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
+#' @export 
 ###############################################################################
 extend.GLD <- function(GLD) {
 	extend.data(GLD, KITCO.data('Gold.PM') / 10)
 }
+
+#' @export 
 extend.SLV <- function(SLV) {
 	extend.data(SLV, KITCO.data('Silver'))
 }
 
-
+#' @export 
 KITCO.data <- function
 (
 	symbol = spl('Gold.AM,Gold.PM,Silver,Platinum.AM,Platinum.PM,Palladium.AM,Palladium.PM')
@@ -550,6 +565,7 @@ KITCO.data <- function
 
 # gold = extend.GLD(data$GLD)
 # comm = extend.data(data$DBC, get.CRB(), scale=T)
+#' @export 
 extend.data <- function
 (
 	current,
@@ -575,7 +591,7 @@ extend.data <- function
 	
 	
 	if( ncol(hist) != ncol(current) )	
-		hist = make.xts( repCol(hist[,close.index], ncol(current)), index(hist))
+		hist = make.xts( rep.col(hist[,close.index], ncol(current)), index(hist))
 	colnames(hist) = colnames(current)
 		
 	rbind( hist, current )
@@ -586,6 +602,7 @@ extend.data <- function
 # Bundes Bank - long history of gold prices
 # http://www.bundesbank.de/Navigation/EN/Statistics/Time_series_databases/Macro_economic_time_series/its_list_node.html?listId=www_s331_b01015_3
 # http://wikiposit.org/w?filter=Finance/Commodities/
+#' @export 
 ###############################################################################  
 bundes.bank.data <- function(symbol) {
 	url = paste('http://www.bundesbank.de/cae/servlet/CsvDownload?tsId=', symbol, '&its_csvFormat=en&mode=its', sep='')
@@ -597,6 +614,8 @@ bundes.bank.data <- function(symbol) {
 		colnames(hist)='Close'
 	return( hist[!is.na(hist)] )
 }
+
+#' @export 
 bundes.bank.data.gold <- function() {
 	bundes.bank.data('BBK01.WT5512')
 }
@@ -615,6 +634,7 @@ bundes.bank.data.gold <- function() {
 #				fx.sauder.data(2004, 2007, base.cur, target.curs), 
 #				fx.sauder.data(2008, 2011, base.cur, target.curs),
 #				fx.sauder.data(2012, 2012, base.cur, target.curs))
+#' @export 
 ###############################################################################  
 fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
 	url = paste('http://fx.sauder.ubc.ca/cgi/fxdata?b=', base.cur, join(paste('&c=', spl(target.curs), sep='')), '&rd=&fd=1&fm=1&fy=', start.year, '&ld=31&lm=12&ly=', end.year, '&y=daily&q=volume&f=csv&o=', sep='')
@@ -632,6 +652,7 @@ fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
 ###############################################################################
 # Download historical prices from Pi Trading - Free Market Data
 # http://pitrading.com/free_market_data.htm
+#' @export 
 ###############################################################################
 getSymbols.PI <- function
 (
@@ -683,6 +704,7 @@ cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')
 ###############################################################################
 # Download FX qoutes: end of day and hourly
 # http://www.fxhistoricaldata.com/EURUSD/
+#' @export 
 ###############################################################################
 getSymbols.fxhistoricaldata <- function
 (
@@ -751,6 +773,7 @@ cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')
 # New Zealand dollars, 
 # Norwegian krone and 
 # Swedish krona
+#' @export 
 ###############################################################################
 get.G10 <- function
 (
@@ -810,6 +833,7 @@ DEXSZUS     Switzerland/U.S.
 # Date, Open, High, Low, Close, Volume (zero for forex cash markets), 
 # Open Interest (futures only), Delivery Month ( YYYYMM futures only), 
 # Unadjusted Close (zero for forex cash markets)
+#' @export 
 ###############################################################################			
 getSymbols.TB <- function(
 	env = .GlobalEnv, 
@@ -968,6 +992,7 @@ cat('\t\t\t Missing data for ', symbol, '\n');
 #
 # data2 = get.fama.french.data('F-F_Research_Data_Factors', periodicity = 'weeks',download = F, clean = F)
 # data3 = get.fama.french.data('6_Portfolios_2x3', periodicity = 'days',download = F, clean = F)	
+#' @export 
 ###############################################################################
 get.fama.french.data <- function(
 	name = c('F-F_Research_Data_Factors', 'F-F_Research_Data_Factors'),
@@ -1056,4 +1081,6 @@ get.fama.french.data <- function(
 	}
 	return( data )
 }
+
+
 

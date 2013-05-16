@@ -24,6 +24,7 @@
 # Get Fundamental Data from advfn
 # http://advfn.com/p.php?pid=financials&symbol=CSCO&mode=quarterly_reports
 # http://advfn.com/p.php?pid=financials&symbol=CSCO&mode=annual_reports
+#' @export 
 ###############################################################################
 fund.data <- function
 (
@@ -120,6 +121,7 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 # determine date when fundamental data is available
 # use 'date preliminary data loaded' when available
 # otherwise lag 'quarter end date' 2 months for Q1/2/3 and 3 months for Q4
+#' @export 
 ###############################################################################		
 date.fund.data <- function(data)
 {
@@ -140,6 +142,7 @@ date.fund.data <- function(data)
 
 ###############################################################################
 # Lookup fundamental data item index
+#' @export 
 ###############################################################################		
 get.fund.data.index <- function
 (
@@ -185,6 +188,7 @@ get.fund.data.index <- function
 
 ###############################################################################
 # Extract and process fundamental data item
+#' @export 
 ###############################################################################		
 get.fund.data <- function
 (

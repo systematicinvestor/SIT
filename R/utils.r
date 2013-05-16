@@ -514,6 +514,19 @@ third.friday.month <- function(year, month)
 #' @examples
 #' \dontrun{ 
 #' dates2index(data$prices, '2010::2012') 
+#' 
+#' data = textConnection('
+#' date,Close
+#' 2013-03-18,    154.97
+#' 2013-03-19,    154.61
+#' 2013-03-20,    155.69
+#' 2013-03-21,    154.36
+#' 2013-03-22,    155.60
+#' 2013-03-25,    154.95')
+#' 
+#' x = read.xts(data)
+#' dates2index(x, '2013-03-19')
+#' 
 #' }
 #' @export 
 ###############################################################################
@@ -724,11 +737,11 @@ repmat <- function
 #' @examples
 #' \dontrun{ 
 #' matrix(1:3, nr=5, nc=3, byrow=T)
-#' repRow(1:3, 5)
+#' rep.row(1:3, 5)
 #' }
 #' @export 
 ###############################################################################
-repRow <- function
+rep.row <- function
 (
 	m, # vector (row)
 	nr # number of copies along rows
@@ -739,7 +752,7 @@ repRow <- function
 
 
 ###############################################################################
-#' Repeat Rows
+#' Repeat Columns
 #'
 #' @param m vector (column)
 #' @param nc number of copies along columns
@@ -749,11 +762,11 @@ repRow <- function
 #' @examples
 #' \dontrun{ 
 #' matrix(1:5, nr=5, nc=3, byrow=F)
-#' repCol(1:5, 3)
+#' rep.col(1:5, 3)
 #' }
 #' @export 
 ###############################################################################
-repCol <- function
+rep.col <- function
 (
 	m,	# vector (column)
 	nc	# number of copies along columns
@@ -951,12 +964,16 @@ read.xts <- function
 	filename,	# file name
 	date.fn = paste,
 	index.class = 'Date',
+	decreasing = FALSE,
 	...
 )
 {
 	out = read.csv(filename, stringsAsFactors=F)
 	#return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
-	out = make.xts(out[,-1,drop=F], as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...))
+	
+	dates = as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...)
+		dates.index = order(dates, decreasing = decreasing)
+	out = make.xts(out[dates.index,-1,drop=F], dates[dates.index])
 		indexClass(out) = index.class
 	return( out )
 
@@ -1125,10 +1142,10 @@ getSymbols.sit <- function
 #' }
 #' @export 
 ############################################################################### 
-# scale.one <- function(x) x / repRow(as.numeric(x[1,]), nrow(x))	
+# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))	
 scale.one <- function(x) {
 	index = 1:nrow(x)
-	x / repRow(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
+	x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
 }
 
 
@@ -1160,6 +1177,10 @@ compute.cor <- function
 ###############################################################################
 # Log (feedback) functions
 ###############################################################################
+
+###############################################################################
+#' @export 
+###############################################################################
 log.fn <- function(p.start=0, p.end=1) {
 	p.start = p.start
   	p.end = p.end
@@ -1168,6 +1189,9 @@ log.fn <- function(p.start=0, p.end=1) {
 	}
 }
 
+###############################################################################
+#' @export 
+###############################################################################
 log.fn.msg <- function(msg, log = log.fn()) {
 	log = log
     msg = msg

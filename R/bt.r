@@ -22,6 +22,7 @@
 
 ###############################################################################
 # Align dates, faster version of merge function
+#' @export 
 ###############################################################################
 bt.merge <- function
 (
@@ -92,6 +93,7 @@ find.names <- function(find.names, all.names)
 }
 ###############################################################################
 # Prepare backtest data
+#' @export 
 ###############################################################################
 bt.prep <- function
 (
@@ -169,6 +171,7 @@ bt.prep <- function
 
 
 # matrix form
+#' @export 
 bt.prep.matrix <- function
 (
 	b,				# enviroment with symbols time series
@@ -250,6 +253,7 @@ bt.prep.matrix.test <- function() {
 
 ###############################################################################
 # Remove symbols from enviroment
+#' @export 
 ###############################################################################
 bt.prep.remove.symbols.min.history <- function
 (
@@ -260,6 +264,7 @@ bt.prep.remove.symbols.min.history <- function
 	bt.prep.remove.symbols(b, which( count(b$prices, side=2) < min.history ))
 }
 
+#' @export 
 bt.prep.remove.symbols <- function
 (
 	b, 					# enviroment with symbols time series
@@ -278,6 +283,7 @@ bt.prep.remove.symbols <- function
 	}
 }
 
+#' @export 
 bt.prep.trim <- function
 (
 	b, 					# enviroment with symbols time series
@@ -299,6 +305,7 @@ bt.prep.trim <- function
 
 ###############################################################################
 # Helper function to backtest for type='share'
+#' @export 
 ###############################################################################
 bt.run.share <- function
 (
@@ -363,6 +370,7 @@ bt.run.share <- function
 ###############################################################################
 # some operators do not work well on xts
 # weight[] = apply(coredata(weight), 2, ifna_prev)
+#' @export 
 ###############################################################################
 bt.run <- function
 (
@@ -459,6 +467,7 @@ bt.run <- function
 
 ###############################################################################
 # Backtest summary
+#' @export 
 ###############################################################################
 bt.summary <- function
 (
@@ -556,6 +565,7 @@ bt.summary <- function
 # Portfolio turnover	
 # http://wiki.fool.com/Portfolio_turnover
 # sales or purchases and dividing it by the average monthly value of the fund's assets
+#' @export 
 ###############################################################################
 compute.turnover <- function
 (	
@@ -604,6 +614,7 @@ compute.turnover <- function
 
 ###############################################################################
 # Compute Portfolio Maximum Deviation
+#' @export 
 ###############################################################################
 compute.max.deviation <- function
 (
@@ -618,6 +629,7 @@ compute.max.deviation <- function
 
 ###############################################################################
 # Backtest Trade summary
+#' @export 
 ###############################################################################
 bt.trade.summary <- function
 (
@@ -703,6 +715,7 @@ bt.trade.summary <- function
 }
 
 # helper function
+#' @export 
 bt.trade.summary.helper <- function(trades) 
 {		
 	if(nrow(trades) <= 0) return(NA)
@@ -735,6 +748,7 @@ bt.trade.summary.helper <- function(trades)
 
 ###############################################################################
 # Apply given function to bt enviroment
+#' @export 
 ###############################################################################
 bt.apply <- function
 (
@@ -760,6 +774,7 @@ bt.apply <- function
 	return(out)
 }
 
+#' @export 
 bt.apply.matrix <- function
 (
 	b,			# matrix
@@ -788,6 +803,7 @@ bt.apply.matrix <- function
 ###############################################################################
 # Remove excessive signal
 # http://www.amibroker.com/guide/afl/exrem.html
+#' @export 
 ###############################################################################
 exrem <- function(x) {        
     temp = c(0, ifna(ifna.prev(x),0))
@@ -801,6 +817,7 @@ exrem.test <- function() {
 	exrem(c(NA,1,1,0,1,1,NA,0))
 }
 
+#' @export 
 bt.exrem <- function(weight)
 {
     bt.apply.matrix(weight, exrem)
@@ -809,6 +826,7 @@ bt.exrem <- function(weight)
 
 ###############################################################################
 # Timed Exit: exit trade after nlen bars
+#' @export 
 ###############################################################################
 bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
 	signal[is.na(signal)] = FALSE
@@ -844,6 +862,7 @@ bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
 
 ###############################################################################
 # Enforce minimum holding period before taking another signal
+#' @export 
 ###############################################################################
 bt.min.holding.period <- function(x, nlen) {
 	x = coredata(x)
@@ -954,29 +973,33 @@ dev.off()
 # Analytics Functions
 ###############################################################################
 # CAGR - geometric return
+#' @export 
 ###############################################################################
 compute.cagr <- function(equity) 
 { 
 	as.double( last(equity,1)^(1/compute.nyears(equity)) - 1 )
 }
 
+#' @export 
 compute.nyears <- function(x) 
 {
 	as.double(diff(as.Date(range(index.xts(x)))))/365
 }
 
+#' @export 
 compute.raw.annual.factor = function(x) {
 	round( nrow(x) / compute.nyears(x) )
 }
 
 # 252 - days, 52 - weeks, 26 - biweeks, 12-months, 6,4,3,2,1
+#' @export 
 compute.annual.factor = function(x) {
 	possible.values = c(252,52,26,13,12,6,4,3,2,1)
 	index = which.min(abs( compute.raw.annual.factor(x) - possible.values ))
 	round( possible.values[index] )
 }
 
-
+#' @export 
 compute.sharpe <- function(x) 
 { 
 	temp = compute.annual.factor(x)
@@ -988,12 +1011,14 @@ compute.sharpe <- function(x)
 # The Calmar Ratio is equal to the compounded annual growth rate divided by the maximum drawdown.
 # The maximum drawdown is typically measured over a three year period.
 # Calmar Ratio = CAGR / MAXDD
+#' @export 
 compute.calmar <- function(x)
 {
     compute.cagr(x) / compute.max.drawdown(x)
 }
 
 # R2 equals the square of the correlation coefficient
+#' @export 
 compute.R2 <- function(equity) 
 {
 	x = as.double(index.xts(equity))
@@ -1004,11 +1029,13 @@ compute.R2 <- function(equity)
 
 # http://cssanalytics.wordpress.com/2009/10/15/ft-portfolio-with-dynamic-hedging/
 # DVR is the Sharpe Ratio times the R-squared of the equity curve
+#' @export 
 compute.DVR <- function(bt) 
 {
 	return( compute.sharpe(bt$ret) * compute.R2(bt$equity) )
 }
 
+#' @export 
 compute.risk <- function(x) 
 { 
 	temp = compute.annual.factor(x)
@@ -1016,17 +1043,19 @@ compute.risk <- function(x)
 	return( sqrt(temp)*sd(x) ) 
 }
 
+#' @export 
 compute.drawdown <- function(x) 
 { 
 	return(x / cummax(c(1,x))[-1] - 1)
 }
 
-
+#' @export 
 compute.max.drawdown <- function(x) 
 { 
 	as.double( min(compute.drawdown(x)) )
 }
 
+#' @export 
 compute.avg.drawdown <- function(x) 
 { 
 	drawdown = c( compute.drawdown(coredata(x)), 0 )
@@ -1035,24 +1064,26 @@ compute.avg.drawdown <- function(x)
 	mean(apply( cbind(dstart, dend), 1, function(x){ min(drawdown[ x[1]:x[2] ], na.rm=T) } ))
 }
 
-
+#' @export 
 compute.exposure <- function(weight) 
 { 
 	sum( apply(weight, 1, function(x) sum(x != 0) ) != 0 ) / nrow(weight) 
 }
 
+#' @export 
 compute.var <- function(x, probs=0.05) 
 { 
 	quantile( coredata(x), probs=probs)
 }
 
+#' @export 
 compute.cvar <- function(x, probs=0.05) 
 { 
 	x = coredata(x)
 	mean( x[ x < quantile(x, probs=probs) ] )
 }
 
-
+#' @export 
 compute.stats <- function(data, fns) 
 {
 	out = matrix(double(), len(fns), len(data))
@@ -1069,6 +1100,7 @@ compute.stats <- function(data, fns)
 
 ###############################################################################
 # Example to illustrate a simeple backtest
+#' @export 
 ###############################################################################
 bt.simple <- function(data, signal) 
 {
@@ -1124,6 +1156,76 @@ bt.simple.test <- function()
 	theme ='white', yrange = range(buy.hold.equity, sma.cross.equity) )	
 }
 
+
+###############################################################################
+#' Remove small weights
+#'
+#' This function will remove weights that are smaller than given threshold
+#'
+#' @param weight weight matrix
+#' @param long.min.weight minimum weight for long positions, \strong{defaults to 0.1 }
+#' @param short.min.weight minimum weight for short positions, \strong{defaults to long.min.weight }
+#'
+#' @return updated weight matrix
+#'
+#' @examples
+#' \dontrun{ 
+#' weight = c(0.1, 0.6, 0.2, 0.1, 0, -0.1, -0.6, -0.2, -0.1, 0)
+#' weight = matrix(weight, nrow=2, byrow=TRUE)
+#' print(bt.apply.min.weight(weight, 0.1))
+#' }
+#' @author Ivan Popivanov and Michael Kapler
+#' @export 
+###############################################################################
+# Possible use
+#   if(!missing(min.weight)) {
+#      for(i in names(obj$weights)) {
+#         obj$weights[[i]] = apply.min.weight(obj$weights[[i]], min.weight)
+#      }    
+#   }
+###############################################################################
+bt.apply.min.weight <- function
+(
+	weight, 
+	long.min.weight = 0.1, 
+	short.min.weight = long.min.weight
+)
+{
+	# make sure weight is a matrix
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+    
+	# in each row, compute total pos/neg weights
+	pos = apply(weight, 1, function(row) sum(row[row > 0]))
+	neg = rowSums(weight) - pos
+    
+	# setup
+	pos.mat = iif(weight >= long.min.weight, weight, 0)
+	neg.mat = iif(weight <= -short.min.weight, weight, 0)
+    
+	# re-scale
+	pos.mat = pos.mat * ifna(pos / rowSums(pos.mat), 1)
+	neg.mat = neg.mat * ifna(neg / rowSums(neg.mat), 1)
+    
+	return(pos.mat + neg.mat)
+} 
+
+test.bt.apply.min.weight <- function()
+{
+	data = c(0.1, 0.6, 0.2, 0.1, 0, -0.1, -0.6, -0.2, -0.1, 0)
+	mm = matrix(data=data, nrow=2, byrow=TRUE)
+	print(bt.apply.min.weight(mm, 0.1))
+	print(bt.apply.min.weight(mm, 0.2))
+   
+	data = c(0.1, 0.6, 0.2, 0.1, 0, -0.1, -0.6, -0.2, -0.1, 0)
+	mm = matrix(data=data, nrow=1, byrow=TRUE)
+	print(bt.apply.min.weight(mm, 0.1))
+	print(bt.apply.min.weight(mm, 0.2))
+   
+	data = c(0.1, 0.6, 0.2, 0.1, 0, -0.2, -0.5, -0.3, -0.1, 0)
+	mm = matrix(data=data, nrow=1, byrow=TRUE)
+	print(bt.apply.min.weight(mm, 0.1))
+	print(bt.apply.min.weight(mm, 0.2))
+}
 
 
 

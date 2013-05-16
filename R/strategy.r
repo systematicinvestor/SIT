@@ -24,6 +24,7 @@
 
 ###############################################################################
 # Helper function to load data
+#' @export 
 ###############################################################################
 strategy.load.historical.data <- function
 (
@@ -79,11 +80,12 @@ strategy.load.historical.data <- function
 
 ###############################################################################
 # Helper function to create Barplot with strategy stats
+#' @export 
 ###############################################################################
-performance.barchart.helper <- function(out, names, custom.order, nplots.page = len(spl(names))) 
+performance.barchart.helper <- function(out, names, custom.order, nplots.page = len(spl(names)), nc.plot = 2) 
 {
 	# Bar chart
-	layout(mat=matrix(1:(nplots.page + nplots.page %% 2), nc=2, byrow=FALSE))
+	layout(mat=matrix(1:(nplots.page + nplots.page %% 2), nc=nc.plot, byrow=FALSE))
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 	
@@ -110,6 +112,7 @@ performance.barchart.helper <- function(out, names, custom.order, nplots.page = 
 
 ###############################################################################
 # helper function to create barplot with labels
+#' @export 
 ###############################################################################
 barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name','both')) {
 	par(mar=c( iif(plotX, 6, 2), 4, 2, 2))
@@ -127,6 +130,7 @@ barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name'
 
 ###############################################################################
 # Summary snapshoot of strategy perfroamnce
+#' @export 
 ###############################################################################
 strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 	#*****************************************************************
@@ -156,7 +160,8 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 ###############################################################################
 # Monthly End-of-the-Month (MEOM) by Quanting Dutchman
 # http://quantingdutchman.wordpress.com/2010/06/30/strategy-2-monthly-end-of-the-month-meom/
-###############################################################################
+#' @export 
+##############################################################################
 meom.strategy <- function
 (
 	tickers = spl('DIA,SPY'),
@@ -274,6 +279,7 @@ dev.off()
 ###############################################################################
 # A Quantitative Approach to Tactical Asset Allocation by M. Faber (2006)
 # http://www.mebanefaber.com/timing-model/
+#' @export 
 ###############################################################################
 timing.strategy <- function
 (
@@ -353,6 +359,7 @@ timing.strategy.test <- function()
 ###############################################################################
 # Rotational Trading Strategies : ETF Sector Strategy
 # http://www.etfscreen.com/sectorstrategy.php
+#' @export 
 ###############################################################################
 rotation.strategy <- function
 (
@@ -428,6 +435,7 @@ rotation.strategy.test <- function()
 
 ###############################################################################
 # Create historical input assumptions
+#' @export 
 ###############################################################################
 create.ia <- function(hist.returns)
 {	
@@ -455,6 +463,23 @@ create.ia <- function(hist.returns)
 	#*****************************************************************
 	# Weighting Schemes
 	#*****************************************************************
+	
+# static allocation
+#' @export 
+static.weight.portfolio <- function(static.allocation)
+{
+	static.allocation = static.allocation
+	function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		return(static.allocation[ia$index])	
+	}	
+}
+	
+	#' @export 
 	equal.weight.portfolio <- function
 	(
 		ia,				# input assumptions
@@ -466,10 +491,12 @@ create.ia <- function(hist.returns)
 	
 
 	# allocate only among assets with risk > 0, ignore cash (i.e. risk = 0)
+	#' @export 
 	get.risky.asset.index <- function(ia) {
 		if(is.null(ia$risk)) ia$risk = sqrt(diag(ia$cov))
 		(ia$risk > 0) & !is.na(ia$risk)
 	}
+	#' @export 
 	set.risky.asset <- function(x, risk.index) {
 		out = rep(0, len(risk.index))
 			out[risk.index] = x
@@ -478,6 +505,7 @@ create.ia <- function(hist.returns)
 	
 	
 	# equal.risk.portfolio
+	#' @export 	
 	risk.parity.portfolio <- function
 	(
 		ia,				# input assumptions
@@ -494,6 +522,7 @@ create.ia <- function(hist.returns)
 		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
+	#' @export 	
 	min.var.portfolio <- function
 	(
 		ia,				# input assumptions
@@ -525,6 +554,7 @@ create.ia <- function(hist.returns)
 	
 	# Toward Maximum Diversification by Y. Choueifaty, Y. Coignard
 	# The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51
+	#' @export 	
 	max.div.portfolio <- function
 	(
 		ia,				# input assumptions
@@ -542,6 +572,83 @@ create.ia <- function(hist.returns)
 		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
+	
+	equal.risk.contribution.portfolio <- function
+	(
+		ia,                     # input assumptions
+	    constraints             # constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+			
+		cov = ia$cov[risk.index, risk.index]
+	       
+	    # obj
+	    fn <- function(x){
+	    	# sum(x) = 1
+	        if (sum(x) == 0) x = x + 1e-2
+	        x  = x / sum(x)
+	       
+	        risk.contribution = (x * (cov %*% x))
+	        var(as.double(risk.contribution))                
+		}
+	         
+	        
+	              				
+		x0 = 1/sqrt(diag(cov))
+			x0 = x0 / sum(x0)
+				
+		if(!is.null(constraints$x0))
+			if(all(!is.na(constraints$x0)))
+				if( sum(constraints$x0) == 1 )
+					if( fn(x0) > fn(constraints$x0[risk.index]) )						
+						x0 = constraints$x0[risk.index]
+	
+		# http://www.ucl.ac.uk/~uctpjyy/nloptr.html
+		load.packages('nloptr')
+			                       
+	    x = nloptr( x0=x0,eval_f=fn,lb = constraints$lb[risk.index],ub = constraints$ub[risk.index],
+	    	opts = list('algorithm'='NLOPT_LN_BOBYQA','xtol_rel'=1.0e-10))
+	
+		# normalize weights to sum up to 1
+		set.risky.asset(x$solution / sum(x$solution), risk.index)			
+	}
+	
+
+# Based on CIR factory by mock-quant
+#' @export 	
+ef.portfolio <- function(percent = 0.5) 
+{
+	percent = as.double(percent[1])
+	if(percent > 1) percent = percent / 100
+	
+	function
+	(
+		ia,			# input assumptions
+		constraints	# constraints
+	)
+	{
+		# find extreme solutions
+		# need to set ia$expected.return for max.return.portfolio
+		max.w = max.return.portfolio(ia, constraints)
+		min.w = min.var.portfolio(ia, constraints)	
+		
+		# compute portfolio returns
+		max.r = sum(max.w * ia$expected.return)
+		min.r = sum(min.w * ia$expected.return)
+		
+		# determine target return
+		target = (max.r - min.r) * percent + min.r
+		
+		constraints = add.constraints(ia$expected.return, 
+							type='>=', b=target, constraints)
+							
+		return(min.var.portfolio(ia, constraints))	
+	}		
+}	
+
+
+		
 ###############################################################################    
 # maximum Sharpe ratio or tangency  portfolio
 # http://faculty.washington.edu/ezivot/econ424/portfolio_noshorts.r
@@ -571,14 +678,19 @@ create.ia <- function(hist.returns)
 #  eqB   = 0,
 #  LB = rep(-1, length(mu))
 # )
+#
+# Interesting info
+# http://r.789695.n4.nabble.com/The-best-solver-for-non-smooth-functions-td4636934.html
 ###############################################################################	
 	# only works for constraints that are homogeneous of degree 0
 	# i.e. if we multiply solution weight by a number, the constraint is unchanged
+	#' @export 
 	max.sharpe.portfolio.helper <- function
 	(
 		ia,				# input assumptions
 		const = spl('long-only,long-short,market-neutral'),
-		const.sum = 1
+		const.sum = 1,
+		rf = 0
 	)
 	{
 		const = const[1]
@@ -588,10 +700,11 @@ create.ia <- function(hist.returns)
 			constraints = add.constraints(diag(n), type='>=', b=0, constraints)
 			
 		# SUM x.i * expected.return = 1
-		if( all(ia$expected.return < 0) )
-			constraints = add.constraints(ia$expected.return, -1 , type = '=', constraints)		
+		excess.return = ia$expected.return - rf
+		if( all(excess.return < 0) )
+			constraints = add.constraints(excess.return, -1 , type = '=', constraints)		
 		else
-			constraints = add.constraints(ia$expected.return, 1 , type = '=', constraints)		
+			constraints = add.constraints(excess.return, 1 , type = '=', constraints)		
 		
 		if( const == 'market-neutral' )
 			constraints = add.constraints(rep(1,n), 0 , type = '=', constraints)		
@@ -604,6 +717,7 @@ create.ia <- function(hist.returns)
 			return(const.sum * weight / sum(weight))
 	}	
 	
+	#' @export 	
 	max.sharpe.portfolio <- function
 	(
 		const = spl('long-only,long-short,market-neutral'),
@@ -692,9 +806,11 @@ dev.off()
 	
 	# MinCorr by David Varadi	
 	# http://cssanalytics.files.wordpress.com/2012/10/minimum-correlation-mincorr-spreadsheet.xlsx
-min.corr.excel <- function(power.function = 1)
+	#' @export 
+min.corr.excel <- function(power.function = 1, final.scale = 'risk')
 {
 	power.function = as.numeric(power.function)
+	final.scale = final.scale
 	
 	function
 	(
@@ -727,12 +843,14 @@ min.corr.excel <- function(power.function = 1)
 			norm.dist.m[upper.index] = 1-pnorm(cor.m, cor.mu, cor.sd)
 		norm.dist.m = (norm.dist.m + t(norm.dist.m))
 		
-		rr.norm.dist.m = repCol(rr.adjustment,n) * norm.dist.m
+		rr.norm.dist.m = rep.col(rr.adjustment,n) * norm.dist.m
 		rr.norm.dist = colSums(rr.norm.dist.m)
 		
 		rr.weighted = rr.norm.dist / sum(rr.norm.dist)
 		
-		inverse.volatility.weight = (1 / ia$risk[risk.index]) / sum(1 / ia$risk[risk.index])
+		vol.scale = ia$risk[risk.index]
+		if(final.scale == 'vol') vol.scale = diag(ia$cov[risk.index, risk.index])
+		inverse.volatility.weight = (1 / vol.scale) / sum(1 / vol.scale)
 		
 		x = rr.weighted * inverse.volatility.weight / sum(rr.weighted * inverse.volatility.weight)
 		
@@ -740,7 +858,37 @@ min.corr.excel <- function(power.function = 1)
 		set.risky.asset(x / sum(x), risk.index)		
 	}	
 }	
+
+# http://cssanalytics.files.wordpress.com/2012/10/minimum-correlation-mincorr-spreadsheet.xlsx
+min.corr.excel.portfolio.test <- function() 
+{
+	ia = list()
+	ia$n = 3
+	ia$risk = c(14, 18, 22) / 100;
+	ia$correlation = matrix(
+				c(1, 0.90, 0.85,
+				0.90, 1, 0.70,
+				0.85, 0.70, 1), nr=3, byrow=T)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(ia$n, lb = 0, ub = 1)
+		constraints = add.constraints(diag(ia$n), type='>=', b = 0, constraints)
+		constraints = add.constraints(diag(ia$n), type='<=', b = 1, constraints)
 	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, ia$n), type = '=', b = 1, constraints)
+								
+	min.corr.excel.portfolio(ia,constraints)				
+	
+	#0.21059807 0.30878663 0.4806153
+							
+
+}
+
+	
+#' @export 
 min.corr.special.case <- function(risk) {
 	n = len(risk)
 	if(n == 1) 1
@@ -749,6 +897,7 @@ min.corr.special.case <- function(risk) {
 }
 
 # MinCorr by David Varadi
+#' @export 
 min.corr <- function(power.function = 1)
 {
 	power.function = as.numeric(power.function)
@@ -791,15 +940,17 @@ min.corr <- function(power.function = 1)
 
 				
 		# re-scale weights to penalize for risk
-		x = final.weight		
-		x = x[risk.index] / ia$risk[risk.index]
+		x = final.weight / ia$risk[risk.index]
 		
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)		
 	}		
 }	
 	
+
+
 # MinCorr2 by David Varadi
+#' @export 
 min.corr2 <- function(power.function = 1)
 {
 	power.function = as.numeric(power.function)
@@ -837,35 +988,206 @@ min.corr2 <- function(power.function = 1)
 
 				
 		# re-scale weights to penalize for risk
-		x = final.weight		
-		x = x[risk.index] / ia$risk[risk.index]
+		x = final.weight / ia$risk[risk.index]
 		
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)		
 	}		
 }
 	
-	# Shrinkage adaptors for above functions
+
+# MinVar2 by David Varadi
+# i.e. take MinCorr2 and use Covariance instead of Correlation
+# The performance is similar to Minimum Variance with smaller turnover and larger drawdown
+#' @export 
+min.var2111 <- function(power.function = 1)
+{
+    power.function = as.numeric(power.function)
+    
+    function
+    (
+        ia,                # input assumptions
+        constraints        # constraints
+    )
+    {                    
+        risk.index = get.risky.asset.index(ia)
+        
+        x = min.corr.special.case(ia$risk[risk.index])
+        if(!is.null(x)) return( set.risky.asset(x / sum(x), risk.index) )
+                
+        data.matrix = ia$cov[risk.index, risk.index]
+            
+        avg = rowMeans(data.matrix)
+            data.mu = mean(avg)
+            data.sd = sd(avg)
+        norm.dist.avg = 1 - pnorm(avg, data.mu, data.sd)
+        
+        norm.dist.rank = rank(-norm.dist.avg)
+        norm.dist.rank = norm.dist.rank ^ power.function        
+        
+        norm.dist.weight = norm.dist.rank / sum(norm.dist.rank)
+                
+        weighted.norm.dist.average = norm.dist.weight %*% (max(data.matrix) - data.matrix)
+        final.weight = weighted.norm.dist.average / sum(weighted.norm.dist.average)
+                
+        # re-scale weights to penalize for risk
+        x = final.weight / ia$risk[risk.index]
+        
+        # normalize weights to sum up to 1
+        set.risky.asset(x / sum(x), risk.index)        
+    }        
+}
+
+#' @export 
+min.var.excel <- function(power.function = 1)
+{
+    power.function = as.numeric(power.function)
+    
+    function
+    (
+        ia,                # input assumptions
+        constraints        # constraints
+    )
+    {                    
+        risk.index = get.risky.asset.index(ia)
+        
+        x = min.corr.special.case(ia$risk[risk.index])
+        if(!is.null(x)) return( set.risky.asset(x / sum(x), risk.index) )
+                
+        data.matrix = ia$cov[risk.index, risk.index]
+            
+        avg = rowMeans(data.matrix)
+            data.mu = mean(avg)
+            data.sd = sd(avg)
+        norm.dist.avg = 1 - pnorm(avg, data.mu, data.sd)
+                
+        final.weight = norm.dist.avg / sum(norm.dist.avg)
+                                
+        # re-scale weights to penalize for risk
+        x = final.weight / diag(data.matrix)
+        
+        # normalize weights to sum up to 1
+        set.risky.asset(x / sum(x), risk.index)        
+    }        
+}
+
+# http://cssanalytics.files.wordpress.com/2013/04/minimum-variance-algorithm.xlsx
+min.var.excel.portfolio.test <- function() 
+{
+	tickers = spl('DBC,EEM,EWJ,GLD')
+
+data = '
+-0.004903678  0.005815362  0.006696429  -0.010055275
+0.000703977  0.01035895  0.014412417  0.006355806
+0.000351741  0.007868383  0.005464481  0.000708299
+-0.000351617  -0.002838893  0.006521739  -0.004423735
+-0.015124868  -0.015421115  -0.012958963  -0.010782629
+-0.004642857  0.009638554  0.014223195  0.003653351
+'
+
+	ia = create.ia(matrix(scan(text=data), nc = len(tickers)))
+
+	# overwrite cov matrix with values from excel
+data = '
+0.000090  0.000044  0.000028  0.000034
+0.000044  0.000084  0.000068  0.000039
+0.000028  0.000068  0.000101  0.000036
+0.000034  0.000039  0.000036  0.000039
+'
+
+	ia$cov = matrix(scan(text=data), nc = ia$n)
+	ia$risk = sqrt(diag(ia$cov))
+	
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(ia$n, lb = 0, ub = 1)
+		constraints = add.constraints(diag(ia$n), type='>=', b = 0, constraints)
+		constraints = add.constraints(diag(ia$n), type='<=', b = 1, constraints)
+	
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, ia$n), type = '=', b = 1, constraints)
+								
+	min.var.excel.portfolio(ia,constraints)				
+	
+	#0.180495776 0.074095784 0.067164775 0.678243665
+						
+}
+
+
+    
+    
+
+
+	# Portfolio Allocation adaptors for above functions
+	#' @export 
+	min.var2.portfolio <- function(ia,constraints) { min.corr.excel(final.scale = 'vol')(ia,constraints) } 
+
+	#' @export 
+	min.var.excel.portfolio <- function(ia,constraints) { min.var.excel()(ia,constraints) } 	
+		
+	#' @export 	
 	min.corr.excel.portfolio <- function(ia,constraints) { min.corr.excel()(ia,constraints) }
+	
+	#' @export 	
 	min.corr.portfolio <- function(ia,constraints) { min.corr()(ia,constraints) }
+	
+	#' @export 	
 	min.corr2.portfolio <- function(ia,constraints) { min.corr2()(ia,constraints) }
+	
+	#' @export 	
+	min.cvar <- function(alpha = 0.95) { 
+		alpha = alpha
+		function(ia,constraints) {
+			ia$parameters.alpha = as.numeric(alpha)
+			min.cvar.portfolio(ia,constraints) 
+		}
+	}
+	#' @export 	
+	min.cdar <- function(alpha = 0.95) {
+		alpha = alpha
+		function(ia,constraints) {
+			ia$parameters.alpha = as.numeric(alpha)
+			min.cdar.portfolio(ia,constraints) 
+		}
+	}
+
+	#' @export 	
+	min.risk.downside <- function(mar = 0) { 
+		mar = mar
+		function(ia,constraints) {
+			ia$parameters.mar = as.numeric(mar)
+			min.risk.downside.portfolio(ia,constraints) 
+		}
+	}
+	#' @export 	
+	min.mad.downside <- function(mar = 0) { 
+		mar = mar
+		function(ia,constraints) {
+			ia$parameters.mar = as.numeric(mar)
+			min.mad.downside.portfolio(ia,constraints) 
+		}
+	}
 	
 	#*****************************************************************
 	# Shrinkage functions - maybe instead provide full input assumptions
 	#*****************************************************************
+	#' @export 	
 	sample.shrinkage <- function( hist, hist.all ) {
 		cov(hist, use='complete.obs', method='pearson')
 	}
 
+	#' @export 	
 	sample.anchored.shrinkage <- function( hist, hist.all ) {
 		cov(hist.all, use='complete.obs', method='pearson')
 	}
 	
+	#' @export 	
 	sample.mix.shrinkage <- function( hist, hist.all ) {
 		0.5 * sample.shrinkage(hist, hist.all) +
 		0.5 * sample.anchored.shrinkage(hist, hist.all)
 	}
 	
+	#' @export 	
 	exp.sample.shrinkage <- function( hist, hist.all ) {
 		hist = na.omit(hist)
 		# Exponentially weighted
@@ -876,12 +1198,14 @@ min.corr2 <- function(power.function = 1)
 		cov.wt(hist, wt=rev(wt))$cov
 	}		
 		
+	#' @export 	
 	diagonal.shrinkage <- function( hist, hist.all ) {
 		n = ncol(hist)
 		s0 = apply(hist, 2, sd, na.rm=T)
 		diag(n) * (s0 %*% t(s0))
 	}
 		
+	#' @export 	
 	average.shrinkage <- function( hist, hist.all ) {
 		n = ncol(hist)
 		correlation = cor(hist, use='complete.obs', method='pearson')
@@ -889,17 +1213,20 @@ min.corr2 <- function(power.function = 1)
 		create.cov.matrix(avg.correlation, hist)
 	}
 
+	#' @export 	
 	min.shrinkage <- function( hist, hist.all ) {
 		correlation = cor(hist, use='complete.obs', method='pearson')
 		create.cov.matrix(min(correlation), hist)
 	}
 	
+	#' @export 	
 	max.shrinkage <- function( hist, hist.all ) {
 		n = ncol(hist)
 		correlation = cor(hist, use='complete.obs', method='pearson')
 		create.cov.matrix(max(correlation-diag(n)), hist)
 	}
 		
+	#' @export 	
 	create.cov.matrix <- function( value, hist ) {
 		n = ncol(hist)
 		s0 = apply(hist, 2, sd, na.rm=T)
@@ -907,11 +1234,13 @@ min.corr2 <- function(power.function = 1)
 		((matrix(1,n,n) - temp) * value + temp) * (s0 %*% t(s0))	
 	}
 
+	#' @export 	
 	ledoit.wolf.shrinkage <- function( hist, hist.all ) {
 		require(BurStFin)
 		var.shrink.eqcor(hist, 1, compatible = T)
 	}
 		
+	#' @export 	
 	factor.model.shrinkage <- function( hist, hist.all ) {
 		require(BurStFin)
 		factor.model.stat(hist, 1)
@@ -944,6 +1273,7 @@ min.corr2 <- function(power.function = 1)
 	#*****************************************************************	
 	
 	# based on the cov_shrink in tawny package
+	#' @export 	
 	cov.shrink <- function(h, prior = NULL, shrinkage = NULL, roff.method = 1) {	
 		require(tawny)
 		#class(h) = c('AssetReturns', class(h)) 
@@ -972,16 +1302,17 @@ min.corr2 <- function(power.function = 1)
 	
 	
 	# cov(h, use='complete.obs', method='pearson') *(T - 1)/T
+	#' @export 	
 	cov.sample <- function(h) {		
 		# center x, de-mean returns
 		T = nrow(h)
-		x = h - repRow(colMeans(h), T)
+		x = h - rep.row(colMeans(h), T)
 		
 		# compute sample covariance matrix
 		(t(x) %*% x) / T
 	}
 	
-	
+	#' @export 	
 	cov.const.cor <- function(h) {		
 		sample = cov.sample(h)
 	
@@ -998,16 +1329,17 @@ min.corr2 <- function(power.function = 1)
 		prior
 	}
 	
+	#' @export 	
 	cov.diag <- function(h) {		
 		S = cov.sample(h)
 		diag(diag(S))
 	}
 	
-	
+	#' @export 	
 	cov.market <- function(h) {		
 		# center x, de-mean returns
 		T = nrow(h)
-		x = h - repRow(colMeans(h), T)
+		x = h - rep.row(colMeans(h), T)
 		xmkt = rowMeans(x)
 		
 		# compute sample covariance matrix and prior
@@ -1021,6 +1353,7 @@ min.corr2 <- function(power.function = 1)
 		prior
 	}	
 		
+	#' @export 	
 	cov.2param <- function(h) {
 		sample = cov.sample(h)		
 	
@@ -1033,15 +1366,23 @@ min.corr2 <- function(power.function = 1)
 	
 	
 	# Shrinkage adaptors for above functions
+	#' @export 
 	shrink.diag <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.diag, s, 0)$sigma }}
+	
+	#' @export 	
 	shrink.const.cor <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.const.cor, s, 1)$sigma }}
+	
+	#' @export 	
 	shrink.single.index <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.market, s, 1)$sigma }}
+	
+	#' @export 	
 	shrink.two.parameter <- function(s=NULL) { s=s; function(x, a) { cov.shrink(x, cov.2param, s, 1)$sigma }}
 
 	
 	#*****************************************************************
 	# Group Methods
 	#*****************************************************************
+	#' @export 	
 	empty.group <- function
 	(
 		ia				# input assumptions
@@ -1051,12 +1392,29 @@ min.corr2 <- function(power.function = 1)
 	}		
 
 	
+#' @export 		
+static.group <- function(group) 
+{	
+	group = group
+	function
+	(
+		ia			# input assumptions
+	)
+	{
+		return(group[ia$index])	
+	}		
+}		
+	
+	
 	# Find groups using clustering algorithm
+	#' @export 	
 	cluster.group.hclust <- function
 	(
 		ia				# input assumptions
 	)
 	{		
+		if(ia$n <= 2) return(c(1,1)[1:ia$n])
+		
 		dissimilarity = 1 - ia$correlation
     	distance = as.dist(dissimilarity)
     	
@@ -1077,11 +1435,14 @@ min.corr2 <- function(power.function = 1)
 	
 
 	# Find groups using clustering algorithm
+	#' @export 	
 	cluster.group.kmeans.90 <- function
 	(
 		ia				# input assumptions
 	)
-	{		
+	{
+		if(ia$n <= 2) return(c(1,1)[1:ia$n])
+		
 		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
 		#dissimilarity = 1 - cor(ia$hist.returns, use='pairwise.complete.obs',method='spearman')		
     	distance = as.dist(dissimilarity)
@@ -1103,11 +1464,14 @@ min.corr2 <- function(power.function = 1)
 
 	
 	# Find groups using clustering algorithm
+	#' @export 	
 	cluster.group.kmeans.elbow <- function
 	(
 		ia				# input assumptions
 	)
 	{		
+		if(ia$n <= 2) return(c(1,1)[1:ia$n])
+		
 		dissimilarity = 1 - cor(ia$hist.returns, use='complete.obs',method='spearman')
 		#dissimilarity = 1 - cor(ia$hist.returns, use='pairwise.complete.obs',method='spearman')
     	distance = as.dist(dissimilarity)
@@ -1136,6 +1500,7 @@ min.corr2 <- function(power.function = 1)
 	###############################################################################
 	# min.risk.fns = list(G0.MV = distribute.weights(min.risk.portfolio, empty.group),					
 	# 					G2.MV = distribute.weights(min.risk.portfolio, cluster.group))
+	#' @export 	
 	distribute.weights <- function
 	(
 		fn,				# function that dictates how to distribute weights
@@ -1155,7 +1520,7 @@ min.corr2 <- function(power.function = 1)
 			if(!is.function(group.fn)) {
 				return(fn(ia, constraints))
 			} else {
-				group = group.fn(ia)
+				group = as.numeric(group.fn(ia))
 				
 				ngroups = max(group)
 				if(ngroups == 1) return(fn(ia, constraints))
@@ -1173,12 +1538,8 @@ min.corr2 <- function(power.function = 1)
 						hist.g[,g] = ia$hist.returns[, group == g, drop=F]
 					} else {
 		
-					ia.temp = list()
-						ia.temp$hist.returns = ia$hist.returns[, group == g, drop=F]
-						ia.temp$n = ncol(ia.temp$hist.returns)
-						ia.temp$cov = cov(ia.temp$hist.returns, use='complete.obs',method='pearson')
-						ia.temp$risk = sqrt(diag(ia.temp$cov))
-							
+					ia.temp = create.ia(ia$hist.returns[, group == g, drop=F])
+													
 					constraints.temp = new.constraints(ia.temp$n, lb = 0, ub = 1)
 						constraints.temp = add.constraints(diag(ia.temp$n), type='>=', b=0, constraints.temp)
 						constraints.temp = add.constraints(diag(ia.temp$n), type='<=', b=1, constraints.temp)
@@ -1194,12 +1555,8 @@ min.corr2 <- function(power.function = 1)
 				}
 				
 				# create GROUP input assumptions
-				ia.g = list()
-					ia.g$hist.returns = hist.g
-					ia.g$n = ncol(hist.g)
-					ia.g$cov = cov(hist.g, use='complete.obs',method='pearson')
-					ia.g$risk = sqrt(diag(ia.g$cov))
-							
+				ia.g = create.ia(hist.g)
+											
 				constraints.g = new.constraints(ngroups, lb = 0, ub = 1)
 					constraints.g = add.constraints(diag(ngroups), type='>=', b=0, constraints.g)
 					constraints.g = add.constraints(diag(ngroups), type='<=', b=1, constraints.g)	
@@ -1219,7 +1576,70 @@ min.corr2 <- function(power.function = 1)
 		}
 	}
 	
+	#*****************************************************************
+	# Maps for portfolio optimization and clustering functions
+	#*****************************************************************
+	#' @export 	
+	get.algo <- function(algo.name, has.param = F) {
+		algo.map = list(
+			'cluster' = distribute.weights,
+			'max.sharpe' = max.sharpe.portfolio()
+		)
 	
+		if(any(names(algo.map) == algo.name))
+			algo.map[[ algo.name ]]
+		else {
+			if(has.param)
+				match.fun(algo.name)					
+			else
+				match.fun(paste(algo.name, '.portfolio', sep=''))					
+		}
+	}
+	
+	#' @export 		
+	get.group <- function(group.name) {
+		group.map = list(
+			'none' = empty.group,
+			'hclust' = cluster.group.hclust,
+			'kmeans90' = cluster.group.kmeans.90
+		)	
+		
+		if(any(names(group.map) == group.name))
+			group.map[[ group.name ]]
+		else
+			stop(paste('Unknown group', group.name))
+	}
+	
+	# parse strategys
+	#' @export 	
+	map.min.risk.fns <- function(strategys) {	
+		strategys = spl(strategys,';')
+		
+		min.risk.fns = list()
+		#strategys = spl(";,EW,Equal.Weight,;,MCE,Min.Corr.Excel,1;,MC,Min.Corr,1;,MC2,Min.Corr2,1;,C.EW,Cluster,kmeans90:min.var;,Empty,Cluster,hclust:min.corr2",';')		
+		strategys = strategys[ nchar(strategys) > 0]		
+		for(i in 1:len(strategys)) {
+			temp = spl(strategys[i])
+						
+			# create name, if empty
+			f.name = temp[1]
+			if(nchar(f.name) == 0 || f.name == 'Empty') f.name = paste(temp[-1], collapse='-') 
+			
+			# remove name and create functions
+			temp = tolower(temp)[-1]		
+			if(len(temp) == 1)
+				min.risk.fns[[ f.name ]] = get.algo(temp[1])
+			else {
+				if(temp[1] == 'cluster') {
+					params = trim(spl(temp[2], ':'))
+					min.risk.fns[[ f.name ]] = get.algo(temp[1])( get.algo(params[2]), get.group(params[1]) )								
+				} else
+					min.risk.fns[[ f.name ]] = get.algo(temp[1],T)(temp[-1])
+			}
+		}					
+		min.risk.fns	
+	}
+		
 	
 	
 	
@@ -1227,6 +1647,7 @@ min.corr2 <- function(power.function = 1)
 #*****************************************************************
 # Portfolio Allocation Helper - distribute portfolio weights according to 
 # the given weighting scheme (min.risk.fns)
+#' @export 
 #*****************************************************************
 portfolio.allocation.helper <- function
 (
@@ -1254,6 +1675,9 @@ portfolio.allocation.helper <- function
 ) 
 {
 	load.packages('quadprog,corpcor')
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
+
+		
 	
 	#*****************************************************************
 	# Setup
@@ -1457,7 +1881,10 @@ portfolio.allocation.helper <- function
 
 
 # compute portfolio allocation additional stats
+#' @export 
 portfolio.allocation.custom.stats <- function(x,ia) {
+gx <<- x
+gia <<- ia
 	risk.contributions = portfolio.risk.contribution(x, ia)
 	return(list(
 		# vectors
@@ -1472,6 +1899,7 @@ portfolio.allocation.custom.stats <- function(x,ia) {
 
 
 # this is a basic version of portfolio.allocation.helper function
+#' @export 
 portfolio.allocation.helper.basic <- function
 (
 	prices,					# prices
@@ -1572,12 +2000,13 @@ portfolio.allocation.helper.basic <- function
 
 
 # Create strategies based on portfolio weights
+#' @export 
 create.strategies <- function
 (
 	obj,	# portfolio.allocation object: list(weights = weights, period.ends = period.ends)
 	data,	# historical prices
 	leverage = 1,	
-	
+	min.weight = NA,
 	silent = F,	
 	log = log.fn(),	
 	
@@ -1585,10 +2014,11 @@ create.strategies <- function
 ) 
 {
 	# adjust weights
-	if(len(leverage) == 1) leverage = rep(leverage, len(obj$weights))
-		names(leverage) = names(obj$weights)
-	
-	for(i in names(obj$weights)) obj$weights[[i]] = leverage[i] * obj$weights[[i]]		
+	if(len(leverage) > 1 || leverage[1] != 1) {				
+		if(len(leverage) == 1) leverage = rep(leverage, len(obj$weights))		
+		for(i in 1:len(obj$weights)) obj$weights[[i]] = leverage[i] * obj$weights[[i]]		
+	}
+	if(!is.na(min.weight)) for(i in names(obj$weights)) obj$weights[[i]] = bt.apply.min.weight(obj$weights[[i]], min.weight)
 
 	#*****************************************************************
 	# Create strategies
@@ -1646,6 +2076,7 @@ asset.allocation.strategy.test <- function()
  
 #*****************************************************************
 # Adjust portfolio leverage to given target volatility
+#' @export 
 #****************************************************************** 				
 target.vol.strategy <- function(model, weight, 
 	target = 10/100, 

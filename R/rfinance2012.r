@@ -118,6 +118,7 @@ dev.off()
 
 #############################################################################
 # Month of the Year Seasonality
+#' @export 
 #############################################################################
 month.year.seasonality <- function
 (
@@ -150,7 +151,7 @@ month.year.seasonality <- function
 
 }    
 
-
+#' @export 
 group.seasonality <- function
 (
 	data_list,	# data list for each group
@@ -197,6 +198,7 @@ group.seasonality <- function
 
 #############################################################################
 # Time seasonally for given periods
+#' @export 
 ###############################################################################
 time.seasonality <- function
 (
@@ -279,6 +281,7 @@ time.seasonality <- function
 
 #############################################################################
 # Find and Plot Classical Techical Patterns
+#' @export 
 #############################################################################
 plot.patterns <- function
 (
@@ -323,6 +326,7 @@ plot.patterns <- function
 
 #############################################################################
 # Find maxima and minima using Kernel estimate
+#' @export 
 #############################################################################
 find.extrema <- function(
 	x	# time series
@@ -371,6 +375,7 @@ find.extrema <- function(
 
 #############################################################################
 # Find Classical Techincal patterns
+#' @export 
 #############################################################################
 find.patterns <- function
 (
@@ -458,6 +463,7 @@ find.patterns <- function
 
 #############################################################################
 # Find historical patterns in the data over a rolling window
+#' @export 
 #############################################################################
 find.all.patterns.window <- function() 
 {
@@ -662,6 +668,7 @@ dev.off()
 # by A.W. LO, H. MAMAYSKY, J. WANG
 ###############################################################################
 # http://thepatternsite.com/
+#' @export 
 ###############################################################################
 pattern.db <- function() 
 {

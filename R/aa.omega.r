@@ -38,6 +38,7 @@
 # Binary b.j enforces that only one of u.j or d.j is greter than 0
 # u.j <= b.j
 # d.j <= 1 - b.j
+#' @export 
 ###############################################################################
 add.constraint.omega <- function
 (
@@ -91,6 +92,7 @@ add.constraint.omega <- function
 	return( constraints )	
 }
 
+#' @export 
 portfolio.omega <- function
 (
 	weight,		# weight
@@ -107,6 +109,7 @@ portfolio.omega <- function
 
 ###############################################################################
 # Find portfolio that Maximizes Omega
+#' @export 
 ###############################################################################
 max.omega.portfolio <- function
 (
@@ -154,6 +157,7 @@ max.omega.portfolio <- function
 
 ###############################################################################
 # Create efficient frontier
+#' @export 
 ###############################################################################
 portopt.omega <- function
 (
@@ -206,6 +210,7 @@ portopt.omega <- function
 
 ###############################################################################
 # Plot Omega Ratio for given portfolios (weights)
+#' @export 
 ###############################################################################
 plot.omega <- function
 (

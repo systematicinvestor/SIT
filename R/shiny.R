@@ -128,6 +128,7 @@ else
 # createNonReactiveTextInputCustom("symbol1", "Yahoo Ticker:", "input", "Update",  opts=list(value = "GOOG", type = "text")),
 # createNonReactiveTextInputCustom("symbol2", "Yahoo Ticker:", "textarea", "Update", opts=list(rows=10, cols=10, "GOOG")),
 # createNonReactiveTextInputCustom("symbol3", "Yahoo Ticker:", "textarea", "Update", enableEnter=F, opts=list(rows=10, cols=10, "GOOG")),
+#' @export 
 ############################################################################### 	
 createNonReactiveTextInputCustom <- function(id, label, tag.label = 'input', button.label='', enableEnter=TRUE,
 	 opts) {

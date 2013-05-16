@@ -348,6 +348,7 @@ custom.report.helper <- function(filename, obj) {
 # Composite Diversification Indicator (CDI) is 50/50 of
 # * 1 - Gini(portfolio risk contribution weights) and  
 # * Minimum Average Correlation (from max.div) / Average Portfolio Correlation (w * Correlation Matrix * w) 			
+#' @export 
 #*****************************************************************
 custom.composite.diversification.indicator <- function
 (

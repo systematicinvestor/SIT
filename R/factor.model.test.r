@@ -1739,6 +1739,7 @@ dev.off()
 ###############################################################################
 # Dow Jones Historical Components
 # http://en.wikipedia.org/wiki/Historical_components_of_the_Dow_Jones_Industrial_Average
+#' @export 
 ###############################################################################
 fm.hist.dow.jones.components <- function()
 {

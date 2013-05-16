@@ -42,6 +42,7 @@
 # solveLP(cvec, bvec - Amat %*% dvec, Amat)$solution + dvec
 #
 # For portfolio weights, it is safe to assume that x.i >= -100
+#' @export 
 ###############################################################################
 solve.LP.bounds <- function
 (
@@ -97,6 +98,7 @@ solve.LP.bounds <- function
 
 ###############################################################################
 # Solve QP problem, handling binary variables using Binary Branch and Bound
+#' @export 
 ###############################################################################
 solve.QP.bounds <- function
 (
@@ -217,6 +219,7 @@ solve.QP.bounds <- function
 # QP interface for Binary Branch and Bound algorithm
 ###############################################################################
 # control list for binary_branch_bound				
+#' @export 
 ###############################################################################
 bbb_control <- function
 (
@@ -704,6 +707,7 @@ lm.constraint <- function
 
 ###############################################################################
 # Run linear least squares regression
+#' @export 
 ###############################################################################
 ols <- function
 (
@@ -729,7 +733,7 @@ ols <- function
 }
 
 
-	
+#' @export 	
 ols.summary <- function
 (
 	x,
@@ -773,17 +777,21 @@ ols.test <- function() {
 ###############################################################################
 # Compute matrix inverse
 ###############################################################################
+#' @export 
 inv <- function(x) { solve(x) }
 
+#' @export 
 inv1 <- function(x) { 1/x }
 
 #http://www.mathwords.com/i/inverse_of_a_matrix.htm
+#' @export 
 inv2 <- function(x) 
 { 
 	matrix(c(x[2,2],-x[1,2],-x[2,1],x[1,1]),nrow=2,byrow=T) / (x[1,1]*x[2,2] - x[1,2]*x[2,1]) 
 }
 
 #http://www.dr-lex.be/random/matrix_inv.html
+#' @export 
 inv3 <- function(x) 
 { 
 	matrix(c(x[3,3]*x[2,2]-x[3,2]*x[2,3],-(x[3,3]*x[1,2]-x[3,2]*x[1,3]),x[2,3]*x[1,2]-x[2,2]*x[1,3],
@@ -808,6 +816,7 @@ inv.test <- function() {
 ###############################################################################
 # Maximum Distance Point on the curve
 # http://stackoverflow.com/questions/2018178/finding-the-best-trade-off-point-on-a-curve		
+#' @export 
 ###############################################################################
 find.maximum.distance.point <- function
 (

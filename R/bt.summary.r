@@ -24,6 +24,7 @@
 
 ###############################################################################
 # Custom Backtest Report
+#' @export 
 ###############################################################################
 plotbt.custom.report <- function
 ( 
@@ -95,6 +96,7 @@ plotbt.custom.report <- function
 }	
 
 # split plotbt.custom.report into 3 functions
+#' @export 
 plotbt.custom.report.part1 <- function
 ( 
 	..., 
@@ -120,6 +122,7 @@ plotbt.custom.report.part1 <- function
 		mtext('Drawdown', side = 2, line = 1)
 }
 
+#' @export 
 plotbt.custom.report.part2 <- function
 ( 
 	..., 
@@ -154,6 +157,7 @@ plotbt.custom.report.part2 <- function
 	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
 }	
 
+#' @export 
 plotbt.custom.report.part3 <- function
 ( 
 	..., 
@@ -189,6 +193,7 @@ plotbt.custom.report.part3 <- function
 
 ###############################################################################
 # Backtest Detail summary
+#' @export 
 ###############################################################################
 bt.detail.summary <- function
 (
@@ -269,6 +274,7 @@ bt.detail.summary <- function
 	
 ###############################################################################
 # Plot strategy perfromance side by side		
+#' @export 
 ###############################################################################
 plotbt.strategy.sidebyside <- function
 ( 
@@ -294,6 +300,7 @@ plotbt.strategy.sidebyside <- function
 
 ###############################################################################
 # Plot equity curves for eact strategy(model)
+#' @export 
 ###############################################################################
 plotbt <- function
 (
@@ -360,6 +367,7 @@ plotbt <- function
 
 ###############################################################################
 # Plot Transition Map
+#' @export 
 ###############################################################################
 plotbt.transition.map <- function
 (
@@ -378,6 +386,7 @@ plotbt.transition.map <- function
 	
 ###############################################################################
 # Plot Pie Chart for holdings
+#' @export 
 ###############################################################################
 plotbt.holdings <- function
 (
@@ -401,6 +410,7 @@ plotbt.holdings <- function
 
 ###############################################################################
 # Plot Pie Chart for holdings throught out time
+#' @export 
 ###############################################################################
 plotbt.holdings.time <- function(weight) 
 {
@@ -412,6 +422,7 @@ plotbt.holdings.time <- function(weight)
 
 ###############################################################################
 # Plot monthly return table
+#' @export 
 ###############################################################################
 plotbt.monthly.table <- function(equity, make.plot = TRUE, smain = '') 
 {
@@ -488,6 +499,7 @@ if(T) {
 	
 ###############################################################################
 # Helper functions
+#' @export 
 ###############################################################################
 #http://tolstoy.newcastle.edu.au/R/help/06/05/28060.html    
 variable.number.arguments <- function( ... ) 
@@ -503,6 +515,7 @@ variable.number.arguments <- function( ... )
 
 ###############################################################################
 # Convert list of lists to matrix
+#' @export 
 ###############################################################################
 list2matrix <- function
 (

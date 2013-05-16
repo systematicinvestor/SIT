@@ -23,6 +23,7 @@
 ###############################################################################
 # Read GNU MathProg model
 # based on Rglpk_read_file, modified to eliminate objective fn from constraint matrix
+#' @export 
 ############################################################################### 
 Rglpk.read.model <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", "MathProg"), ignore_first_row = FALSE, verbose = FALSE){
 	if(!file.exists(file)) stop(paste("There is no file called", file, "!"))
@@ -55,6 +56,7 @@ Rglpk.read.model <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP",
 
 ###############################################################################
 # Create constraints structure from model data (Rglpk.read.model)
+#' @export 
 ############################################################################### 
 Rglpk.create.constraints <- function( prob ) 
 {       
@@ -104,6 +106,7 @@ Rglpk.create.constraints <- function( prob )
 
 ###############################################################################
 # Helper function to find Minimum Variance Portfolio
+#' @export 
 ############################################################################### 
 min.var.portfolio.gmpl <- function(ia, constraints)
 {

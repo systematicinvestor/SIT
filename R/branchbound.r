@@ -28,6 +28,7 @@
 # The routine was modified to work with large set of optimization problems.
 #
 # http://www.aut.ee.ethz.ch/~hybrid/miqp/ 
+#' @export 
 ###############################################################################
 binary_branch_bound <- function
 (

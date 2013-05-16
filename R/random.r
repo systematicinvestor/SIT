@@ -42,6 +42,7 @@
 # is used to map these points radially to fit in the 
 # hypersphere of finite radius r with a uniform % spatial distribution.
 # Roger Stafford - 12/23/05
+#' @export 
 ###############################################################################
 randsphere <- function
 (
@@ -148,6 +149,7 @@ dev.off()
 # returned set equal to the hexagon's area.
 #
 # Roger Stafford - Jan. 19, 2006
+#' @export 
 ###############################################################################
 randfixedsum <- function
 (
@@ -318,6 +320,7 @@ dev.off()
 #
 # This function returns the simulation matrix (time, simulation, asset)
 # Instead of using mvrnorm from MASS library, we can use rmvnorm function from mvtnorm package
+#' @export 
 ###############################################################################
 asset.paths <- function(s0, mu, sigma, 
 	nsims = 10000, 

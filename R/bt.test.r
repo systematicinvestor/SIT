@@ -1509,7 +1509,7 @@ bt.max.deviation.rebalancing <- function
 	while(T) {	
 		# find rows that violate max.deviation
 		weight = model$weight
-		index = apply(abs(weight - repRow(target.allocation, nperiods)), 1, max) > max.deviation
+		index = apply(abs(weight - rep.row(target.allocation, nperiods)), 1, max) > max.deviation
 		index = which( index[period.ends] )
 	
 		if( len(index) > 0 ) {
@@ -1522,7 +1522,7 @@ bt.max.deviation.rebalancing <- function
 				data$weight[] = NA	
 					data$weight[start.index0,] = target.allocation
 					
-					temp = repRow(target.allocation, sum(action.index))
+					temp = rep.row(target.allocation, sum(action.index))
 					data$weight[action.index,] = temp + 
 						rebalancing.ratio * (weight[action.index,] - temp)					
 					
@@ -5016,7 +5016,7 @@ dev.off()
 ###############################################################################
 
 
-
+#' @export 
 bt.aaa.combo <- function
 (
 	data,
@@ -5045,6 +5045,7 @@ bt.aaa.combo <- function
     bt.run.share(data, clean.signal=F, silent=T)
 }
 
+#' @export 
 bt.aaa.minrisk <- function
 (
 	data,
@@ -7117,7 +7118,7 @@ bt.pca.trading.test <- function()
 	components = loadings[,1:4]
 	
 	# normalize all selected components to have total weight = 1
-	components = components / repRow(colSums(abs(components)),len(tickers))
+	components = components / rep.row(colSums(abs(components)),len(tickers))
 	
 	# note that first component is market, and all components are orthogonal i.e. not correlated to market
 	market = ret[1:250,] %*% rep(1/n,n)
@@ -7165,8 +7166,8 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 	layout(1:2)
 	# add Bollinger Bands
 	i.comp = 4	
-	bbands1 = BBands(repCol(equity[,i.comp],3), n=200, sd=1)
-	bbands2 = BBands(repCol(equity[,i.comp],3), n=200, sd=2)
+	bbands1 = BBands(rep.col(equity[,i.comp],3), n=200, sd=1)
+	bbands2 = BBands(rep.col(equity[,i.comp],3), n=200, sd=2)
 	temp = cbind(equity[,i.comp], bbands1[,'up'], bbands1[,'dn'], bbands1[,'mavg'],
 				bbands2[,'up'], bbands2[,'dn'])
 		colnames(temp) = spl('Comp. 4,1SD Up,1SD Down,200 SMA,2SD Up,2SD Down')
@@ -7676,3 +7677,79 @@ dev.off()
 
 }
 	
+
+###############################################################################
+# Examples of 4 ways to load Historical Stock Data
+###############################################################################
+load.hist.stock.data <- function()
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	stock.folder = 'c:\\Stocks\\Data\\'
+	tickers = spl('UUP,EMB,HYG')
+	
+	data <- new.env()
+
+		
+	# load historical data, select data load method
+	data.load.method = 'basic'
+	
+	if(data.load.method == 'basic') {		
+		# quantmod - getSymbols
+		getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	}else if(data.load.method == 'basic.local') {
+		# if you saved yahoo historical price files localy
+		getSymbols.sit(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T, stock.folder = stock.folder)
+	}else if(data.load.method == 'custom.local') {
+		# custom format historical price files
+		for(n in tickers) {
+			data[[n]] = read.xts(paste(stock.folder, n, '.csv', sep=''), format='%m/%d/%Y')
+		}	
+	}else if(data.load.method == 'custom.one.file') {
+		# read from one csv file, column headers are tickers
+		filename = 'hex.csv'
+		all.data = read.xts(paste(stock.folder, filename, sep=''), format='%m/%d/%Y')
+		for(n in names(all.data)) {
+			data[[n]] = all.data[,n]
+			colnames(data[[n]]) = 'Close'
+			data[[n]]$Adjusted = data[[n]]$Open = data[[n]]$High = data[[n]]$Low = data[[n]]$Close
+		}
+	}		
+		
+	
+	# prepare data for back test
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='remove.na')
+ 
+   
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    prices = data$prices  
+    n = ncol(prices)
+   
+    models = list()
+   
+    # find period ends
+    period.ends = endpoints(prices, 'months')
+        period.ends = period.ends[period.ends > 0]
+       
+	obj = portfolio.allocation.helper(data$prices, period.ends=period.ends, lookback.len = 250, 
+		min.risk.fns = list(EW=equal.weight.portfolio,
+						RP=risk.parity.portfolio,
+						MV=min.var.portfolio,
+						MC=min.corr.portfolio)
+	) 
+	
+	models = create.strategies(obj, data)$models
+					
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+    
+    strategy.performance.snapshoot(models, T)
+
+}    

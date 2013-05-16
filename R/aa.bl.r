@@ -27,6 +27,7 @@
 # T. Idzorek: A STEP-BY-STEP GUIDE TO THE BLACK-LITTERMAN MODEL
 # note (5)
 #
+#' @export 
 bl.compute.risk.aversion <- function(bench, risk.free = 0)
 {
 	# The implied risk aversion coefficient can be estimated by dividing
@@ -42,6 +43,7 @@ bl.compute.risk.aversion <- function(bench, risk.free = 0)
 # formulas (1)
 #
 # use reverse optimization to compute the vector of equilibrium returns
+#' @export 
 bl.compute.eqret <- function
 (
 	risk.aversion, 	# Risk Aversion
@@ -56,6 +58,7 @@ bl.compute.eqret <- function
 # He & Litterman: The intuition Behind Black- Litterman Model Portfolios
 # formulas (8), (9), (10)
 # compute the posterior estimate of the returns and covariance
+#' @export 
 bl.compute.posterior <- function
 (
 	mu, 		# Equilibrium returns
@@ -93,6 +96,7 @@ bl.compute.posterior <- function
 # formulas (2)
 #
 # compute the portfolio weights for the optimal portfolio on the unconstrained efficient frontier
+#' @export 
 bl.compute.optimal <- function(risk.aversion, mu, cov)
 {
 	return( (1/risk.aversion) * solve(cov) %*% mu )

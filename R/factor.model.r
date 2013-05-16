@@ -23,6 +23,7 @@
 
 ###############################################################################
 # Count Consecutive Changes
+#' @export 
 ###############################################################################
 consecutive.changes <- function
 (
@@ -42,6 +43,7 @@ consecutive.changes <- function
 # http://stackoverflow.com/questions/4310727/what-is-rs-multidimensional-equivalent-of-rbind-and-cbind
 # apply(temp, 3, rbind)
 # http://r.789695.n4.nabble.com/Collapse-an-array-td850008.html
+#' @export 
 factor.avgcor <- function(data, next.month.ret, name) { 
 	load.packages('abind')
 	# create matrix
@@ -57,6 +59,7 @@ factor.avgcor <- function(data, next.month.ret, name) {
 			
 ###############################################################################
 # Compute average correlations
+#' @export 
 ###############################################################################
 compute.avgcor <- function
 (
@@ -81,6 +84,7 @@ compute.avgcor <- function
 
 ###############################################################################
 # Compute Market Cap weighted mean
+#' @export 
 ###############################################################################
 cap.weighted.mean <- function
 (
@@ -95,6 +99,7 @@ cap.weighted.mean <- function
 
 ###############################################################################
 # Compute factor mean for each sector
+#' @export 
 ###############################################################################
 sector.mean <- function
 (
@@ -116,6 +121,7 @@ sector.mean <- function
 # http://en.wikipedia.org/wiki/Quantile
 # rank each month stocks according to E/P factor
 # create quantiles, and record their performance next month
+#' @export 
 ###############################################################################
 compute.quantiles <- function
 (
@@ -167,6 +173,7 @@ compute.quantiles <- function
 
 ###############################################################################
 # Create Average factor
+#' @export 
 ###############################################################################
 add.avg.factor <- function
 (
@@ -183,6 +190,7 @@ add.avg.factor <- function
 	
 ###############################################################################
 # Convert factor to Z scores, normalize using market capitalization average
+#' @export 
 ###############################################################################
 normalize.mkval <- function
 (
@@ -202,6 +210,7 @@ normalize.mkval <- function
 
 ###############################################################################
 # Convert factor to Z scores, only keep the ranks
+#' @export 
 ###############################################################################
 normal.transform <- function(data) 
 {	
@@ -226,6 +235,7 @@ normalize.normal <- function
 
 ###############################################################################
 # Plot Quantiles
+#' @export 
 ###############################################################################
 plot.quantiles <- function
 (
@@ -242,6 +252,7 @@ plot.quantiles <- function
 
 ###############################################################################
 # Plot Backtest Quantiles and spread (Q5-Q1)
+#' @export 
 ###############################################################################
 plot.bt.quantiles <- function
 (
@@ -289,6 +300,7 @@ plot.bt.quantiles <- function
 
 ###############################################################################
 # Plot Factors details
+#' @export 
 ###############################################################################
 plot.factors <- function
 (

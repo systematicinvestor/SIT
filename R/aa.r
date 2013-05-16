@@ -27,6 +27,7 @@
 #  all further as inequality constraints
 ###############################################################################
 # new.constraints - create new constraints structure
+#' @export 
 ###############################################################################
 new.constraints <- function
 (
@@ -64,6 +65,7 @@ new.constraints <- function
 
 ###############################################################################
 # add.constraints - add to existing constraints structure
+#' @export 
 ###############################################################################
 add.constraints <- function
 (
@@ -100,6 +102,7 @@ add.constraints <- function
 
 ###############################################################################
 # add.variables - add to existing constraints structure
+#' @export 
 ###############################################################################
 add.variables <- function
 (
@@ -127,6 +130,7 @@ add.variables <- function
 
 ###############################################################################
 # delete.constraints - remove specified constraints from existing constraints structure
+#' @export 
 ###############################################################################
 delete.constraints <- function
 (
@@ -140,6 +144,7 @@ delete.constraints <- function
 	return( constraints )				
 }
 
+#' @export 
 type.constraints <- function(constraints)
 {
 	c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq))
@@ -155,6 +160,7 @@ type.constraints <- function(constraints)
 
 ###############################################################################
 # General interface to Finding portfolio that Minimizes Given Risk Measure
+#' @export 
 ###############################################################################
 min.portfolio <- function
 (
@@ -167,6 +173,7 @@ min.portfolio <- function
 	optimize.portfolio(ia, constraints, add.constraint.fn, min.risk.fn)
 }
 
+#' @export 
 optimize.portfolio <- function
 (
 	ia,					# input assumptions
@@ -239,6 +246,7 @@ optimize.portfolio <- function
 #    and netlib-source is suitable.                                         
 # 5. The free use of donlp2 and parts of it is restricted for research purposes                                                               
 #    commercial uses require permission and licensing from P. Spellucci.    
+#' @export 
 ###############################################################################
 optimize.portfolio.nlp <- function
 (
@@ -328,6 +336,7 @@ optimize.portfolio.nlp <- function
 #  w
 #  such that
 #  - [ SUM <over i> r.ij * x.i ] < w, for each j = 1,...,T 
+#' @export 
 ###############################################################################
 add.constraint.maxloss <- function
 (
@@ -355,6 +364,7 @@ add.constraint.maxloss <- function
 	return( constraints )	
 }
 
+#' @export 
 portfolio.maxloss <- function
 (
 	weight,		# weight
@@ -367,6 +377,7 @@ portfolio.maxloss <- function
 	return( -apply(portfolio.returns, 1, min) )
 }	
 
+#' @export 
 min.maxloss.portfolio <- function
 (
 	ia,				# input assumptions
@@ -399,6 +410,7 @@ min.maxloss.portfolio <- function
 #  such that
 #  [ SUM <over i> r.ij * x.i ] - 1/T * [ SUM <over j> [ SUM <over i> r.ij * x.i ] ] = u+.j - u-.j , for each j = 1,...,T 
 #  u+.j, u-.j >= 0, for each j = 1,...,T 
+#' @export 
 ###############################################################################
 add.constraint.mad <- function
 (
@@ -427,6 +439,7 @@ add.constraint.mad <- function
 	return( constraints )	
 }
 
+#' @export 
 portfolio.mad <- function
 (
 	weight,		# weight
@@ -439,6 +452,7 @@ portfolio.mad <- function
 	return( apply(portfolio.returns, 1, function(x) mean(abs(x - mean(x))) ) )
 }	
 
+#' @export 
 min.mad.portfolio <- function
 (
 	ia,				# input assumptions
@@ -469,6 +483,7 @@ min.mad.portfolio <- function
 #  E + 1/(1-a) * 1/T * [ SUM <over j> w.j ]
 #  -E - [ SUM <over i> r.ij * x.i ] < w.j, for each j = 1,...,T 
 #  w.j >= 0, for each j = 1,...,T 
+#' @export 
 ###############################################################################
 add.constraint.cvar <- function
 (
@@ -500,6 +515,7 @@ add.constraint.cvar <- function
 }
 
 # average of portfolio returns that are below portfolio's VaR
+#' @export 
 portfolio.cvar <- function
 (
 	weight,		# weight
@@ -513,6 +529,7 @@ portfolio.cvar <- function
 	return( apply(portfolio.returns, 1, function(x) -compute.cvar(x, 1-alpha) ) )
 }	
 
+#' @export 
 min.cvar.portfolio <- function
 (
 	ia,				# input assumptions
@@ -524,6 +541,7 @@ min.cvar.portfolio <- function
 
 ###############################################################################
 # portfolio.var
+#' @export 
 ###############################################################################
 portfolio.var <- function
 (
@@ -569,6 +587,7 @@ portfolio.var <- function
 #  [ SUM <over i> [ SUM <over j> r.ij ] * x.i ] < u.j, for each j = 1,...,T 
 #  u.j-1 < u.j, for each j = 1,...,T - portfolio high water mark
 #  w.j >= 0, for each j = 1,...,T 
+#' @export 
 ###############################################################################
 add.constraint.cdar <- function
 (
@@ -612,6 +631,7 @@ add.constraint.cdar <- function
 	return( constraints )	
 }
 
+#' @export 
 portfolio.cdar <- function
 (
 	weight,		# weight
@@ -633,6 +653,7 @@ portfolio.cdar <- function
 			
 }	
 
+#' @export 
 min.cdar.portfolio <- function
 (
 	ia,				# input assumptions
@@ -644,6 +665,7 @@ min.cdar.portfolio <- function
 
 ###############################################################################
 # Compute CDaR based on data
+#' @export 
 ###############################################################################
 portfolio.cdar.real <- function
 (
@@ -670,6 +692,7 @@ portfolio.cdar.real <- function
 
 ###############################################################################
 # Compute Portfolio Drawdowns
+#' @export 
 ###############################################################################
 compute.drawdowns <- function( portfolio.equity, make.plot = FALSE )	
 {
@@ -723,6 +746,7 @@ compute.drawdowns <- function( portfolio.equity, make.plot = FALSE )
 #    and netlib-source is suitable.                                         
 # 5. The free use of donlp2 and parts of it is restricted for research purposes                                                               
 #    commercial uses require permission and licensing from P. Spellucci.    
+#' @export 
 ###############################################################################
 min.avgcor.portfolio <- function
 (
@@ -745,6 +769,7 @@ min.avgcor.portfolio <- function
 	return( x )
 }
 
+#' @export 
 portfolio.avgcor <- function
 (
 	weight,		# weight
@@ -765,6 +790,7 @@ portfolio.avgcor <- function
 ###############################################################################
 # Use Correlation instead of Variance in Find Minimum Risk Portfolio
 # (i.e. assume all assets have same risk = 1)
+#' @export 
 ###############################################################################
 min.cor.insteadof.cov.portfolio <- function
 (
@@ -783,6 +809,7 @@ min.cor.insteadof.cov.portfolio <- function
 
 ###############################################################################
 # portfolio.avgcor - average correlation
+#' @export 
 ###############################################################################
 portfolio.avgcor.real <- function
 (
@@ -820,6 +847,7 @@ portfolio.avgcor.real <- function
 #  such that
 #  - [ SUM <over i> (r.ij - r.i) * x.i ] <= z.j , for each j = 1,...,T 
 #  z.j >= 0, for each j = 1,...,T 
+#' @export 
 ###############################################################################
 add.constraint.mad.downside <- function
 (
@@ -855,6 +883,7 @@ add.constraint.mad.downside <- function
 	return( constraints )	
 }
 
+#' @export 
 portfolio.mad.downside <- function
 (
 	weight,		# weight
@@ -872,6 +901,7 @@ portfolio.mad.downside <- function
 	}
 }	
 
+#' @export 
 min.mad.downside.portfolio <- function
 (
 	ia,				# input assumptions
@@ -897,6 +927,7 @@ min.mad.downside.portfolio <- function
 #
 # Same logic as add.constraint.mad.downside, but minimize (z.j)^2
 # use quadratic solver
+#' @export 
 ###############################################################################
 portfolio.risk.downside <- function
 (
@@ -915,6 +946,7 @@ portfolio.risk.downside <- function
 	}
 }	
 
+#' @export 
 min.risk.downside.portfolio <- function
 (
 	ia,				# input assumptions
@@ -977,6 +1009,7 @@ min.risk.downside.portfolio <- function
 #
 # The Generation of Mean Gini Efficient Sets by J. Okunev (1991)
 # Can be made more efficient by solving for dual
+#' @export 
 ###############################################################################
 add.constraint.gini <- function
 (
@@ -1020,6 +1053,7 @@ add.constraint.gini <- function
 	return( constraints )	
 }
 
+#' @export 
 min.gini.portfolio <- function
 (
 	ia,				# input assumptions
@@ -1031,6 +1065,7 @@ min.gini.portfolio <- function
 }
 
 
+#' @export 
 portfolio.gini.coefficient <- function
 (
 	weight,		# weight
@@ -1081,6 +1116,7 @@ portfolio.gini.coefficient <- function
 ###############################################################################
 # maximize     C x
 # subject to   A x <= B
+#' @export 
 ###############################################################################
 max.return.portfolio <- function
 (
@@ -1108,6 +1144,7 @@ max.return.portfolio <- function
 
 ###############################################################################
 # portfolio.return - weight * expected.return
+#' @export 
 ###############################################################################
 portfolio.return <- function
 (
@@ -1124,6 +1161,7 @@ portfolio.return <- function
 
 ###############################################################################
 # portfolio.geometric.return
+#' @export 
 ###############################################################################
 portfolio.geometric.return <- function
 (
@@ -1140,6 +1178,7 @@ portfolio.geometric.return <- function
 
 ###############################################################################
 # Find Maximum Geometric Return Portfolio
+#' @export 
 ###############################################################################
 max.geometric.return.portfolio <- function
 (
@@ -1173,6 +1212,7 @@ max.geometric.return.portfolio <- function
 ###############################################################################
 # portfolio.unrebalanced.return
 # http://www.effisols.com/mvoplus/sample1.htm
+#' @export 
 ###############################################################################
 portfolio.unrebalanced.return <- function
 (
@@ -1201,12 +1241,14 @@ portfolio.unrebalanced.return <- function
 # Functions to convert between Arithmetic and Geometric means
 ###############################################################################
 # page 8, DIVERSIFICATION, REBALANCING, AND THE GEOMETRIC MEAN FRONTIER by W. Bernstein and D. Wilkinson (1997)
+#' @export 
 ###############################################################################
 geom2aritm <- function(G, V, a, b) 
 { 
 	(2*G + a*V^2) / (1 - b*G + sqrt((1+b*G)^2 + 2*a*b*V^2)) 
 }
 
+#' @export 
 aritm2geom <- function(R, V, a, b) 
 { 
 	R - a*V^2 / (2*(1 + b*R)) 
@@ -1214,12 +1256,14 @@ aritm2geom <- function(R, V, a, b)
 
 ###############################################################################
 # page 14, A4, On the Relationship between Arithmetic and Geometric Returns by D. Mindlin
+#' @export 
 ###############################################################################
 geom2aritm4 <- function(G, V) 
 { 
 	(1+G)*sqrt(1/2 + 1/2*sqrt(1 + 4*V^2/(1+G)^2)) - 1 
 }
 
+#' @export 
 aritm2geom4 <- function(R, V) 
 { 
 	(1+R)/(sqrt(1 + V^2/(1+R)^2)) - 1 
@@ -1238,6 +1282,7 @@ aritm2geom4 <- function(R, V)
 ###############################################################################
 # solve.QP function from quadprog library
 # min(-d^T w.i + 1/2 w.i^T D w.i) constraints A^T w.i >= b_0
+#' @export 
 ###############################################################################
 min.risk.portfolio <- function
 (
@@ -1268,6 +1313,7 @@ min.risk.portfolio <- function
 
 ###############################################################################
 # portfolio.risk - square root of portfolio volatility
+#' @export 
 ###############################################################################
 portfolio.risk <- function
 (
@@ -1303,6 +1349,7 @@ portfolio.risk <- function
 #
 # Matlab code for Equal Risk Contribution Portfolio by Farid Moussaoui
 # http://mfquant.net/erc_portfolio.html
+#' @export 
 ###############################################################################
 find.erc.portfolio <- function
 (
@@ -1322,7 +1369,8 @@ find.erc.portfolio <- function
 	
 	return( x )
 }	
-		
+	
+#' @export 	
 find.erc.portfolio.simple <- function
 (
 	ia,				# input assumptions
@@ -1351,38 +1399,7 @@ find.erc.portfolio.simple <- function
 	return(x$par)
 }	
 
-find.erc.portfolio.simple1 <- function
-(
-	ia,				# input assumptions
-	constraints		# constraints
-)
-{
-	cov = ia$cov[1:ia$n, 1:ia$n]
-	
-	# obj
-	fn <- function(x){
-		# sum(x) = 1
-		if (sum(x) == 0) x = x + 1e-2
-		x  = x / sum(x)
-	
-		risk.contribution = (x * (cov %*% x))
-		var(as.double(risk.contribution))
-	}
-		
-
-	x0 = 1/sqrt(diag(cov))
-		x0 = x0 / sum(x0)
-		
-	# http://www.ucl.ac.uk/~uctpjyy/nloptr.html
-	load.packages('nloptr', 'http://R-Forge.R-project.org')
 			
-	x = nloptr( x0=x0,eval_f=fn,lb = constraints$lb,ub = constraints$ub,
-		opts = list("algorithm"="NLOPT_LN_BOBYQA","xtol_rel"=1.0e-10))
-		
-	x$solution = x$solution / sum(x$solution)
-	return(x$solution)
-}	
-
 
 find.erc.portfolio.test <- function() {
 	#--------------------------------------------------------------------------
@@ -1443,7 +1460,7 @@ find.erc.portfolio.test <- function() {
 	#--------------------------------------------------------------------------
 	# Construct ERC Equal-Risk-Contribution Portfolio	
 	#--------------------------------------------------------------------------
-	temp = find.erc.portfolio.simple1(ia, constraints)
+	temp = equal.risk.contribution.portfolio(ia, constraints)
 		temp = temp / sum(temp)
 	rc.temp = portfolio.risk.contribution(temp, ia)		
 		rc.temp = abs(as.vector(rc.temp))
@@ -1459,6 +1476,7 @@ find.erc.portfolio.test <- function() {
 # portfolio.risk.contribution - (w * V %*% w) / (w %*% V %*% w)
 # Unproxying weight constraints by Pat Burns
 # http://www.portfolioprobe.com/2011/04/13/unproxying-weight-constraints/
+#' @export 
 ###############################################################################
 portfolio.risk.contribution <- function
 (
@@ -1489,6 +1507,7 @@ portfolio.risk.contribution <- function
 
 ###############################################################################
 # Create efficient frontier
+#' @export 
 ###############################################################################
 portopt <- function
 (
@@ -1625,6 +1644,7 @@ portopt <- function
 
 ###############################################################################
 # Visualize input assumptions
+#' @export 
 ###############################################################################
 plot.ia <- function
 (
@@ -1650,6 +1670,7 @@ plot.ia <- function
 
 ###############################################################################
 # Plot efficient fontier(s) and transitopn map
+#' @export 
 ###############################################################################
 plot.ef <- function
 (
@@ -1716,11 +1737,13 @@ plot.ef <- function
 
 ###############################################################################
 # Plot Transition Map
+#' @export 
 ###############################################################################
 plot.transitopn.map <- function(x,y,xlab = 'Risk',name = '',type=c('s','l')) {
 	plot.transition.map(x,y,xlab,name,type)
 }
 
+#' @export 
 plot.transition.map <- function
 (
 	y,				# weights
@@ -1754,6 +1777,7 @@ plot.transition.map <- function
 # On the property of equally-weighted risk contributions portfolios by S. Maillard, 
 # T. Roncalli and J. Teiletche (2008), page 22
 # http://www.thierry-roncalli.com/download/erc.pdf
+#' @export 
 ###############################################################################
 portfolio.turnover <- function
 (
@@ -1769,6 +1793,7 @@ portfolio.turnover <- function
 
 # Herfindahl Index of portfolio weights
 # http://en.wikipedia.org/wiki/Herfindahl_index
+#' @export 
 portfolio.concentration.herfindahl.index <- function
 (
 	weight		# weight
@@ -1792,6 +1817,7 @@ portfolio.concentration.herfindahl.index <- function
 # Gini is designed to work with positive numbers!!!
 # http://en.wikipedia.org/wiki/Gini_coefficient
 # http://en.wikipedia.org/wiki/Mean_difference
+#' @export 
 portfolio.concentration.gini.coefficient <- function
 (
 	weight		# weight

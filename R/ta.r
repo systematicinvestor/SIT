@@ -26,6 +26,10 @@
 # Backfill NA's with last non NA value, similar to na.locf(y,na.rm=FALSE)	
 # http://r.789695.n4.nabble.com/Vector-replace-0-elements-without-using-a-loop-td2
 ############################################################################### 
+
+###############################################################################
+#' @export 
+###############################################################################
 ifna.prev <- function(y)
 { 	
 	y1 = !is.na(y)
@@ -37,6 +41,9 @@ ifna.prev <- function(y)
 }
 
 # index of non NAs filled from left to right
+###############################################################################
+#' @export 
+###############################################################################
 ifna.prevx <- function(y) { 	
 	y1 = !is.na(y)
 	
@@ -47,6 +54,9 @@ ifna.prevx <- function(y) {
 }
 
 # index of non NAs filled from right to left
+###############################################################################
+#' @export 
+###############################################################################
 ifna.prevx.rev <- function(y) {
 	y1 = !is.na(y)
 	
@@ -69,17 +79,28 @@ ifna.prevx.test <- function() {
 # To find out when ARRAY1 crosses below ARRAY2, use the formula cross(ARRAY2, ARRAY1)
 # http://www.amibroker.com/guide/afl/afl_view.php?id=34
 ############################################################################### 
+###############################################################################
+#' @export 
+###############################################################################
 cross <- function( array1, array2 ) {
 	array1 > array2 & iif(len(array1) > 1, mlag(array1), array1) < iif(len(array2) > 1, mlag(array2), array2)
 }
 
+###############################################################################
+#' @export 
+###############################################################################
 cross.up <- function( array1, array2 ) { cross( array1, array2 ) }
+
+###############################################################################
+#' @export 
+###############################################################################
 cross.dn <- function( array1, array2 ) { cross( array2, array1 ) }
     
 
 
 ###############################################################################
 # Percentile Rank over given window
+#' @export 
 ############################################################################### 
 percent.rank <- function
 (
@@ -105,6 +126,7 @@ percent.rank <- function
 
 ###############################################################################
 # Percentile Rank over given window, multiple arrays version
+#' @export 
 ############################################################################### 
 percent.rankM <- function
 (
@@ -138,6 +160,7 @@ percent.rankM <- function
 ###############################################################################
 # DV2 indicator
 # http://blog.fosstrading.com/2009/07/david-varadis-rsi2-alternative.html
+#' @export 
 ############################################################################### 
 DV <- function
 (
@@ -165,6 +188,7 @@ DV <- function
 # http://marketsci.wordpress.com/2010/07/27/css-analytics%E2%80%99-dvi-indicator-revealed/
 # http://dvindicators.cssanalytics.com/community/?vasthtmlaction=viewtopic&t=47.0
 # http://quantingdutchman.wordpress.com/2010/07/28/dvi-indicator-for-amibroker/
+#' @export 
 ############################################################################### 
 DVI <- function
 (
@@ -192,6 +216,7 @@ DVI <- function
 ###############################################################################
 # TSI indicator
 # http://engineering-returns.com/tsi/
+#' @export 
 ############################################################################### 
 TSI <- function
 (
@@ -212,6 +237,7 @@ TSI <- function
 # Ulcer Index: alternative to Standard Devation
 # http://en.wikipedia.org/wiki/Ulcer_index
 # http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ulcer_index
+#' @export 
 ############################################################################### 
 ulcer.index <- function
 (
@@ -228,6 +254,7 @@ ulcer.index <- function
 # cumulative W% (up periods/total periods) x W/L ratio (sum of wins/sum of losses)            
 # http://cssanalytics.wordpress.com/2010/06/02/rolling-ev-ratio-a-trend-indicator-or-performance-measurement-statistic/    
 # http://davesbrain.blogs.com/mindmoneymarkets/2010/07/will-mean-reversion-bounce-back.html
+#' @export 
 ###############################################################################
 ev.ratio <- function
 (
@@ -254,6 +281,7 @@ ev.ratio <- function
 ############################################################################### 
 # Select top N for each period
 # http://www.etfscreen.com/sectorstrategy.php
+#' @export 
 ############################################################################### 
 ntop <- function
 (
@@ -350,6 +378,7 @@ toc(12)
 ############################################################################### 
 # Select top N for each period, and keep them till they drop below keepn rank
 # http://www.etfscreen.com/sectorstrategy.php
+#' @export 
 ############################################################################### 
 ntop.keep <- function
 (
