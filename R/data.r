@@ -19,6 +19,75 @@
 # or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
+
+find.tokens <- function
+(
+	txt, 		# source text
+	marker,		# key-phrase(s) to find
+	pos = 1,	# position to start searching at
+	pos.start = T
+)
+{
+	# find location of data
+	marker = spl(marker)
+		
+	for(i in 1:len(marker)) {
+		if( pos < 2 )
+			pos1 = regexpr(marker[i], txt) 
+		else 		
+			pos1 = regexpr(marker[i], substr(txt, pos, nchar(txt))) 
+
+		if( pos1 < 0 )	
+			return(pos1)
+		else {
+			if( pos < 2 ) pos = pos1
+			else pos = pos1 + pos - 1			
+		}
+		
+		if( !pos.start ) pos = pos + attr(pos1, 'match.length')
+	}
+	
+	return(pos)
+}	
+
+
+extract.token <- function
+(
+	txt, 		# source text
+	smarker,	# start key-phrase(s) to find
+	emarker,	# end key-phrase(s) to find
+	pos = 1		# position to start searching at
+)
+{
+	pos1 = find.tokens(txt, smarker, pos, pos.start = F)
+	if( pos1 < 0 ) return("")
+	pos2 = find.tokens(txt, emarker, pos1, pos.start = T) - 1
+	if( pos2 < 0 ) return("")
+	return(substr(txt,pos1,pos2))	
+}
+
+
+remove.tags <- function
+(
+	temp 		# source text
+)
+{
+	# remove all formating							
+	temp = gsub(pattern = '<.*?>', replacement = '', temp, perl = TRUE) 
+		
+	temp = gsub(pattern = '\r', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '\n', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '\t', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '&nbsp;', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '&amp;', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '&raquo;', replacement = '', temp, perl = TRUE) 		
+	temp = gsub(pattern = '&#37;', replacement = '%', temp, perl = TRUE) 			
+
+	
+	return(temp)
+}
+
+
 ###############################################################################
 # extract.table.from.webpage
 #' @export 
@@ -235,7 +304,9 @@ processTBill.test <- function()
 ###############################################################################
 # ... parameters for read.xls function
 # i.e. CRB = get.CRB(perl = 'c:/perl/bin/perl.exe')
-#' @export 
+#
+# This url is not working anymore, for updated example please see
+#   bt.extend.DBC.update.test in bt.test.r 
 ###############################################################################
 get.CRB <- function(...)
 {
@@ -243,8 +314,7 @@ get.CRB <- function(...)
 	
 	#http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Excess&StartDate=19940103&EndDate=20111202
 	url = paste('http://www.jefferies.com/html/ProductsServices/SalesTrading/Commodities/scripts/genExcel.pl?Index=RJCRB_Total&StartDate=19940101&EndDate=', format(Sys.Date(), '%Y%m%d'), sep='')	
-  	temp = read.xls(url, ...)
-  	
+  		temp = read.xls(url, ...)
   	temp = as.matrix(temp[-c(1:7),])
   	
 	out = repmat(as.double(temp[,2]), 1, 6)

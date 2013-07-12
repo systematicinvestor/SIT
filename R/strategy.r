@@ -132,7 +132,7 @@ barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name'
 # Summary snapshoot of strategy perfroamnce
 #' @export 
 ###############################################################################
-strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
+strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, data = NULL) {
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 					
@@ -141,10 +141,17 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 		mtext('Cumulative Performance', side = 2, line = 1)
 		
 	out = plotbt.strategy.sidebyside(models, return.table=T)
-
+	
 	if(one.page) return()
-		
-	performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
+	
+	# Portfolio Turnover
+	if(!is.null(data)) {
+		y = 100 * sapply(models, compute.turnover, data)
+			out = rbind(y, out)
+			rownames(out)[1] = 'Turnover'		
+		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD,Volatility,Turnover', c(T,T,T,T,F,F))
+	} else		
+		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
 
 	# Plot transition maps
 	layout(1:len(models))
@@ -152,6 +159,12 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL) {
 		plotbt.transition.map(models[[m]]$weight, name=m)
 			legend('topright', legend = m, bty = 'n')
 	}
+	
+	# Plot monthly retunrs tables
+	layout(1:4)
+	for(n in names(models))
+		plotbt.monthly.table(models[[n]]$equity, smain=n)			
+	
 }
 
 
@@ -2007,8 +2020,12 @@ create.strategies <- function
 	data,	# historical prices
 	leverage = 1,	
 	min.weight = NA,
+	round.weight = NA,
 	silent = F,	
 	log = log.fn(),	
+	prefix = '',
+	suffix = '',
+	clean.signal = F,	# flag to remove excessive signal
 	
 	...		
 ) 
@@ -2019,6 +2036,12 @@ create.strategies <- function
 		for(i in 1:len(obj$weights)) obj$weights[[i]] = leverage[i] * obj$weights[[i]]		
 	}
 	if(!is.na(min.weight)) for(i in names(obj$weights)) obj$weights[[i]] = bt.apply.min.weight(obj$weights[[i]], min.weight)
+	if(!is.na(round.weight)) for(i in names(obj$weights)) {
+		# round a few times to get more consisitent results
+		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
+		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
+		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
+	}
 
 	#*****************************************************************
 	# Create strategies
@@ -2027,15 +2050,16 @@ create.strategies <- function
 	n = len(names(obj$weights))
 	for(j in 1:n) {
 		i = names(obj$weights)[j]
+		i = paste(prefix, i, suffix, sep='')
 	
 if(!silent) log(j, percent = j / n)
 	
 		data$weight[] = NA
-			data$weight[obj$period.ends,] = obj$weights[[i]]	
-		models[[i]] = bt.run.share(data, clean.signal = F, ...)
+			data$weight[obj$period.ends,] = obj$weights[[j]]	
+		models[[i]] = bt.run.share(data, clean.signal = clean.signal, ...)
 		
-#		models[[i]]$risk.contribution = obj$risk.contributions[[i]]
-		models[[i]]$period.weight = obj$weights[[i]]
+#		models[[i]]$risk.contribution = obj$risk.contributions[[j]]
+		models[[i]]$period.weight = obj$weights[[j]]
 	}
 	obj$models = models
 	return(obj)			

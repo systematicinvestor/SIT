@@ -91,6 +91,7 @@ find.names <- function(find.names, all.names)
 			iif(len(loc) > 0, loc, NA)
 		}))
 }
+
 ###############################################################################
 # Prepare backtest data
 #' @export 
@@ -302,7 +303,6 @@ bt.prep.trim <- function
 	return(data.copy)
 }
  
-
 ###############################################################################
 # Helper function to backtest for type='share'
 #' @export 
@@ -327,6 +327,11 @@ bt.run.share <- function
 	# weights account for missing prices i.e. no price means no allocation
 	prices[] = bt.apply.matrix(coredata(prices), ifna.prev)	
 
+	
+	weight = mlag(weight, do.lag - 1)
+	do.lag = 1
+
+		
 	if(clean.signal) {
 		weight[] = (capital / prices) * bt.exrem(weight)
 	} else {
@@ -463,7 +468,6 @@ bt.run <- function
 	    
 	return(bt)
 }
-
 
 ###############################################################################
 # Backtest summary
@@ -626,7 +630,6 @@ compute.max.deviation <- function
 	max(abs(weight - repmat(target.allocation, nrow(weight), 1)))
 }
 
-
 ###############################################################################
 # Backtest Trade summary
 #' @export 
@@ -745,7 +748,6 @@ bt.trade.summary.helper <- function(trades)
 	return(as.matrix(unlist(out)))
 }		
 
-
 ###############################################################################
 # Apply given function to bt enviroment
 #' @export 
@@ -797,9 +799,6 @@ bt.apply.matrix <- function
 	return(out)
 }
 
-
-
-
 ###############################################################################
 # Remove excessive signal
 # http://www.amibroker.com/guide/afl/exrem.html
@@ -822,7 +821,6 @@ bt.exrem <- function(weight)
 {
     bt.apply.matrix(weight, exrem)
 }
-
 
 ###############################################################################
 # Timed Exit: exit trade after nlen bars
@@ -859,7 +857,6 @@ bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
 	}
 }
 
-
 ###############################################################################
 # Enforce minimum holding period before taking another signal
 #' @export 
@@ -879,8 +876,6 @@ bt.min.holding.period <- function(x, nlen) {
 		}
 	return(x)
 }
-
-
 
 ###############################################################################
 # Backtest Test function
@@ -967,7 +962,6 @@ dev.off()
 	temp = bt.run(data, type='share', capital=capital)
 	
 }
-
 
 ###############################################################################
 # Analytics Functions
@@ -1084,19 +1078,26 @@ compute.cvar <- function(x, probs=0.05)
 }
 
 #' @export 
-compute.stats <- function(data, fns) 
+compute.stats <- function(data, fns, do.na.omit = T) 
 {
 	out = matrix(double(), len(fns), len(data))
 		colnames(out) = names(data)
 		rownames(out) = names(fns)
+if( do.na.omit )
 	for(c in 1:len(data)) {
 		for(r in 1:len(fns)) {
-			out[r,c] = match.fun(fns[[r]])( na.omit(data[[c]]) )
+			out[r,c] = match.fun(fns[[r]])( fast.na.omit(data[[c]]) )
 		}
 	}
+else
+	for(c in 1:len(data)) {
+		for(r in 1:len(fns)) {
+			out[r,c] = match.fun(fns[[r]])( data[[c]] )
+		}
+	}
+
 	return(out)
 }
-
 
 ###############################################################################
 # Example to illustrate a simeple backtest
@@ -1155,7 +1156,6 @@ bt.simple.test <- function()
 	chartSeries(buy.hold.equity, TA=c(addTA(sma.cross.equity, on=1, col='red')),	
 	theme ='white', yrange = range(buy.hold.equity, sma.cross.equity) )	
 }
-
 
 ###############################################################################
 #' Remove small weights
@@ -1226,6 +1226,61 @@ test.bt.apply.min.weight <- function()
 	print(bt.apply.min.weight(mm, 0.1))
 	print(bt.apply.min.weight(mm, 0.2))
 }
+
+###############################################################################
+#' Round weights
+#' 
+#' Similar idea to bt.apply.min.weight
+#' 
+#' @export 
+###############################################################################
+bt.apply.round.weight <- function
+(
+	weight, 
+	long.round.weight = 5/100, 
+	short.round.weight = long.round.weight
+)
+{
+	# make sure weight is a matrix
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))
+    
+	# in each row, compute total pos/neg weights
+	pos = apply(weight, 1, function(row) sum(row[row > 0]))
+	neg = rowSums(weight) - pos
+    
+	# setup
+	pos.mat = iif(weight >= 0, round(weight / long.round.weight) * long.round.weight, 0)
+	neg.mat = iif(weight <= 0, round(weight / short.round.weight) * short.round.weight, 0)
+    
+	# re-scale
+	pos.mat = pos.mat * ifna(pos / rowSums(pos.mat), 1)
+	neg.mat = neg.mat * ifna(neg / rowSums(neg.mat), 1)
+    
+	return(pos.mat + neg.mat)
+} 
+
+###############################################################################
+#' Print starting dates for time series
+#' 
+#' @export 
+###############################################################################
+bt.start.dates <- function
+(
+	b 					# enviroment with symbols time series
+) 
+{
+	temp = lapply(b, function(x) index(x[1]) )
+		temp$dates = NULL
+		temp$prices = NULL
+		temp$weight = NULL
+		temp$execution.price = NULL
+		temp$symbolnames = NULL
+	temp = temp[order( sapply(temp, function(x) x) )]
+	
+	t(t( sapply(temp, function(x) as.character(x)) ))
+}
+	
+
 
 
 

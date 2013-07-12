@@ -5639,6 +5639,40 @@ png(filename = 'plot3.png', width = 1200, height = 800, units = 'px', pointsize 
 dev.off()	
 }
 
+
+bt.extend.DBC.update.test <- function() 
+{
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************    
+	load.packages('quantmod')		
+	tickers = spl('GSG,DBC')
+    data = new.env()
+	    getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)    
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+     
+    # "TRJ_CRB" file was downloaded from the http://www.jefferies.com/Commodities/2cc/389
+    # for "TRJ/CRB Index-Total Return"
+	temp = extract.table.from.webpage( join(readLines("TRJ_CRB")), 'EODValue' )
+		temp = join( apply(temp, 1, join, ','), '\n' )
+	data$CRB_1 = make.stock.xts( read.xts(temp, format='%m/%d/%y' ) )
+	
+    # "prfmdata.csv" file was downloaded from the http://www.crbequityindexes.com/indexdata-form.php
+    # for "TR/J CRB Global Commodity Equity Index", "Total Return", "All Dates"
+    data$CRB_2 = make.stock.xts( read.xts("prfmdata.csv", format='%m/%d/%Y' ) )
+        	    
+	bt.prep(data, align='remove.na')
+	    
+    #*****************************************************************
+    # Compare
+    #******************************************************************    
+png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	
+	plota.matplot(scale.one(data$prices))
+	
+dev.off()
+}
+
 ###############################################################################
 # Extending Gold time series
 # http://wikiposit.org/w?filter=Finance/Commodities/
@@ -6290,9 +6324,30 @@ bt.mca.speed.test <- function()
 	summaryRprof()
 
 	
-				
 	#ia$cov = make.positive.definite.fast(ia$cov)
 	#ia$correlation = make.positive.definite.fast(ia$correlation)
+	
+	#*****************************************************************
+	# Template for testing speed finding bottle necks
+	#*****************************************************************					
+	# time it
+	tic(12)  	
+	for(icount in 1:10) {
+  		
+  		# inset your code here and adjust number of evalutaions
+  		
+	}  		  		
+	toc(12) 
+	
+	# determine bottle necks
+	Rprof()
+	for(icount in 1:10) {
+  		
+  		# inset your code here and adjust number of evalutaions
+  		
+	}  				
+	Rprof(NULL)
+	summaryRprof()  		
 		
 }	
 

@@ -185,10 +185,19 @@ ifna <- function
 (
 	x,	# check x for NA, NaN, Inf
 	y	# if found replace with y
-) { 	
+) 
+{ 	
 	return(iif(is.na(x) | is.nan(x) | is.infinite(x), y, x))
 }
 
+#' @export 
+fast.na.omit <- function
+(
+	x
+) 
+{
+	x[!is.na(x)]
+}
 
 ###############################################################################
 #' Replace NULL values
@@ -214,8 +223,6 @@ ifnull <- function
 ) { 	
 	return(iif(is.null(x), y, x))
 }
-
-
 
 ###############################################################################
 #' Faster version of rep fucntion
@@ -249,16 +256,15 @@ fast.rep.test.speed <- function() {
 		fast.rep(101,10000)
 	}
 		
-	library(rbenchmark)
-	 benchmark(
-	     test1(), 
-	     test2(),
-	     columns = c("test", "replications", "elapsed", "relative"),
-	     order = "relative",
-	     replications = 10000
-	 )
+	require(rbenchmark)
+	benchmark(
+		test1(), 
+	    test2(),
+	    columns = c("test", "replications", "elapsed", "relative"),
+	    order = "relative",
+	    replications = 10000
+	)
 }	
-
 
 ###############################################################################
 #' Count number of non NA elements
@@ -363,7 +369,6 @@ date.year <- function(dates)
 	return(as.double(format(dates, '%Y')))
 }
 
-
 ###############################################################################
 #' Dates Index Functions
 #'
@@ -396,7 +401,6 @@ date.year.ends <- function(dates)
 {	
 	return( unique(c(which(diff( date.year(dates) ) != 0), len(dates))) )
 }
-
 
 ###############################################################################
 #' Map given time series to monthly
@@ -435,7 +439,6 @@ map2monthly <- function(equity)
 	return( make.xts( ifna.prev(temp), new.dates) )
 }
 
-
 ###############################################################################
 #' Create monthly table
 #'
@@ -470,7 +473,6 @@ create.monthly.table <- function(monthly.data)
 	return(temp)
 }
 		
-
 ###############################################################################
 #' Compute the expiration date of stock options (3rd Friday of the month)
 #'
@@ -501,7 +503,6 @@ third.friday.month <- function(year, month)
 	day = c(20,19,18,17,16,15,21)[1 + day]
 	return(as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1])
 }
-
 
 ###############################################################################
 #' Determine the index of subset of dates in the time series
@@ -539,7 +540,6 @@ dates2index <- function( x, dates = 1:nrow(x) ) {
 	}
 	return(dates.index)
 } 
-
 
 ###############################################################################
 #' Load Packages that are available and install ones that are not available
@@ -579,7 +579,6 @@ load.packages <- function
 	}
 }
 
-
 ###############################################################################
 #' Begin Timing
 #'
@@ -601,7 +600,6 @@ tic <- function
 {
 	assign(paste('saved.time', identifier, sep=''), proc.time()[3], envir = .GlobalEnv)
 }
-
 
 ###############################################################################
 #' End Timing and report elapsed time
@@ -640,12 +638,6 @@ test.tic.toc <- function()
 	}
 	toc(10)
 }
-
-
-
-
-
-
 
 ###############################################################################
 #' Lag matrix or vector
@@ -696,7 +688,6 @@ mlag <- function
 	return(m);
 }
 
-
 ###############################################################################
 #' Replicate and tile a given vector
 #'
@@ -725,7 +716,6 @@ repmat <- function
 	kronecker( matrix(1, n, m), v )
 }
 
-
 ###############################################################################
 #' Repeat Rows
 #'
@@ -750,7 +740,6 @@ rep.row <- function
 	matrix(m, nr=nr, nc=len(m), byrow=T)
 }
 
-
 ###############################################################################
 #' Repeat Columns
 #'
@@ -774,9 +763,6 @@ rep.col <- function
 {
 	matrix(m, nr=len(m), nc=nc, byrow=F)
 }
-
-
-
 
 ###############################################################################
 #' Find location: row, col in the matrix, given index of of observation
@@ -811,7 +797,6 @@ lookup.index <- function
 		list(irow=irow,icol=icol)
 }
 
-
 ###############################################################################
 #' Convert beta (slope of reggression line) to degrees
 #'
@@ -832,7 +817,6 @@ beta.degree <- function(beta)
 { 
 	atan(beta)*360/(2*pi) 
 }
-
 
 ###############################################################################
 # XTS helper functions
@@ -874,7 +858,6 @@ Sys.setenv(TZ = 'GMT')
 ###############################################################################
 XTSFunctions <- function() {}
 
-
 ###############################################################################
 #' Create \code{\link{xts}} object, faster version of \code{\link{xts}} fucntion
 #'
@@ -909,7 +892,6 @@ make.xts <- function
 	return( x )
 }
 
-
 ###############################################################################
 #' Write \code{\link{xts}} object to file
 #'
@@ -941,7 +923,6 @@ write.xts <- function
 	#write.csv(x, row.names = format(index(x)), filename)	
 }
 
-
 ###############################################################################
 #' Read \code{\link{xts}} object from file
 #'
@@ -968,6 +949,30 @@ read.xts <- function
 	...
 )
 {
+	load.packages('data.table')
+	out = fread(filename, stringsAsFactors=F)
+		setnames(out,gsub(' ', '_', trim(colnames(out)))) 
+#		first.column.expr = parse(text = colnames(out)[1])
+		rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-1],collapse=','),')'))
+		
+#	dates = as.POSIXct(match.fun(date.fn)(out[,eval(first.column.expr)]), tz = Sys.getenv('TZ'), ...)
+	dates = as.POSIXct(match.fun(date.fn)(as.matrix(out[,1,with=FALSE])), tz = Sys.getenv('TZ'), ...)		
+		dates.index = order(dates, decreasing = decreasing)
+	out = make.xts(out[dates.index, eval(rest.columns.expr)], dates[dates.index])
+		indexClass(out) = index.class
+	return( out )
+}
+
+# A few other variations to read data
+read.xts.old <- function
+(
+	filename,	# file name
+	date.fn = paste,
+	index.class = 'Date',
+	decreasing = FALSE,
+	...
+)
+{
 	out = read.csv(filename, stringsAsFactors=F)
 	#return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
 	
@@ -982,7 +987,82 @@ read.xts <- function
 # indexClass(fr) = "Date"	
 }
 
+read.xts.yahoo.old <- function
+(
+	filename,	# file name
+	date.fn = paste,
+	index.class = 'Date',
+	decreasing = FALSE,
+	...
+)
+{
+	temp = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)	
+	
+	dates = as.POSIXct(match.fun(date.fn)(temp[[1]]), tz = Sys.getenv('TZ'), ...)	
+		dates.index = order(dates, decreasing = decreasing)
+		
+	out = matrix(double(1),len(dates), 6)
+   		colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
+	out[,1] = temp[[2]] 
+   	out[,2] = temp[[3]]
+   	out[,3] = temp[[4]]
+   	out[,4] = temp[[5]] 
+   	out[,5] = temp[[6]]
+   	out[,6] = temp[[7]]
+		
+   	out = make.xts(out[dates.index,],  dates[dates.index])
+		indexClass(out) = index.class
+	return( out )
+}
 
+read.xts.test <- function() {
+	load.packages('rbenchmark')
+
+	filename = 'c:/stocks/SPY.csv'
+
+	test1 <- function() {
+		out = read.csv(filename, stringsAsFactors=F)
+	}
+	test2 <- function() {
+		out1 = fread(filename, stringsAsFactors=F)
+	}
+	test3 <- function() {
+		out2 = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)
+	}
+   		
+	library(rbenchmark)
+	 benchmark(
+	     test1(), 
+	     test2(),
+	     test3(),
+	     columns = c("test", "replications", "elapsed", "relative"),
+	     order = "relative",
+	     replications = 20
+	 )
+
+
+	test1 <- function() {
+		out = read.xts(filename, format = '%Y-%m-%d')
+	}
+	test2 <- function() {
+		out1 = read.xts.old(filename, format = '%Y-%m-%d')
+	}
+	test3 <- function() {
+		out2 = read.xts.yahoo.old(filename, format = '%Y-%m-%d')
+	}
+		
+	library(rbenchmark)
+	 benchmark(
+	     test1(), 
+	     test2(),
+	     test3(),
+	     columns = c("test", "replications", "elapsed", "relative"),
+	     order = "relative",
+	     replications = 20
+	 )
+	 
+}
+   	
 ###############################################################################
 #' Fast alternative to index() function for \code{\link{xts}} object
 #'
@@ -1013,7 +1093,6 @@ index.xts <- function
 	return(temp)
 }
 
-
 # other variants that are not currently used
 # this function is used in plota for X axis
 index4xts <- function
@@ -1036,7 +1115,6 @@ index2date.time <- function(temp) {
 		as.POSIXct(temp, tz = Sys.getenv('TZ'))
 	}
 }
-
 
 ###############################################################################
 #' File name Functions
@@ -1129,49 +1207,8 @@ getSymbols.sit <- function
 }
 
 
-###############################################################################
-#' Normilize all timeseries to start at one
-#'
-#' @param x \code{\link{xts}} time series 
-#'
-#' @return scaled \code{\link{xts}} time series, so that each timeseries starts at one
-#'
-#' @examples
-#' \dontrun{ 
-#' plota.matplot(scale.one(data$prices))
-#' }
-#' @export 
-############################################################################### 
-# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))	
-scale.one <- function(x) {
-	index = 1:nrow(x)
-	x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
-}
-
-
-###############################################################################
-#' Compute correlations
-#'
-#' @param data matrix with data
-#' @param method method used to compute correlations, please see \code{\link{cor}} for more details
-#'
-#' @return correlation matrix
-#'
-#' @export 
-############################################################################### 
-compute.cor <- function
-(
-	data, 		# matrix with data
-	method = c("pearson", "kendall", "spearman")
-)
-{
-	cor(data, use='complete.obs',method=method[1])
-}
-
-
-#all possible combinations of list elements
+# Aside : all possible combinations of list elements
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
-
 
 
 ###############################################################################
@@ -1198,4 +1235,41 @@ log.fn.msg <- function(msg, log = log.fn()) {
     function(..., percent=NULL) { log(paste(msg, ...), percent=percent) }
 }  
 
-    
+###############################################################################
+#' Working with characters
+#'
+#' http://datadebrief.blogspot.ca/2011/03/ascii-code-table-in-r.html
+#'
+#' char is 8 bits, so to generate 512 bits random string 
+#' rawToChar(as.raw(runif(512/8, 1, 255)))
+#'
+#' @export 
+#' @rdname StringFunctions
+############################################################################### 
+asc <- function(x) { strtoi(charToRaw(x),16L) }
+
+#' @export 
+#' @rdname StringFunctions
+chr <- function(n) { rawToChar(as.raw(n)) }
+
+#' @export 
+#' @rdname StringFunctions
+make.random.string <- function(nbits = 256) { chr( runif(nbits/8, 1, 255) ) }
+
+
+###############################################################################
+#' List function / variables in enviroment
+#'
+#' http://www.mail-archive.com/r-help@stat.math.ethz.ch/msg22679.html
+#'
+#' @export 
+#' @rdname ListEnvFunctions
+############################################################################### 
+ls.f <- function(env=sys.frame(-1))unlist(lapply(ls(env=env),function(x)if(is.function(get(x)))x))
+
+#' @export 
+#' @rdname ListEnvFunctions
+ls.v <- function(env=sys.frame(-1))unlist(lapply(ls(env=env),function(x)if(!is.function(get(x)))x))
+
+
+

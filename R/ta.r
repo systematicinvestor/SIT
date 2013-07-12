@@ -158,8 +158,9 @@ percent.rankM <- function
 
 
 ###############################################################################
-# DV2 indicator
+# DV2 indicator (DVB)
 # http://blog.fosstrading.com/2009/07/david-varadis-rsi2-alternative.html
+# http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
 #' @export 
 ############################################################################### 
 DV <- function
@@ -188,6 +189,7 @@ DV <- function
 # http://marketsci.wordpress.com/2010/07/27/css-analytics%E2%80%99-dvi-indicator-revealed/
 # http://dvindicators.cssanalytics.com/community/?vasthtmlaction=viewtopic&t=47.0
 # http://quantingdutchman.wordpress.com/2010/07/28/dvi-indicator-for-amibroker/
+# http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
 #' @export 
 ############################################################################### 
 DVI <- function
