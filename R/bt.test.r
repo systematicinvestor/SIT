@@ -7808,3 +7808,184 @@ load.hist.stock.data <- function()
     strategy.performance.snapshoot(models, T)
 
 }    
+
+
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Predictive Indicators for Effective Trading Strategies By John Ehlers
+# http://www.stockspotter.com/files/PredictiveIndicators.pdf
+# http://dekalogblog.blogspot.ca/2013/07/my-nn-input-tweak.html
+###############################################################################
+john.ehlers.custom.strategy.plot <- function(
+	data,
+	models,
+	name,
+	main = name,
+	dates = '::',
+	layout = NULL		# flag to idicate if layout is already set	
+) {
+ 	# John Ehlers Stochastic
+    stoch = roofing.stochastic.indicator(data$prices)
+    
+	
+    # highlight logic based on weight
+    weight = models[[name]]$weight[dates]
+    	col = iif(weight > 0, 'green', iif(weight < 0, 'red', 'white'))
+    	plota.control$col.x.highlight = col.add.alpha(col, 100)
+    	highlight = T
+   
+	if(is.null(layout)) layout(1:2)
+    	 
+    plota(data$prices[dates], type='l', x.highlight = highlight, plotX = F, main=main)
+   	plota.legend('Long,Short,Not Invested','green,red,white')
+    	
+	plota(stoch[dates], type='l', x.highlight = highlight, plotX = F, ylim=c(0,1))        	
+       	col = col.add.alpha('red', 100)
+        abline(h = 0.2, col=col, lwd=3)
+        abline(h = 0.8, col=col, lwd=3)
+    plota.legend('John Ehlers Stochastic')        
+}
+
+john.ehlers.filter.test <- function() {
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************   
+    load.packages('quantmod')  
+    
+    tickers = spl('DG')
+    data = new.env()
+    getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)   
+        for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data)
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices  
+   
+    models = list()
+        
+    # John Ehlers Stochastic
+    stoch = roofing.stochastic.indicator(prices)
+    
+	# Day Stochastic
+	stoch14 = bt.apply(data, function(x) stoch(HLC(x),14)[,'slowD'])
+		
+    #*****************************************************************
+    # Create plots
+    #******************************************************************           
+    dates = '2011:10::2012:9'
+           
+jpeg(filename = 'plot1.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    
+    layout(1:3)
+    
+    plota(prices[dates], type='l', plotX=F)
+    plota.legend('DG')
+    
+    plota(stoch[dates], type='l', plotX=F)
+        abline(h = 0.2, col='red')
+        abline(h = 0.8, col='red')
+    plota.legend('John Ehlers Stochastic')
+
+    plota(stoch14[dates], type='l')
+        abline(h = 0.2, col='red')
+        abline(h = 0.8, col='red')
+    plota.legend('Stochastic')
+dev.off()	
+	                
+	#*****************************************************************
+	# Code Strategies
+	#*****************************************************************
+	# Figure 6: Conventional Wisdom is to Buy When the Indicator Crosses Above 20% and 
+	# To Sell Short when the Indicator Crosses below 80%
+    data$weight[] = NA
+        data$weight[] = iif(cross.up(stoch, 0.2), 1, iif(cross.dn(stoch, 0.8), -1, NA))
+    models$post = bt.run.share(data, clean.signal=T, trade.summary=T)
+
+    data$weight[] = NA
+        data$weight[] = iif(cross.up(stoch, 0.2), 1, iif(cross.dn(stoch, 0.8), 0, NA))
+    models$post.L = bt.run.share(data, clean.signal=T, trade.summary=T)
+    
+    data$weight[] = NA
+        data$weight[] = iif(cross.up(stoch, 0.2), 0, iif(cross.dn(stoch, 0.8), -1, NA))
+    models$post.S = bt.run.share(data, clean.signal=T, trade.summary=T)
+        
+	# Figure 8: Predictive Indicators Enable You to Buy When the Indicator Crosses Below 20% and 
+	# To Sell Short when the Indicator Crosses Above 80%
+    data$weight[] = NA
+        data$weight[] = iif(cross.dn(stoch, 0.2), 1, iif(cross.up(stoch, 0.8), -1, NA))
+    models$pre = bt.run.share(data, clean.signal=T, trade.summary=T)
+
+    data$weight[] = NA
+        data$weight[] = iif(cross.dn(stoch, 0.2), 1, iif(cross.up(stoch, 0.8), 0, NA))
+    models$pre.L = bt.run.share(data, clean.signal=T, trade.summary=T)
+
+    data$weight[] = NA
+        data$weight[] = iif(cross.dn(stoch, 0.2), 0, iif(cross.up(stoch, 0.8), -1, NA))
+    models$pre.S = bt.run.share(data, clean.signal=T, trade.summary=T)
+    	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 		    
+jpeg(filename = 'plot2.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	strategy.performance.snapshoot(models, T)
+dev.off()		
+		
+jpeg(filename = 'plot3.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	layout(1:4, heights=c(2,1,2,1))
+	john.ehlers.custom.strategy.plot(data, models, 'post.L', dates = '2013::', layout=T,
+		main = 'post.L: Buy When the Indicator Crosses Above 20% and Sell when the Indicator Crosses Below 80%')
+	john.ehlers.custom.strategy.plot(data, models, 'pre.L', dates = '2013::', layout=T,
+		main = 'pre.L: Buy When the Indicator Crosses Below 20% and Sell when the Indicator Crosses Above 80%')
+dev.off()	
+	
+	
+	return
+	
+	
+	
+	
+	
+	
+
+    
+        
+        
+        
+
+	# Not used
+	x = Cl(data$DG)
+    dates = '2013'
+	
+    layout(1:2)
+    plota(x[dates], type='l')
+        plota(my.stochastic.indicator(x)[dates], type='l')
+        abline(h = 0.2, col='red')
+        abline(h = 0.8, col='red')
+
+	# Draw arrows corresponding buy/sell signals               
+	trades = last(models$pre.L$trade.summary$trades,10)
+	position = sign(as.double(trades[,'weight']))
+        
+	d = index4xts(prices[dates2index(prices, trades[,'entry.date'])])
+		col = col.add.alpha('green', 50)
+		segments(d, rep(0.2,len(d)), d, rep(0.25,len(d)), col=col, lwd=5)
+		points(d, rep(0.25,len(d)), pch=24, col=col, bg=col, lwd=5)
+	
+	d = index4xts(prices[dates2index(prices, trades[,'exit.date'])])
+		col = col.add.alpha('red', 50)
+		segments(d, rep(0.8,len(d)), d, rep(0.75,len(d)), col=col, lwd=5)
+		points(d, rep(0.75,len(d)), pch=25, col=col, bg=col, lwd=5)
+		           
+	last(models$post$trade.summary$trades,10)            	
+} 
+

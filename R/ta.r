@@ -430,3 +430,60 @@ ntop.keep <- function
 	out[] = temp		
 	return( out )
 }
+
+
+############################################################################### 
+# SuperSmoother filter 2013 John F. Ehlers
+# http://www.stockspotter.com/files/PredictiveIndicators.pdf
+#' @export 
+############################################################################### 
+super.smoother.filter <- function(x) {
+    a1 = exp( -1.414 * pi / 10.0 )
+    b1 = 2.0 * a1 * cos( (1.414*180.0/10.0) * pi / 180.0 )
+    c2 = b1
+    c3 = -a1 * a1
+    c1 = 1.0 - c2 - c3
+
+    x = c1 * (x + mlag(x)) / 2
+        x[1] = x[2]
+ 
+    out = x * NA
+        out[] = filter(x, c(c2, c3), method='recursive', init=c(0,0))
+    out
+}
+
+# out = 0*x
+# for(i in 3:len(x))
+#    out[i] = c1 * (x[i] + x[(i-1)])/2 + c2* out[(i-1)]+ c3* out[(i-2)]     
+
+
+# Roofing filter 2013 John F. Ehlers
+#' @export 
+roofing.filter <- function(x) {
+    # Highpass filter cyclic components whose periods are shorter than 48 bars
+    alpha1 = (cos((0.707*360 / 48) * pi / 180.0 ) + sin((0.707*360 / 48) * pi / 180.0 ) - 1) / cos((0.707*360 / 48) * pi / 180.0 )
+    
+    x = (1 - alpha1 / 2)*(1 - alpha1 / 2)*( x - 2*mlag(x) + mlag(x,2))
+        x[1] = x[2] = x[3]
+    
+    HP = x * NA
+    HP[] = filter(x, c(2*(1 - alpha1), - (1 - alpha1)*(1 - alpha1)), method='recursive', init=c(0,0))
+    
+    super.smoother.filter(HP)
+}
+
+# My Stochastic Indicator 2013 John F. Ehlers
+#' @export 
+roofing.stochastic.indicator  <- function(x, lookback = 20) {
+    Filt = roofing.filter(x)
+    
+    HighestC = runMax(Filt, lookback)
+        HighestC[1:lookback] = as.double(HighestC[lookback])
+    LowestC = runMin(Filt, lookback)
+        LowestC[1:lookback] = as.double(LowestC[lookback])
+    Stoc = (Filt - LowestC) / (HighestC - LowestC)
+
+    super.smoother.filter(Stoc)
+}
+
+

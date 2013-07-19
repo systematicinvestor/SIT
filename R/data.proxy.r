@@ -240,4 +240,73 @@ proxy.prices <- function(data, names = ls(data)) {
 
 
 
+proxy.example.test <- function() {
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************   
+    load.packages('quantmod')  
+    
+    tickers = spl('GSG,DBC')
+    data = new.env()
+    getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)   
+        for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+      
+    # "TRJ_CRB" file was downloaded from the http://www.jefferies.com/Commodities/2cc/389
+    # for "TRJ/CRB Index-Total Return"
+    temp = extract.table.from.webpage( join(readLines("TRJ_CRB")), 'EODValue' )
+    temp = join( apply(temp, 1, join, ','), '\n' )
+    data$CRB_1 = make.stock.xts( read.xts(temp, format='%m/%d/%y' ) )
+     
+    # "prfmdata.csv" file was downloaded from the http://www.crbequityindexes.com/indexdata-form.php
+    # for "TR/J CRB Global Commodity Equity Index", "Total Return", "All Dates"
+    data$CRB_2 = make.stock.xts( read.xts("prfmdata.csv", format='%m/%d/%Y' ) )
+                 
+    #*****************************************************************
+    # Compare
+    #******************************************************************    
+jpeg(filename = 'plot1.jpg', width = 500, height = 500, units = 'px', pointsize = 12)		
+    proxy.test(data)    
+dev.off()
+jpeg(filename = 'plot2.jpg', width = 500, height = 500, units = 'px', pointsize = 12)		    
+    proxy.overlay.plot(data)
+dev.off()
+
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************   
+    load.packages('quantmod')  
+    
+    tickers = spl('IYR,VGSIX,RWO')
+    data = new.env()
+    getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)   
+        for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+                 
+    #*****************************************************************
+    # Compare
+    #******************************************************************    
+jpeg(filename = 'plot3.jpg', width = 500, height = 500, units = 'px', pointsize = 12)		
+    proxy.test(data)    
+dev.off()
+jpeg(filename = 'plot4.jpg', width = 500, height = 500, units = 'px', pointsize = 12)		    
+    proxy.overlay.plot(data)
+dev.off()
+
+# VGSIX,VEIEX,VBMFX,VWEHX,PEBIX,VIPSX,VTSMX,VGTSX,VFISX,VUSTX
+#
+#    Equity Market
+#        Vanguard Total Stock Mkt (VTSMX)
+#        Vanguard Total Intl Stock (VGTSX)
+#        Vanguard 500 Index (VFINX)
+#        Vanguard Emerging Mkts (VEIEX)
+#    Fixed Income Market
+#        Vanguard Short-Term Treasury (VFISX)
+#        Vanguard Long-Term Treasury (VUSTX)
+#        Vanguard Total Bond Market (VBMFX)
+#        Vanguard High-Yield Corporate (VWEHX)
+#        PIMCO Emerging Markets Bond (PEBIX)
+#        Vanguard Inflation-Protected (VIPSX)
+#        PIMCO Total Return (PTTRX)
+#    Vanguard REIT (VGSIX)
+#
+}    
 
