@@ -386,7 +386,7 @@ dow.jones.components <- function()
 	txt = join(readLines(url))
 
 	# extract table from this page
-	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = T)
+	temp = extract.table.from.webpage(txt, 'Volume', hasHeader = T)
 	tickers = temp[, 'Symbol']
 
 	return(tickers)

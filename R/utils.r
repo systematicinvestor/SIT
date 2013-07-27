@@ -883,7 +883,14 @@ make.xts <- function
 	
     orderBy = class(order.by)
     index = as.numeric(as.POSIXct(order.by, tz = tzone))
-    if( is.null(dim(x)) ) dim(x) = c(len(x), 1)
+    
+    # need to handle case for one row; i.e. len(orderBy) == 1
+    if( is.null(dim(x)) ) {
+    	if( len(orderBy) == 1 )
+    		x = t(as.matrix(x))
+    	else
+	    	dim(x) = c(len(x), 1)
+    }
     x = as.matrix(x)
 
     x = structure(.Data = x, 
