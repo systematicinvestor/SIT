@@ -822,60 +822,6 @@ bt.exrem <- function(weight)
     bt.apply.matrix(weight, exrem)
 }
 
-###############################################################################
-# Timed Exit: exit trade after nlen bars
-#' @export 
-###############################################################################
-bt.exrem.time.exit <- function(signal, nlen, create.weight = T) {
-	signal[is.na(signal)] = FALSE
-	
-	signal.index = which(signal)
-		nsignal.index = len(signal.index)
-		nperiods = len(signal)	
-		signal.index.exit = iif(signal.index + nlen - 1 > nperiods, nperiods, signal.index + nlen - 1)
-				
-	if(!create.weight) {
-		for(i in 1:nsignal.index) {
-			if( signal[ signal.index[i] ] ) {
-				signal[ (signal.index[i]+1) : signal.index.exit[i] ] = FALSE
-			}
-		}	
-		return(signal)
-	} else {
-		signal.index.exit1 = iif(signal.index + nlen > nperiods, nperiods, signal.index + nlen)
-		temp = signal * NA
-
-		for(i in 1:nsignal.index) {
-			if( signal[ signal.index[i] ] ) {
-				signal[ (signal.index[i]+1) : signal.index.exit[i] ] = FALSE
-				temp[ signal.index.exit1[i] ] = 0
-			}
-		}	
-				
-		temp[signal] = 1
-		return(temp)
-	}
-}
-
-###############################################################################
-# Enforce minimum holding period before taking another signal
-#' @export 
-###############################################################################
-bt.min.holding.period <- function(x, nlen) {
-	x = coredata(x)
-	
-	enter = x != 0
-    enter[is.na(enter)] = FALSE
-    enter.index = which(enter)
-    
-    for(t in enter.index)
-	    if( enter[ t ] ) {
-			index = t + nlen
-			enter[ t : index ] = FALSE
-		    x[ t : index ] = x[t]
-		}
-	return(x)
-}
 
 ###############################################################################
 # Backtest Test function
