@@ -7810,16 +7810,6 @@ load.hist.stock.data <- function()
 }    
 
 
-
-
-
-
-
-
-
-
-
-
 ###############################################################################
 # Predictive Indicators for Effective Trading Strategies By John Ehlers
 # http://www.stockspotter.com/files/PredictiveIndicators.pdf
@@ -7988,4 +7978,163 @@ dev.off()
 		           
 	last(models$post$trade.summary$trades,10)            	
 } 
+
+
+
+
+###############################################################################
+# Calendar-based sector strategy
+#
+# http://www.cxoadvisory.com/2785/calendar-effects/kaeppels-sector-seasonality-strategy/
+# http://www.optionetics.com/marketdata/article.aspx?aid=13623
+# http://www.optionetics.com/marketdata/article.aspx?aid=18343
+#
+# Buy Fidelity Select Technology (FSPTX) at the October close.
+# Switch from FSPTX to Fidelity Select Energy (FSENX) at the January close.
+# Switch from FSENX to cash at the May close.
+# Switch from cash to Fidelity Select Gold (FSAGX) at the August close.
+# Switch from FSAGX to cash at the September close.
+# Repeat by switching from cash to FSPTX at the October close.
+#
+# Benchmarks
+# - Vanguard 500 Index Investor (VFINX)
+# - VFINX from the October close through the May close and cash otherwise (VFINX /Cash)
+###############################################################################
+bt.calendar.based.sector.strategy.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('FSPTX,FSENX,FSAGX,VFINX,BIL') 
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+
+	#--------------------------------   
+	# BIL     30-May-2007 
+	# load 3-Month Treasury Bill from FRED
+	TB3M = quantmod::getSymbols('DTB3', src='FRED', auto.assign = FALSE)		
+	TB3M[] = ifna.prev(TB3M)	
+	TB3M = processTBill(TB3M, timetomaturity = 1/4, 261)	
+	#--------------------------------       	
+	#proxies = list(BIL = data$BIL, TB3M = TB3M)
+	#proxy.test(proxies)
+	#proxy.overlay.plot(proxies)
+	#bt.start.dates(data)		
+
+	
+	# extend	
+	data$BIL = extend.data(data$BIL, TB3M, scale=T)	
+	
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+				
+	bt.prep(data, align='remove.na')
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices 
+	dates = data$dates	
+	        
+	models = list()
+
+	# find period ends
+	period.ends = endpoints(prices, 'months')
+    	period.ends = period.ends[period.ends > 0]	
+	
+	months = date.month(dates[period.ends])
+	    	
+	# control back-test
+	dates = '::'
+	# we can use zero lag becuase buy/sell dates are known in advance
+	do.lag = 0
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	# Vanguard 500 Index Investor (VFINX)
+	data$weight[] = NA
+		data$weight$VFINX[] = 1
+	models$VFINX  = bt.run.share(data, clean.signal=F, dates=dates, do.lag=do.lag) 
+	
+	
+	# VFINX from the October[10] close through the May[5] close and cash otherwise (VFINX /Cash)
+	data$weight[] = NA
+		data$weight$VFINX[period.ends] = iif( months >= 10 | months <= 5, 1, 0)
+		data$weight$BIL[period.ends] = iif( !(months >= 10 | months <= 5), 1, 0)
+	models$VFINX_Cash  = bt.run.share(data, clean.signal=F, dates=dates, do.lag=do.lag) 	
+
+	
+    #*****************************************************************
+    # Calendar-based sector strategy
+    #****************************************************************** 	
+	# Buy Fidelity Select Technology (FSPTX) at the October close.
+	# Switch from FSPTX to Fidelity Select Energy (FSENX) at the January close.
+	# Switch from FSENX to cash at the May close.
+	# Switch from cash to Fidelity Select Gold (FSAGX) at the August close.
+	# Switch from FSAGX to cash at the September close.
+	# Repeat by switching from cash to FSPTX at the October close.
+	data$weight[] = NA
+		# Buy Fidelity Select Technology (FSPTX) at the October close.
+		data$weight$FSPTX[period.ends] = iif( months >= 10 | months < 1, 1, 0)
+		
+		# Switch from FSPTX to Fidelity Select Energy (FSENX) at the January close.
+		data$weight$FSENX[period.ends] = iif( months >= 1 & months < 5, 1, 0)
+				
+		# Switch from cash to Fidelity Select Gold (FSAGX) at the August close.
+		data$weight$FSAGX[period.ends] = iif( months >= 8 & months < 9, 1, 0)
+
+		# Rest time in Cash
+		data$weight$BIL[period.ends] = 1 - rowSums(data$weight[period.ends], na.rm = T)
+	models$Sector  = bt.run.share(data, clean.signal=F, dates=dates, do.lag=do.lag) 	
+		           
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+jpeg(filename = 'plot1.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	strategy.performance.snapshoot(models, T)
+dev.off()		
+	
+    
+	plotbt.custom.report.part2(models$sector, trade.summary=T)
+				
+
+	return
+	
+	
+	
+	
+	
+	
+
+    
+        
+        
+        
+
+	# Not used	
+	data$weight[] = NA
+		# Buy Fidelity Select Technology (FSPTX) at the October close.
+		data$weight$FSPTX[period.ends] = iif( months >= 10 | months < 1, 1, 0)
+		
+		# Switch from FSPTX to Fidelity Select Energy (FSENX) at the January close.
+		data$weight$FSENX[period.ends] = iif( months >= 1 & months < 5, 1, 0)
+		
+		# Switch from FSENX to cash at the May close.
+		data$weight$BIL[period.ends] = iif( months >= 5 & months < 8, 1, data$weight$BIL[period.ends])		
+		
+		# Switch from cash to Fidelity Select Gold (FSAGX) at the August close.
+		data$weight$FSAGX[period.ends] = iif( months >= 8 & months < 9, 1, 0)
+		
+		# Switch from FSAGX to cash at the September close.
+		data$weight$BIL[period.ends] = iif( months >= 9 & months < 10, 1, data$weight$BIL[period.ends])
+		
+		# since we have multiple entries to BIL, make sure to close them
+		data$weight$BIL[period.ends] = ifna(data$weight$BIL[period.ends], 0)		
+	models$sector1  = bt.run.share(data, clean.signal=F) 	
+	
+}
+
+
 

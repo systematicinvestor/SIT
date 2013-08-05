@@ -132,6 +132,9 @@ bt.ts.trade.index <- function(x)
     # index of enter signals
     enter = x != 0
     enter[is.na(enter)] = FALSE
+# do not consider trade that happend today    
+enter[length(x)] = FALSE
+    
     enter.index = which(enter)
     
 
@@ -146,6 +149,19 @@ bt.ts.trade.index <- function(x)
     list(enter = enter, enter.index = enter.index, exit = exit)
 }
 
+
+###############################################################################
+# enter signal: weight != 0
+# true/false vector, true indicating start of trade
+#' @export 
+###############################################################################
+bt.ts.enter.state <- function(x)
+{
+    # enter signals
+    enter = x != 0
+    	enter[is.na(enter)] = FALSE
+    enter
+}
 
 ###############################################################################
 # Exit position if holding periods > nlen
@@ -355,6 +371,75 @@ custom.stop.fn <- function(x, price, stop.fn, ...)
     return(x)
 }
 	
+# expect list(state - T/F vector, remove - T/F - if remove signals, value - value to set)
+#
+# in terms of custom.stop.fn, list(state = state, remove = T, value = 0 i.e. exit)
+#' @export 
+custom.stop.fn.list <- function(x, price, stop.fn, ...)
+{
+	price = coredata(price)
+
+	if(is.character(stop.fn)) stop.fn = match.fun(stop.fn)
+
+	# faster which
+	dummy = 1:length(x)
+		
+	# get index of trades
+	temp = bt.ts.trade.index(x)
+		enter = temp$enter
+		enter.index = temp$enter.index
+		exit = temp$exit
+
+
+    # loop over all enter signals and apply stop
+    for(t in enter.index)
+	if( enter[ t ] ) {
+		# temp = stop.fn(x[ t ], price, t, exit[ t ], ...)
+		out = stop.fn(x[ t ], price, t, exit[ (t + 1) ], ...)
+		temp = out$state
+			
+		if( any(temp, na.rm=T) ) {
+			iexit = t - 1 + dummy[temp][1]
+			if(out$remove) enter[ t : iexit ] = FALSE
+		    x[ iexit ] = out$value				
+		} else
+			enter[ t : exit[ t ] ] = FALSE			
+	}
+    return(x)
+}
+
+
+
+
+custom.stop.fn.full <- function(x, price, stop.fn, ...)
+{
+	price = coredata(price)
+
+	if(is.character(stop.fn)) stop.fn = match.fun(stop.fn)
+
+	# get index of trades
+	temp = bt.ts.trade.index(x)
+		enter = temp$enter
+		enter.index = temp$enter.index
+		exit = temp$exit
+
+
+    # loop over all enter signals and apply stop
+    for(t in enter.index)
+	if( enter[ t ] ) {
+		# temp = stop.fn(x[ t ], price, t, exit[ t ], ...)
+		out = stop.fn(x, price, t, exit[ (t + 1) ], ...)
+			x = out$x
+			if(out$remove) enter[ t : out$tlast ] = FALSE				
+	}
+    return(x)
+}
+
+
+	
+
+
+
 
 
 # note that this is a custom function because HHV (i.e. cummax) and is path dependent

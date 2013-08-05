@@ -99,7 +99,8 @@ cross.dn <- function( array1, array2 ) { cross( array2, array1 ) }
 
 
 ###############################################################################
-# Percentile Rank over given window
+# Percentile Rank over given window, works for both single column and matrix
+# If data is matrix, lookup value in the first column across all columns
 #' @export 
 ############################################################################### 
 percent.rank <- function
@@ -109,9 +110,8 @@ percent.rank <- function
 )
 {	
 	# simple percent rank function
-    pctRank <- function(x,i) sum(x[i] >= x[(i- (n-1) ):i])    
- 
-       
+    pctRank <- function(x,i) sum(x[i,1] >= x[(i- (n-1) ):i,])    
+        
     out = data
     
     # Apply the percent rank function to the coredata of our results
@@ -155,7 +155,6 @@ percent.rankM <- function
 
     return(out/len(data))
 }
-
 
 ###############################################################################
 # DV2 indicator (DVB)
