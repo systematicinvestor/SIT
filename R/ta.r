@@ -116,6 +116,7 @@ percent.rank <- function
     
     # Apply the percent rank function to the coredata of our results
     data = coredata(data)
+    	if( is.null(dim(data)) ) dim(data) = c(len(data),1)
     rng = n:len(data)
     
     out[] = c( rep(NA,(n-1)), sapply(rng, function(i) pctRank(data, i) / n) )
