@@ -369,6 +369,7 @@ date.year <- function(dates)
 	return(as.double(format(dates, '%Y')))
 }
 
+
 ###############################################################################
 #' Dates Index Functions
 #'
@@ -383,23 +384,76 @@ date.year <- function(dates)
 #' @export 
 #' @rdname DateFunctionsIndex
 ###############################################################################
-date.week.ends <- function(dates) 
+date.week.ends <- function(dates, last.date=T) 
 {	
-	return( unique(c(which(diff( 100*date.year(dates) + date.week(dates) ) != 0), len(dates))) )
+	ends = which(diff( 100*date.year(dates) + date.week(dates) ) != 0)
+	if(last.date)
+		ends.add.last.date(ends, len(dates))
+	else
+		ends
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
-date.month.ends <- function(dates) 
+date.month.ends <- function(dates, last.date=T) 
 {	
-	return( unique(c(which(diff( 100*date.year(dates) + date.month(dates) ) != 0), len(dates))) )
+	ends = which(diff( 100*date.year(dates) + date.month(dates) ) != 0)
+	if(last.date)
+		ends.add.last.date(ends, len(dates))
+	else
+		ends	
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
-date.year.ends <- function(dates) 
+date.year.ends <- function(dates, last.date=T) 
 {	
-	return( unique(c(which(diff( date.year(dates) ) != 0), len(dates))) )
+	ends = which(diff( date.year(dates) ) != 0)
+	if(last.date)
+		ends.add.last.date(ends, len(dates))
+	else
+		ends	
+}
+
+# helper function to add last date
+ends.add.last.date <- function(ends, last.date) 
+{
+	unique(c(ends, last.date))
+}
+
+# to ger proper month-end and a day before month-end
+# !!!note holidayTSX() is missing CALabourDay
+# http://www.tmx.com/en/about_tsx/market_hours.html
+# load.packages('timeDate')    
+# from = as.Date('10Jun2013','%d%b%Y')
+# to = as.Date('10Jan2014','%d%b%Y')
+# holidays = holidayNYSE(date.year(from))
+#' @export 
+business.days <- function(from, to = as.Date(from) + 31, holidays = NULL) {
+	from = as.Date(from)
+	to = as.Date(to)
+
+	require(timeDate)
+    dates = seq(from, to, by='day')
+    rm.index = date.dayofweek(dates) == 6 | date.dayofweek(dates) == 0
+    if(!is.null(holidays)) {
+        holidays = as.Date(holidays)
+        rm.index = rm.index | !is.na(match(dates, holidays))        
+    }
+     dates[!rm.index]
+}
+
+# if date is month end, return zero
+# from = as.Date('27Dec2013','%d%b%Y')
+# holidays = holidayNYSE(date.year(from))
+# dates = business.days(from, from + 40, holidays)
+# business.days.till.end(from, holidays)
+#' @export 
+business.days.till.end <- function(from, holidays = NULL, fn.ends = date.month.ends) {
+	from = as.Date(from)
+	dates = business.days(from, from + 40, holidays)
+	index = match.fun(fn.ends)(dates, F)
+	index[1] - 1
 }
 
 ###############################################################################

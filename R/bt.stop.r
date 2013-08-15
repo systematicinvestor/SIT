@@ -400,7 +400,7 @@ custom.stop.fn.list <- function(x, price, stop.fn, ...)
 			
 		if( any(temp, na.rm=T) ) {
 			iexit = t - 1 + dummy[temp][1]
-			if(out$remove) enter[ t : iexit ] = FALSE
+			if(out$clean.signal) enter[ t : iexit ] = FALSE
 		    x[ iexit ] = out$value				
 		} else
 			enter[ t : exit[ t ] ] = FALSE			
@@ -430,7 +430,7 @@ custom.stop.fn.full <- function(x, price, stop.fn, ...)
 		# temp = stop.fn(x[ t ], price, t, exit[ t ], ...)
 		out = stop.fn(x, price, t, exit[ (t + 1) ], ...)
 			x = out$x
-			if(out$remove) enter[ t : out$tlast ] = FALSE				
+			if(out$clean.signal) enter[ t : out$tlast ] = FALSE				
 	}
     return(x)
 }
