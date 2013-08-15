@@ -7980,8 +7980,6 @@ dev.off()
 } 
 
 
-
-
 ###############################################################################
 # Calendar-based sector strategy
 #
@@ -8138,3 +8136,121 @@ dev.off()
 
 
 
+
+###############################################################################
+# 7Twelve strategy
+#
+# http://www.7twelveportfolio.com/index.html
+# http://www.mebanefaber.com/2013/08/01/the-712-allocation/
+# http://seekingalpha.com/article/228664-on-israelsens-7twelve-portfolio
+###############################################################################
+bt.7twelve.strategy.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('VFINX,VIMSX,NAESX,VDMIX,VEIEX,VGSIX,FNARX,QRAAX,VBMFX,VIPSX,OIBAX,BIL') 
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+
+	#--------------------------------   
+	# BIL     30-May-2007 
+	# load 3-Month Treasury Bill from FRED
+	TB3M = quantmod::getSymbols('DTB3', src='FRED', auto.assign = FALSE)		
+	TB3M[] = ifna.prev(TB3M)	
+	TB3M = processTBill(TB3M, timetomaturity = 1/4, 261)	
+	#--------------------------------       	
+	# extend	
+	data$BIL = extend.data(data$BIL, TB3M, scale=T)	
+	
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+				
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	models = list()
+	
+	# Vanguard 500 Index Investor (VFINX)
+	data$weight[] = NA
+		data$weight$VFINX[] = 1
+	models$VFINX  = bt.run.share(data, clean.signal=F) 
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 	
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'years',
+		min.risk.fns = list(EW=equal.weight.portfolio)
+	) 	
+	models$year = create.strategies(obj, data)$models$EW
+
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'quarters',
+		min.risk.fns = list(EW=equal.weight.portfolio)
+	) 	
+	models$quarter = create.strategies(obj, data)$models$EW
+		
+	obj = portfolio.allocation.helper(data$prices, periodicity = 'months',
+		min.risk.fns = list(EW=equal.weight.portfolio)
+	) 	
+	models$month = create.strategies(obj, data)$models$EW
+	
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+jpeg(filename = 'plot1.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	strategy.performance.snapshoot(models, T)
+dev.off()		
+	
+    
+	return
+	
+	
+	
+	
+	
+	
+
+    
+        
+        
+        
+
+	# Not used	
+	#http://seekingalpha.com/article/228664-on-israelsens-7twelve-portfolio
+	map = list(
+	    us.eq = list(
+	        us.large = list('VFINX', 'VTI'),
+	        us.mid = list('VIMSX', 'VO'),
+	        us.small = list('NAESX', 'VB')
+	    ),
+	    non.us.eq = list(
+	        devel.eq = list('VDMIX', 'EFA'),	# VGTSX
+	        em.eq = list('VEIEX', 'EEM')
+	    ),
+	    re = list(    
+	    	re = list('VGSIX', 'RWX')
+	    ),
+	    res = list(
+	    	nat.res = list('FNARX', 'GLD'),
+	    	com = list('QRAAX', 'DBC')	# CRSAX
+	    ),
+	    us.bond = list(
+	    	us.bond = list('VBMFX', 'AGG'),
+	    	tips = list('VIPSX', 'TIP')
+	    ),
+	    non.bond = list(
+	    	int.bond = list('OIBAX', 'BWX')	# BEGBX
+	    ),
+	    cash = list(
+	    	cash = list('BIL', 'BIL')	# VFISX
+	    )
+	) 
+	
+	funds = unlist(lapply(map, function(x) lapply(x, function(y) y[[1]])))    
+	etfs = unlist(lapply(map, function(x) lapply(x, function(y) y[[2]]))) 
+	
+	paste(funds, collapse=',')
+}	
