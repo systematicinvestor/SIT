@@ -362,6 +362,15 @@ date.month <- function(dates)
 	return(as.double(format(dates, '%m')))
 }
 
+# (((1:12)-1) %/% 3)+1	
+# date.quarter(Sys.Date())
+#' @export 
+#' @rdname DateFunctions
+date.quarter <- function(dates) 
+{	
+	(((date.month(dates))-1) %/% 3)+1	
+}
+
 #' @export 
 #' @rdname DateFunctions
 date.year <- function(dates) 
@@ -387,10 +396,7 @@ date.year <- function(dates)
 date.week.ends <- function(dates, last.date=T) 
 {	
 	ends = which(diff( 100*date.year(dates) + date.week(dates) ) != 0)
-	if(last.date)
-		ends.add.last.date(ends, len(dates))
-	else
-		ends
+	ends.add.last.date(ends, len(dates), last.date)
 }
 
 #' @export 
@@ -398,10 +404,15 @@ date.week.ends <- function(dates, last.date=T)
 date.month.ends <- function(dates, last.date=T) 
 {	
 	ends = which(diff( 100*date.year(dates) + date.month(dates) ) != 0)
-	if(last.date)
-		ends.add.last.date(ends, len(dates))
-	else
-		ends	
+	ends.add.last.date(ends, len(dates), last.date)
+}
+
+#' @export 
+#' @rdname DateFunctionsIndex
+date.quarter.ends <- function(dates, last.date=T) 
+{	
+	ends = which(diff( 10*date.year(dates) + date.quarter(dates) ) != 0)
+	ends.add.last.date(ends, len(dates), last.date)
 }
 
 #' @export 
@@ -409,31 +420,53 @@ date.month.ends <- function(dates, last.date=T)
 date.year.ends <- function(dates, last.date=T) 
 {	
 	ends = which(diff( date.year(dates) ) != 0)
-	if(last.date)
-		ends.add.last.date(ends, len(dates))
-	else
-		ends	
+	ends.add.last.date(ends, len(dates), last.date)
 }
 
 # helper function to add last date
-ends.add.last.date <- function(ends, last.date) 
+ends.add.last.date <- function(ends, last.date, action=T) 
 {
-	unique(c(ends, last.date))
+	if(action)
+		unique(c(ends, last.date))
+	else
+		ends
 }
+
+#' @export 
+#' @rdname DateFunctionsIndex
+date.ends.fn <- function(periodicity) {
+	switch(periodicity,
+		'weeks' = date.week.ends,
+		'months' = date.month.ends,
+		'quarters' = date.quarter.ends,
+		'years' = date.year.ends,
+		date.month.ends)	
+}
+
+#' out is result of the business.days.location.end
+#' @export 
+#' @rdname DateFunctionsIndex
+date.ends.index <- function(out, timing) {
+	if(timing <= 0)
+		which(out$days.till == (-timing))
+	else
+		which(out$days.since == (timing))
+}
+	
+	
 
 # to ger proper month-end and a day before month-end
 # !!!note holidayTSX() is missing CALabourDay
 # http://www.tmx.com/en/about_tsx/market_hours.html
-# load.packages('timeDate')    
+# load.packages('RQuantLib')    
 # from = as.Date('10Jun2013','%d%b%Y')
 # to = as.Date('10Jan2014','%d%b%Y')
-# holidays = holidayNYSE(date.year(from))
+# holidays = getHolidayList("UnitedStates/NYSE", from, to) 	
 #' @export 
 business.days <- function(from, to = as.Date(from) + 31, holidays = NULL) {
 	from = as.Date(from)
 	to = as.Date(to)
-
-	require(timeDate)
+	
     dates = seq(from, to, by='day')
     rm.index = date.dayofweek(dates) == 6 | date.dayofweek(dates) == 0
     if(!is.null(holidays)) {
@@ -451,10 +484,99 @@ business.days <- function(from, to = as.Date(from) + 31, holidays = NULL) {
 #' @export 
 business.days.till.end <- function(from, holidays = NULL, fn.ends = date.month.ends) {
 	from = as.Date(from)
+	
+	# make sure from is a business date
+	dates = business.days(from - 10, from, holidays)
+	from = dates[len(dates)]
+	
 	dates = business.days(from, from + 40, holidays)
 	index = match.fun(fn.ends)(dates, F)
 	index[1] - 1
 }
+
+# from = as.Date('3Dec2013','%d%b%Y')
+# holidays = holidayNYSE(date.year(from))
+# dates = business.days(from - 40, from+10, holidays)
+# business.days.since.end(from, holidays)
+#' @export  
+business.days.since.end <- function(from, holidays = NULL, fn.ends = date.month.ends) {
+	from = as.Date(from)
+	
+	# make sure from is a business date
+	dates = business.days(from - 10, from, holidays)
+	from = dates[len(dates)]
+		
+	dates = business.days(from - 40, from + 10, holidays)
+	index = match.fun(fn.ends)(dates, F)
+			
+	last.index = index[len(index)]
+	if( dates[last.index] == from) return(0)
+	
+	from.index = sum(dates <= from)
+	if( dates[last.index] < from) return(from.index - last.index)
+	
+	last.index = index[(len(index) - 1)]
+	return(from.index - last.index)
+}
+
+next.business.day <- function(from, holidays = NULL, offset = 0) {
+	from = as.Date(from)
+	
+	# make sure from is a business date
+	dates = business.days(from + offset, from + 10, holidays)
+	dates[1]
+}
+
+last.business.day <- function(from, holidays = NULL, offset = 0) {
+	from = as.Date(from)
+	
+	# make sure from is a business date
+	dates = business.days(from - 10, from - offset, holidays)
+	dates[1]
+}
+
+# load.packages('quantmod')
+# data = getSymbols('AAPL', auto.assign = F)
+# dates = index(data)
+# out = business.days.location.end(dates, holidayNYSE)
+# cbind(format(dates,'%d%b%y'), out$days.since, out$days.till)
+#' @export 
+business.days.location.end <- function(dates, calendar = null, fn.ends = date.month.ends) {	
+	dates = as.Date(dates)
+	n = len(dates)
+	
+	# getHolidayList
+	load.packages('RQuantLib')
+	
+holidays = NULL		
+if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1) 	
+	
+	before = business.days(dates[1] - 60, dates[1] - 1, holidays)
+		n.before = len(before) 
+
+holidays = NULL		
+if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n] + 60) 	
+				
+	after = business.days(dates[n] + 1, dates[n] + 60, holidays)
+	
+	
+	all = c(before, dates, after)
+		n.all = len(all)
+	all.index = (n.before + 1) : (n.before + n)
+	
+	index = match.fun(fn.ends)(all, F)
+	
+	temp.cum = cumsum(fast.rep(1,n.all))
+		temp = temp.cum * NA
+		temp[index] = temp.cum[index]
+	days.since = temp.cum - ifna.prev(temp)
+	days.till = temp[ifna.prevx.rev(temp)] - temp.cum
+	
+	#cbind(format(all,'%d%b%y'), days.since, days.till)[all.index, ]
+	
+	list(days.since = days.since[all.index], days.till = days.till[all.index])
+}
+ 
 
 ###############################################################################
 #' Map given time series to monthly
@@ -952,6 +1074,26 @@ make.xts <- function
     	class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
 	return( x )
 }
+
+
+###############################################################################
+#' Reverse order of \code{\link{xts}} object
+#'
+#' @param x \code{\link{xts}} object
+#'
+#' @return \code{\link{xts}} object
+#' 
+#' @export 
+###############################################################################
+flip.xts <- function(x)
+{
+	dates = index(x)
+	dates.index = nrow(x):1
+	out = make.xts(coredata(x)[dates.index,], dates[dates.index])
+		indexClass(out) = indexClass(x)
+	return( out )
+}
+
 
 ###############################################################################
 #' Write \code{\link{xts}} object to file

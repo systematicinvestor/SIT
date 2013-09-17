@@ -433,6 +433,16 @@ ntop.keep <- function
 
 
 ############################################################################### 
+# Rank observations in each row
+#' @export 
+############################################################################### 
+br.rank <- function(x)
+{	
+	t(apply(coredata(-x), 1, rank, na.last='keep'))
+}	
+
+
+############################################################################### 
 # SuperSmoother filter 2013 John F. Ehlers
 # http://www.stockspotter.com/files/PredictiveIndicators.pdf
 #' @export 

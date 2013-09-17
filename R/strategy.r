@@ -1134,6 +1134,17 @@ data = '
 	# Portfolio Allocation adaptors for above functions
 	#' @export 
 	min.var2.portfolio <- function(ia,constraints) { min.corr.excel(final.scale = 'vol')(ia,constraints) } 
+	
+	
+
+#' @export 
+min.var2 <- function(power.function = 1)
+{
+    power.function = as.numeric(power.function)    
+    function(ia,constraints) min.corr.excel(power.function, final.scale = 'vol')(ia,constraints)      
+}
+	
+	
 
 	#' @export 
 	min.var.excel.portfolio <- function(ia,constraints) { min.var.excel()(ia,constraints) } 	
@@ -2021,6 +2032,8 @@ create.strategies <- function
 	leverage = 1,	
 	min.weight = NA,
 	round.weight = NA,
+	execution.price = NA,
+	close.all.positions.index = NULL,
 	silent = F,	
 	log = log.fn(),	
 	prefix = '',
@@ -2035,12 +2048,15 @@ create.strategies <- function
 		if(len(leverage) == 1) leverage = rep(leverage, len(obj$weights))		
 		for(i in 1:len(obj$weights)) obj$weights[[i]] = leverage[i] * obj$weights[[i]]		
 	}
-	if(!is.na(min.weight)) for(i in names(obj$weights)) obj$weights[[i]] = bt.apply.min.weight(obj$weights[[i]], min.weight)
-	if(!is.na(round.weight)) for(i in names(obj$weights)) {
+	
+	if(!is.na(min.weight) && min.weight != 0) for(i in names(obj$weights)) 
+		obj$weights[[i]][] = bt.apply.min.weight(coredata(obj$weights[[i]]), min.weight)
+	
+	if(!is.na(round.weight) && round.weight != 0) for(i in names(obj$weights)) {
 		# round a few times to get more consisitent results
-		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
-		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
-		obj$weights[[i]] = bt.apply.round.weight(obj$weights[[i]], round.weight)
+		obj$weights[[i]][] = bt.apply.round.weight(coredata(obj$weights[[i]]), round.weight)
+		obj$weights[[i]][] = bt.apply.round.weight(coredata(obj$weights[[i]]), round.weight)
+		obj$weights[[i]][] = bt.apply.round.weight(coredata(obj$weights[[i]]), round.weight)
 	}
 
 	#*****************************************************************
@@ -2051,11 +2067,16 @@ create.strategies <- function
 	for(j in 1:n) {
 		i = names(obj$weights)[j]
 		i = paste(prefix, i, suffix, sep='')
-	
-if(!silent) log(j, percent = j / n)
+		
+if(!silent) log(i, percent = j / n)
 	
 		data$weight[] = NA
-			data$weight[obj$period.ends,] = obj$weights[[j]]	
+			data$execution.price[] = execution.price
+			data$weight[obj$period.ends,] = obj$weights[[j]]
+#			data$weight[obj$period.ends,] = as.matrix(obj$weights[[j]][1:len(obj$period.ends),])
+
+			if( !is.null(close.all.positions.index) ) data$weight[close.all.positions.index,] = 0
+
 		models[[i]] = bt.run.share(data, clean.signal = clean.signal, ...)
 		
 #		models[[i]]$risk.contribution = obj$risk.contributions[[j]]
@@ -2063,8 +2084,7 @@ if(!silent) log(j, percent = j / n)
 	}
 	obj$models = models
 	return(obj)			
-}
-	
+}	
 
 	
 #*****************************************************************
