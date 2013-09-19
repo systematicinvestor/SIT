@@ -1274,7 +1274,63 @@ aritm2geom4 <- function(R, V)
 
 
 
+###############################################################################
+# Find Portfolio with Minimum Risk and given Target Return
+#' @export 
+###############################################################################
+given.return.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints,	# constraints
+	target.return
+)
+{
+	# must check that target.return within min/max possible return
+	constraints = add.constraints(ia$expected.return, type='>=', b=target.return, constraints)							
+	min.var.portfolio(ia, constraints)
+}
 
+
+###############################################################################
+# Find Portfolio with Minimum Risk and given Target Risk
+#' @export 
+###############################################################################
+given.risk.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints,	# constraints
+	target.risk,
+	silent = T,
+	min.w = NA,
+	max.w = NA
+)
+{
+	# must check that target.risk within min/max possible risk
+	if( is.na(max.w) ) max.w = max.return.portfolio(ia, constraints)
+	if( is.na(min.w) ) min.w = min.var.portfolio(ia, constraints)	
+	
+	max.r = portfolio.return(max.w, ia)
+	min.r = portfolio.return(min.w, ia)
+	
+	max.s = portfolio.risk(max.w, ia)
+	min.s = portfolio.risk(min.w, ia)
+	
+	if( target.risk >= min.s & target.risk <= max.s ) {
+		# function to compute risk given return x
+		f <- function (x, ia, constraints, target.risk) {
+			portfolio.risk(given.return.portfolio(ia, constraints, x), ia) - target.risk
+		}
+		
+		f.lower = min.s - target.risk
+		f.upper = max.s - target.risk
+				
+		sol = uniroot(f, c(min.r, max.r), f.lower=f.lower, f.upper=f.upper, tol = 0.0001, 
+			ia=ia, constraints=constraints, target.risk=target.risk)
+		if(!silent) cat('Found solution in', sol$iter, 'itterations', '\n')
+		return( given.return.portfolio(ia, constraints, sol$root) )
+	}
+	stop(paste('target.risk =', target.risk, 'is not possible, max risk =', max.s, ', min risk =', min.s))
+}
 
 
 ###############################################################################

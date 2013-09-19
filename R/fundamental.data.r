@@ -34,7 +34,7 @@ fund.data <- function
 	max.attempts=5	# maximum number of attempts to download before exiting
 )
 {
-	all.data = c()
+	all.data = c() 
 	option.value = -1
 	
 	start_date = spl('istart_date,start_date')

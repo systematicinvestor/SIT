@@ -812,6 +812,50 @@ dev.off()
 		
 }
 
+find.portfolio.given.risk.test <- function() 
+{
+	#*****************************************************************
+	# Create Efficient Frontier
+	#****************************************************************** 	
+	# create sample historical input assumptions
+	ia = aa.test.create.ia()
+	
+	# create long-only, fully invested efficient frontier
+	n = ia$n		
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+		constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+		constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+		
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+
+	#*****************************************************************
+	# Look at portfolios
+	#****************************************************************** 	
+	# load / check required packages
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
+		
+	weight = max.return.portfolio(ia, constraints)
+		weight
+cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
+	
+	weight = min.var.portfolio(ia,constraints)	
+		weight
+cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
+	
+	
+	weight = given.return.portfolio(ia,constraints, 12/100)	
+		weight
+cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
+
+	weight = given.risk.portfolio(ia,constraints, 10/100, silent=F)	
+		weight
+cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
+
+}
+
 
 
 
