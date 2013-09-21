@@ -450,13 +450,13 @@ rotation.strategy.test <- function()
 # Create historical input assumptions
 #' @export 
 ###############################################################################
-create.ia <- function(hist.returns)
+create.ia <- function(hist.returns, index=1:ncol(hist.returns))
 {	
 	# setup input assumptions
 	ia = list()	
 		ia$hist.returns = hist.returns
 		ia$n = ncol(ia$hist.returns)
-		ia$index = 1:ia$n
+		ia$index = index
 		ia$symbols = colnames(ia$hist.returns)
 		
 		ia$risk = apply(ia$hist.returns, 2, sd, na.rm = T)
@@ -466,6 +466,16 @@ create.ia <- function(hist.returns)
 	ia$expected.return = apply(ia$hist.returns, 2, mean, na.rm = T)
 							
 	return(ia)
+}
+
+update.ia <- function(ia, name, cov.shrink)
+{
+	if(name != 'sample.shrinkage') {
+		ia$cov = cov.shrink
+			s0 = 1 / sqrt(diag(ia$cov))
+		ia$correlation = ia$cov * (s0 %*% t(s0))
+	}
+	ia
 }
 
 
@@ -1732,6 +1742,9 @@ portfolio.allocation.helper <- function
 	custom.stats.fn = NULL,
 	shrinkage.fns = 'sample.shrinkage',	# covariance Shrinkage Estimator functions
 	
+	create.ia.fn = create.ia,
+	update.ia.fn = update.ia,
+	
 	adjust2positive.definite = T,
 	silent = F,
 	
@@ -1871,24 +1884,11 @@ portfolio.allocation.helper <- function
 					constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
 							
 				# create historical input assumptions
-				#ia = new.env()
-				ia = list()
-					ia$index = index
-					ia$n = n
-					ia$hist.returns = hist
-					ia$expected.return = apply(hist, 2, mean)				
-					ia$risk = apply(hist, 2, sd)
-					ia$correlation = cor(hist, use='complete.obs', method='pearson')
-					#ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
-					
-					
-					
+				ia.base = create.ia.fn(hist, index)
+				
 				for(c in names(shrinkage.fns)) {
-					#ia$cov = shrinkage.fns[[c]](hist, risk, correlation)
-					ia$cov = shrinkage.fns[[c]](hist, hist.all)
-						s0 = 1 / sqrt(diag(ia$cov))
-					ia$correlation = ia$cov * (s0 %*% t(s0))
-	
+					cov.shrink = shrinkage.fns[[c]](hist, hist.all)					
+					ia = update.ia.fn(ia.base, c, cov.shrink)
 										
 					# adjust correlation and covariance matrices to be positive defined
 					if(adjust2positive.definite) {

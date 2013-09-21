@@ -39,15 +39,15 @@ fund.data <- function
 	
 	start_date = spl('istart_date,start_date')
 		names(start_date) = spl('quarterly,annual')
-	
-	
+		
 	repeat {
 		# download Quarterly Financial Report data
 		if(option.value >= 0) {
-			url = paste('http://uk.advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports&', start_date[mode[1]], '=', option.value, sep = '')	
+			url = paste('http://uk.advfn.com/p.php?pid=financials&symbol=', Symbol, '&btn=', mode[1], '_reports&', start_date[mode[1]], '=', option.value, sep = '')	
 		} else {
-			url = paste('http://uk.advfn.com/p.php?pid=financials&symbol=', Symbol, '&mode=', mode[1], '_reports', sep = '')
+			url = paste('http://uk.advfn.com/p.php?pid=financials&symbol=', Symbol, '&btn=', mode[1], '_reports', sep = '')
 		}
+		
 		cat('Downloading', url, '\n')
 		
 		#txt = join(readLines(url))		
