@@ -1285,9 +1285,13 @@ given.return.portfolio <- function
 	target.return
 )
 {
-	# must check that target.return within min/max possible return
-	constraints = add.constraints(ia$expected.return, type='>=', b=target.return, constraints)							
-	min.var.portfolio(ia, constraints)
+	constraints.target = add.constraints(ia$expected.return, type='>=', b=target.return, constraints)							
+	sol = try(min.var.portfolio(ia, constraints.target), silent = TRUE)
+
+	if(inherits(sol, 'try-error'))
+		sol = max.return.portfolio(ia, constraints)
+
+	sol$solution
 }
 
 
@@ -1305,7 +1309,6 @@ given.risk.portfolio <- function
 	max.w = NA
 )
 {
-	# must check that target.risk within min/max possible risk
 	if( is.na(max.w) ) max.w = max.return.portfolio(ia, constraints)
 	if( is.na(min.w) ) min.w = min.var.portfolio(ia, constraints)	
 	
@@ -1328,7 +1331,12 @@ given.risk.portfolio <- function
 			ia=ia, constraints=constraints, target.risk=target.risk)
 		if(!silent) cat('Found solution in', sol$iter, 'itterations', '\n')
 		return( given.return.portfolio(ia, constraints, sol$root) )
+	} else if( target.risk < min.s ) {
+		return( min.w )
+	} else {
+		return( max.w )
 	}
+	
 	stop(paste('target.risk =', target.risk, 'is not possible, max risk =', max.s, ', min risk =', min.s))
 }
 
