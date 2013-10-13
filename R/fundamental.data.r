@@ -31,7 +31,8 @@ fund.data <- function
 	Symbol, 		# ticker 
 	n=10, 			# number of periods
 	mode=c('quarterly','annual'), # periodicity
-	max.attempts=5	# maximum number of attempts to download before exiting
+	max.attempts=5,	# maximum number of attempts to download before exiting
+	keepHTMLTITLEtext = FALSE	# last row includes HTML TITLE text			
 )
 {
 	all.data = c() 
@@ -70,11 +71,14 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 	cat('No Data Found for', Symbol, '\n')
 	return(all.data)
 }
-		# extract title from this page
-		HTMLOPENTITLETAGposStart    <- regexpr(pattern="<title>", txt,ignore.case=TRUE)[1]
-		HTMLCLOSETITLETAGposStart   <- regexpr(pattern="</title>",txt,ignore.case=TRUE)[1]
-		HTMLOPENTITLETAGlength      <- nchar("<title>")
-		HTMLTITLEtext <- substr(txt, HTMLOPENTITLETAGposStart  + HTMLOPENTITLETAGlength , HTMLCLOSETITLETAGposStart - 1 )
+
+		if ( keepHTMLTITLEtext == TRUE ) {
+			# extract title from this page
+			HTMLOPENTITLETAGposStart    <- regexpr(pattern="<title>", txt,ignore.case=TRUE)[1]
+			HTMLCLOSETITLETAGposStart   <- regexpr(pattern="</title>",txt,ignore.case=TRUE)[1]
+			HTMLOPENTITLETAGlength      <- nchar("<title>")
+			HTMLTITLEtext <- substr(txt, HTMLOPENTITLETAGposStart  + HTMLOPENTITLETAGlength , HTMLCLOSETITLETAGposStart - 1 )
+                }
 
 		# extract table from this page
 		data = extract.table.from.webpage(txt, 'INDICATORS', hasHeader = T)
@@ -131,21 +135,23 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 			all.data <- all.data.temp
 			all.data.temp <- matrix(nrow=0, ncol=0)
 		}
-		# add a row of the HTMLTITLEtext values
-		all.data <- rbind(all.data, rep( HTMLTITLEtext, ncol(all.data) ) )
-		# to the new 'added row' name it "HTMLTITLEtext"
-		rownames(all.data)[nrow(all.data)] <- "HTMLTITLEtext"
+                if ( keepHTMLTITLEtext == TRUE ) {
+			# add a row of the HTMLTITLEtext values
+			all.data <- rbind(all.data, rep( HTMLTITLEtext, ncol(all.data) ) )
+			# to the new 'added row' name it "HTMLTITLEtext"
+			rownames(all.data)[nrow(all.data)] <- "HTMLTITLEtext"
+		}
 		return(all.data)
 	} else {
-		# add a row of the HTMLTITLEtext values
-		all.data <- rbind(all.data, rep( HTMLTITLEtext, ncol(all.data) ) )
-		# to the new 'added row' name it "HTMLTITLEtext"
-		rownames(all.data)[nrow(all.data)] <- "HTMLTITLEtext"
+                if ( keepHTMLTITLEtext == TRUE ) {
+			# add a row of the HTMLTITLEtext values
+			all.data <- rbind(all.data, rep( HTMLTITLEtext, ncol(all.data) ) )
+			# to the new 'added row' name it "HTMLTITLEtext"
+			rownames(all.data)[nrow(all.data)] <- "HTMLTITLEtext"
+		}
 		return(all.data)
 	}
 }
-
-
 
 ###############################################################################
 # determine date when fundamental data is available
