@@ -71,6 +71,12 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 	return(all.data)
 }
 		
+		# get title
+		pos = regexpr(pattern = '<title>(.*?)</title>', txt, ignore.case = TRUE, perl = TRUE)
+		if(len(pos) == 1)
+			title = substr(txt, attr(pos, 'capture.start'), attr(pos, 'capture.start') + attr(pos, 'capture.length') - 1)
+	
+
 		# extract table from this page
 		data = extract.table.from.webpage(txt, 'INDICATORS', hasHeader = T)
 			colnames(data) = data[1,]
@@ -106,10 +112,12 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 	}
 	
 	# remove empty columns
-	all.data = all.data[, colSums(nchar(trim(all.data))) > 0]
+	all.data = all.data[, colSums(nchar(trim(all.data))) > 0, drop=F]
+		all.data = rbind(all.data, title)
+		rownames(all.data)[nrow(all.data)] = 'HTMLTITLEtext'
 	
 	if( ncol(all.data) > n ) {	
-		return(all.data[,(ncol(all.data)-n+1):ncol(all.data)])
+		return(all.data[,(ncol(all.data)-n+1):ncol(all.data), drop=F])
 	} else {
 		return(all.data)
 	}

@@ -662,6 +662,9 @@ extend.data <- function
 	
 	if( ncol(hist) != ncol(current) )	
 		hist = make.xts( rep.col(hist[,close.index], ncol(current)), index(hist))
+	else
+		hist = hist[, colnames(current)]
+	
 	colnames(hist) = colnames(current)
 		
 	rbind( hist, current )

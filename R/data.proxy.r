@@ -68,7 +68,7 @@ make.stock.xts <- function(out, column=1, ...) {
 		colnames(out) = 'Close'
 	out$Adjusted = out$Open = out$High = out$Low = out$Close
 		out$Volume = 0
-	return(out)
+	return(out[,spl('Open,High,Low,Close,Volume,Adjusted')])
 }	    
 
 ###############################################################################

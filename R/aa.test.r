@@ -1180,6 +1180,114 @@ dev.off()
 }
 
 
+###############################################################################
+# Test AA functions to control risk and return at the same time
+###############################################################################
+aa.control.risk.return.test <- function()
+{
+	#*****************************************************************
+	# Load data
+	#******************************************************************	
+	tickers = spl('EEM,EFA,GLD,IWM,IYR,QQQ,SPY,TLT')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', dates='2012:12::')
+
+	#*****************************************************************
+	# Create Input Assumptions
+	#******************************************************************	
+	prices = data$prices
+	n=ncol(prices)
+
+	# make sure that there is no na's in returns; othwerwise MAD will complain
+	ret = na.omit(prices/mlag(prices)-1)
+	ia = create.historical.ia(ret,252)
+
+	#*****************************************************************
+	# Create Efficient Frontier
+	#******************************************************************		
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = 0, ub = 1)
+	constraints = add.constraints(diag(n), type='>=', b=0, constraints)
+	constraints = add.constraints(diag(n), type='<=', b=1, constraints)
+	 
+	# SUM x.i = 1
+	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)
+
+	# create efficient frontier
+	ef = portopt(ia, constraints, 50, 'Efficient Frontier')
+
+	# plot
+	risk.fn = portfolio.risk
+	plot.ef(ia, list(ef), risk.fn, transition.map=F)
+
+	#*****************************************************************
+	# Plot example portfolios
+	#******************************************************************			
+	weight = min.var.portfolio(ia,constraints)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='red')
+	
+	weight = max.sharpe.portfolio()(ia,constraints)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
+	
+	weight = max.return.portfolio(ia,constraints)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='green')
+
+	weight = risk.parity.portfolio(ia,constraints)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='green')
+
+	#*****************************************************************
+	# Find portfolio for given return
+	#******************************************************************				
+	target.return = 24/100	
+	constraints1 = add.constraints(ia$expected.return,type='>=', b=target.return, constraints)
+	weight = min.var.portfolio(ia,constraints1)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
+
+	#*****************************************************************
+	# Find portfolio for given risk
+	#******************************************************************				
+	# map between risk and mad
+	# plot(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia))
+	# approx(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia), 10/100, method='linear')$y
+	target.risk = 12/100
+	target.mad = approx(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia), target.risk, method='linear')$y
+	
+	constraints1 = add.constraint.mad(ia, type='<=', value=target.mad, constraints)	
+	weight = max.return.portfolio(ia,constraints1)	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
+	
+	#*****************************************************************
+	# Find portfolio for given return and given risk
+	#******************************************************************				
+	target.return = 24/100
+	target.risk = 12/100
+	# map between risk and mad
+	# plot(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia))
+	# approx(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia), 10/100, method='linear')$y	
+	# this is not very precise, so extra adjusment might be necessary
+	target.mad = approx(portfolio.risk(ef$weight,ia), portfolio.mad(ef$weight,ia), target.risk, method='linear')$y
+	target.mad = target.mad	# - 0.0002
+
+	constraints1 = add.constraints(ia$expected.return,type='>=', b=target.return, constraints)		
+	constraints1 = add.constraint.mad(ia, type='>=', value=target.mad, constraints1)	
+
+	f.obj.return = c(ia$expected.return, rep(0, nrow(constraints1$A) - ia$n))	
+	f.obj.mad = constraints1$A[, ncol(constraints1$A)]
+	weight = lp.obj.portfolio(ia, constraints1, f.obj.return + f.obj.mad )	
+	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
+	
+		
+	# diagnostics
+	100 * portfolio.mad(weight, ia)	
+	100 * target.mad
+	100 * portfolio.risk(weight, ia)	
+	100 * portfolio.return(weight, ia)	
+}
+
+
 
 ###############################################################################
 # Test AA functions: Solutions to Instability of mean-variance efficient portfolios

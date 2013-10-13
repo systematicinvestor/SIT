@@ -207,7 +207,7 @@ optimize.portfolio <- function
 	sol = try(solve.LP.bounds(direction, f.obj, t(f.con), f.dir, f.rhs, 
 				lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec,
 				default.lb = -100), TRUE)	
-	
+				
 	if(!inherits(sol, 'try-error')) {
 		x = sol$solution[1:n]
 		
@@ -446,6 +446,7 @@ portfolio.mad <- function
 	ia			# input assumptions
 )	
 {
+	if(is.null(dim(weight))) dim(weight) = c(1, len(weight))	
 	weight = weight[, 1:ia$n, drop=F]
 	
 	portfolio.returns = weight %*% t(ia$hist.returns)
@@ -1108,8 +1109,34 @@ portfolio.gini.coefficient <- function
 
 
 
+###############################################################################
+# Solve LP Portfolio Problem 
+#' @export 
+###############################################################################
+lp.obj.portfolio <- function
+(
+	ia,				# input assumptions
+	constraints,	# constraints
+	f.obj = c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)),
+	direction = 'min'
+)
+{
+	x = NA
 
-
+	binary.vec = 0
+	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
+	
+	sol = try(solve.LP.bounds(direction, f.obj,
+		t(constraints$A), 
+		c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq)), 
+		constraints$b, lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec), TRUE)	
+	
+	if(!inherits(sol, 'try-error')) {
+		x = sol$solution
+	}			
+	
+	return( x )
+}
 
 ###############################################################################
 # Find Maximum Return Portfolio
@@ -1124,22 +1151,7 @@ max.return.portfolio <- function
 	constraints		# constraints
 )
 {
-	x = NA
-
-	binary.vec = 0
-	if(!is.null(constraints$binary.index)) binary.vec = constraints$binary.index
-	
-	sol = try(solve.LP.bounds('max', c(ia$expected.return, rep(0, nrow(constraints$A) - ia$n)),
-		t(constraints$A), 
-		c(rep('=', constraints$meq), rep('>=', len(constraints$b) - constraints$meq)), 
-		constraints$b, lb = constraints$lb, ub = constraints$ub, binary.vec = binary.vec), TRUE)	
-	
-		
-	if(!inherits(sol, 'try-error')) {
-		x = sol$solution
-	}			
-	
-	return( x )
+	lp.obj.portfolio(ia, constraints, direction = 'max')
 }
 
 ###############################################################################
