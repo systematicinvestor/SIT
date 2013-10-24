@@ -559,6 +559,10 @@ bt.summary <- function
     	
     bt$best = max(bt$ret)
     bt$worst = min(bt$ret)
+    
+	bankrupt = which(bt$ret <= -1)
+	if(len(bankrupt) > 0) bt$ret[bankrupt[1]:n] = -1
+        
     bt$equity = cumprod(1 + bt$ret)
     bt$cagr = compute.cagr(bt$equity)
     	

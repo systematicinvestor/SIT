@@ -154,7 +154,8 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, d
 		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
 
 	# Plot transition maps
-	layout(1:len(models))
+	#layout(1:len(models))
+	layout(1:4)
 	for(m in names(models)) {
 		plotbt.transition.map(models[[m]]$weight, name=m)
 			legend('topright', legend = m, bty = 'n')
@@ -856,11 +857,11 @@ cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfoli
 cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
 	
 	
-	weight = given.return.portfolio(ia,constraints, 12/100)	
+	weight = target.return.portfolio.helper(ia,constraints, 12/100)	
 		weight
 cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
 
-	weight = given.risk.portfolio(ia,constraints, 10/100, silent=F)	
+	weight = target.risk.portfolio.helper(ia,constraints, 10/100, silent=F)	
 		weight
 cat(round(100*c(portfolio.return(weight,ia), portfolio.risk(weight,ia), portfolio.return(weight,ia) /  portfolio.risk(weight,ia)),2), '\n')
 
@@ -1654,6 +1655,11 @@ static.group <- function(group)
 		}
 	}
 	
+	
+	
+	
+	
+	
 	#*****************************************************************
 	# Maps for portfolio optimization and clustering functions
 	#*****************************************************************
@@ -1717,9 +1723,60 @@ static.group <- function(group)
 		}					
 		min.risk.fns	
 	}
-		
-	
-	
+
+			
+	#*****************************************************************
+	# Random Subspace Optimization(RSO)
+	# https://cssanalytics.wordpress.com/2013/10/06/random-subspace-optimization-rso/
+	# http://systematicedge.wordpress.com/2013/10/14/random-subspace-optimization-max-sharpe/
+	#*****************************************************************
+	#' @export 	
+rso.portfolio <- function
+(
+    weight.fn,    # function that dictates how to distribute weights
+    k,            # number of assets to include, should be less than ia$n
+    s             # number of samples
+)
+{
+    weight.fn = match.fun(weight.fn)
+    k = k
+    s = s
+    
+    constraints0 = new.constraints(k, lb = 0, ub = 1)
+        constraints0 = add.constraints(diag(k), type='>=', b=0, constraints0)
+        constraints0 = add.constraints(diag(k), type='<=', b=1, constraints0)
+    constraints0 = add.constraints(rep(1, k), 1, type = '=', constraints0)
+        
+    function
+    (
+        ia,            # input assumptions
+        constraints    # constraints
+    )
+    {
+		if(k > ia$n) stop("K is greater than number of assets.")
+         
+        # randomly select k assets; repeat s times
+		space = seq(1:ia$n)
+        index.samples =t(replicate(s, sample(space, size=k)))
+        weight = matrix(NA, nrow = s, ncol = ia$n)
+    
+        # resample across randomly selected assets
+        for(i in 1:s){
+            #ia.temp = create.ia(ia$hist.returns[, index.samples[i,], drop=F])            
+			ia.temp = create.historical.ia(ia$hist.returns[, index.samples[i,], drop=F],252)
+
+            weight[i,index.samples[i,]] = weight.fn(ia.temp, constraints0)
+        }
+        final.weight = ifna(colMeans(weight, na.rm=T), 0)
+        # normalize weights to sum up to 1
+        final.weight / sum(final.weight)
+    }    
+}    
+        
+    
+    
+
+
 	
 	
 #*****************************************************************

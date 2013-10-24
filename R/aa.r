@@ -1282,15 +1282,11 @@ aritm2geom4 <- function(R, V)
 }
 
 
-
-
-
-
 ###############################################################################
 # Find Portfolio with Minimum Risk and given Target Return
 #' @export 
 ###############################################################################
-given.return.portfolio <- function
+target.return.portfolio.helper <- function
 (
 	ia,				# input assumptions
 	constraints,	# constraints
@@ -1299,19 +1295,39 @@ given.return.portfolio <- function
 {
 	constraints.target = add.constraints(ia$expected.return, type='>=', b=target.return, constraints)							
 	sol = try(min.var.portfolio(ia, constraints.target), silent = TRUE)
-
+	
 	if(inherits(sol, 'try-error'))
 		sol = max.return.portfolio(ia, constraints)
 
-	sol$solution
+	sol
 }
 
+#' @export 	
+target.return.portfolio <- function
+(
+	target.return,
+	annual.factor = 252
+)
+{
+	target.return = as.double(target.return[1])
+	if(target.return > 1) target.return = target.return / 100
+	target.return = target.return / annual.factor
+
+	function
+	(
+		ia,			# input assumptions
+		constraints	# constraints
+	)
+	{
+		target.return.portfolio.helper(ia, constraints, target.return)
+	}	
+}
 
 ###############################################################################
 # Find Portfolio with Minimum Risk and given Target Risk
 #' @export 
 ###############################################################################
-given.risk.portfolio <- function
+target.risk.portfolio.helper <- function
 (
 	ia,				# input assumptions
 	constraints,	# constraints
@@ -1333,7 +1349,7 @@ given.risk.portfolio <- function
 	if( target.risk >= min.s & target.risk <= max.s ) {
 		# function to compute risk given return x
 		f <- function (x, ia, constraints, target.risk) {
-			portfolio.risk(given.return.portfolio(ia, constraints, x), ia) - target.risk
+			portfolio.risk(target.return.portfolio.helper(ia, constraints, x), ia) - target.risk
 		}
 		
 		f.lower = min.s - target.risk
@@ -1342,7 +1358,7 @@ given.risk.portfolio <- function
 		sol = uniroot(f, c(min.r, max.r), f.lower=f.lower, f.upper=f.upper, tol = 0.0001, 
 			ia=ia, constraints=constraints, target.risk=target.risk)
 		if(!silent) cat('Found solution in', sol$iter, 'itterations', '\n')
-		return( given.return.portfolio(ia, constraints, sol$root) )
+		return( target.return.portfolio.helper(ia, constraints, sol$root) )
 	} else if( target.risk < min.s ) {
 		return( min.w )
 	} else {
@@ -1351,6 +1367,28 @@ given.risk.portfolio <- function
 	
 	stop(paste('target.risk =', target.risk, 'is not possible, max risk =', max.s, ', min risk =', min.s))
 }
+
+#' @export 	
+target.risk.portfolio <- function
+(
+	target.risk,
+	annual.factor = 252
+)
+{
+	target.risk = as.double(target.risk[1])
+	if(target.risk > 1) target.risk = target.risk / 100
+	target.risk = target.risk / sqrt(annual.factor)
+
+	function
+	(
+		ia,			# input assumptions
+		constraints	# constraints
+	)
+	{
+		target.risk.portfolio.helper(ia, constraints, target.risk)
+	}	
+}
+
 
 
 ###############################################################################

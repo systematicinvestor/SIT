@@ -1336,6 +1336,90 @@ dev.off()
 
 }
 
+bt.aa.test.new <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,quadprog,corpcor,lpSolve')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='remove.na', dates='1990::') 
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 					
+	cluster.group = cluster.group.kmeans.90
+		
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = 'months', lookback.len = 60, 
+		min.risk.fns = list(
+			EW=equal.weight.portfolio,
+			RP=risk.parity.portfolio,
+			MD=max.div.portfolio,						
+			
+			MV=min.var.portfolio,
+			MVE=min.var.excel.portfolio,
+			MV2=min.var2.portfolio,
+			
+			MC=min.corr.portfolio,
+			MCE=min.corr.excel.portfolio,
+			MC2=min.corr2.portfolio,
+			
+			MS=max.sharpe.portfolio(),
+			ERC = equal.risk.contribution.portfolio,
+
+			# target retunr / risk
+			TRET.12 = target.return.portfolio(12/100),								
+			TRISK.10 = target.risk.portfolio(10/100),
+		
+			# cluster
+			C.EW = distribute.weights(equal.weight.portfolio, cluster.group),
+			C.RP = distribute.weights(risk.parity.portfolio, cluster.group),
+			
+			# rso
+			RSO.RP.5 = rso.portfolio(risk.parity.portfolio, 5, 500), 
+			
+			# others
+			MMaxLoss = min.maxloss.portfolio,
+			MMad = min.mad.portfolio,
+			MCVaR = min.cvar.portfolio,
+			MCDaR = min.cdar.portfolio,
+			MMadDown = min.mad.downside.portfolio,
+			MRiskDown = min.risk.downside.portfolio,
+			MCorCov = min.cor.insteadof.cov.portfolio
+		)
+	)
+	
+	models = create.strategies(obj, data)$models
+						
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+    # put all reports into one pdf file
+	#pdf(file = 'filename.pdf', width=8.5, height=11)
+
+png(filename = 'plot1.png', width = 1800, height = 1800, units = 'px', pointsize = 12, bg = 'white')	
+		strategy.performance.snapshoot(models, T, 'Backtesting Asset Allocation portfolios')
+dev.off()
+	
+			
+		
+	# close pdf file
+    #dev.off()	
+    
+	#pdf(file = 'filename.pdf', width=18.5, height=21)
+	#	strategy.performance.snapshoot(models, title = 'Backtesting Asset Allocation portfolios', data = data)
+	#dev.off()	
+    
+}
+
+
+
+
 
 ###############################################################################
 # Investigate Rebalancing methods:
@@ -5470,6 +5554,7 @@ n.top = 4
 						MC=min.corr.portfolio,
 						MC2=min.corr2.portfolio,
 						MCE=min.corr.excel.portfolio,
+						RSO.2 = rso.portfolio(equal.weight.portfolio, 2, 100), 
 						MS=max.sharpe.portfolio())
 	) 
 	
@@ -5503,6 +5588,59 @@ dev.off()
     #dev.off()	
 }
 
+
+
+
+#*****************************************************************
+# Random Subspace Optimization(RSO)
+# https://cssanalytics.wordpress.com/2013/10/06/random-subspace-optimization-rso/
+# http://systematicedge.wordpress.com/2013/10/14/random-subspace-optimization-max-sharpe/
+#*****************************************************************
+bt.rso.portfolio.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,quadprog,corpcor,lpSolve')
+	tickers = spl('SPY,EEM,EFA,TLT,IWM,QQQ,GLD')	
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='keep.all', dates='1998::') 
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 					
+		
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = 'months', lookback.len = 120, 
+		min.risk.fns = list(
+			EW = equal.weight.portfolio,
+			# RP = risk.parity.portfolio,
+			
+			# MV = min.var.portfolio,
+			# RSO.MV = rso.portfolio(min.var.portfolio, 3, 100),
+			
+			MS = max.sharpe.portfolio(),			
+			RSO.MS.2 = rso.portfolio(max.sharpe.portfolio(), 2, 100),
+			RSO.MS.3 = rso.portfolio(max.sharpe.portfolio(), 3, 100),
+			RSO.MS.4 = rso.portfolio(max.sharpe.portfolio(), 4, 100),
+			RSO.MS.5 = rso.portfolio(max.sharpe.portfolio(), 5, 100),
+			RSO.MS.6 = rso.portfolio(max.sharpe.portfolio(), 6, 100),
+			RSO.MS.7 = rso.portfolio(max.sharpe.portfolio(), 7, 100)
+		)
+	)
+	
+	models = create.strategies(obj, data)$models
+			
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+	strategy.performance.snapshoot(models,T)
+			
+}
 
 ###############################################################################
 # Merging Current Stock Quotes with Historical Prices
