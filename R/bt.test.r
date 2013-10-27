@@ -1415,6 +1415,8 @@ dev.off()
 	#	strategy.performance.snapshoot(models, title = 'Backtesting Asset Allocation portfolios', data = data)
 	#dev.off()	
     
+	# to see last 5 re-balances
+	# round(100 * last(models$MCDaR$weight[obj$period.ends[-len(obj$period.ends)]+1], 5))
 }
 
 

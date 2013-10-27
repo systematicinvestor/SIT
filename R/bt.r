@@ -480,10 +480,23 @@ bt.summary <- function
 	type = c('weight', 'share'),
 	close.prices,
 	capital = 100000,
-	commission = 0,
+	commission = 0,	# cents / share commission
 	dates.index = 1:nrow(weight)
 ) 
 {
+	# cents / share commission
+   	#   trade cost = abs(share - mlag(share)) * commission$cps
+	# fixed commission per trade to more effectively to penalize for turnover
+   	#   trade cost = abs(share - mlag(share)) * commission$cps +  sign(abs(share - mlag(share))) * commission$fixed
+	# percentage commission
+	#   trade cost = price * abs(share - mlag(share)) * commission$percentage
+	if( !is.list(commission) ) {
+		if( type == 'weight') 
+			commission = list(cps = 0.0, fixed = 0.0, percentage = commission)	
+		else 
+			commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
+	}
+	
 	# subset dates
 	if(len(dates.index) != nrow(weight)) {
 		weight = weight[dates.index,,drop=F]
@@ -501,7 +514,9 @@ bt.summary <- function
     	
 	if( type == 'weight') {    
 		temp = ret[,1]
-			temp[] = rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T)
+			temp[] = rowSums(ret * weight) - 
+				rowSums(abs(weight - mlag(weight)) * commission$percentage, na.rm=T)
+				- rowSums(sign(abs(weight - mlag(weight))) * commission$fixed, na.rm=T)
 		bt$ret = temp
     	#bt$ret = make.xts(rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T), index.xts(ret))    	
     	#bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))    	
@@ -539,8 +554,10 @@ bt.summary <- function
 		
 		# We can introduce transaction cost to portfolio returns as
 		# abs(bt$share - mlag(bt$share)) * 0.01
-		portfolio.ret = (totalcash  + rowSums(bt$share * prices, na.rm=T) -
-							rowSums(abs(bt$share - mlag(bt$share)) * commission, na.rm=T)
+		portfolio.ret = (totalcash  + rowSums(bt$share * prices, na.rm=T)
+							- rowSums(abs(bt$share - mlag(bt$share)) * commission$cps, na.rm=T)
+							- rowSums(sign(abs(bt$share - mlag(bt$share))) * commission$fixed, na.rm=T)
+							- rowSums(prices * abs(bt$share - mlag(bt$share)) * commission$percentage, na.rm=T)
 		 				) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
 				
 		#portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1				
