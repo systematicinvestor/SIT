@@ -1145,23 +1145,32 @@ write.xts <- function
 ###############################################################################
 read.xts <- function
 (
-	filename,	# file name
+	x,	# file name or data matrix
 	date.fn = paste,
 	index.class = 'Date',
 	decreasing = FALSE,
 	...
 )
 {
+if (is.matrix(x) || is.data.frame(x) ) {
+	data = x
+	dates = as.matrix(data[,1,drop=F])
+	data  = data[,-1,drop=F]
+} else {
+	filename = x
 	load.packages('data.table')
 	out = fread(filename, stringsAsFactors=F)
 		setnames(out,gsub(' ', '_', trim(colnames(out)))) 
 #		first.column.expr = parse(text = colnames(out)[1])
 		rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-1],collapse=','),')'))
 		
-#	dates = as.POSIXct(match.fun(date.fn)(out[,eval(first.column.expr)]), tz = Sys.getenv('TZ'), ...)
-	dates = as.POSIXct(match.fun(date.fn)(as.matrix(out[,1,with=FALSE])), tz = Sys.getenv('TZ'), ...)		
+#	dates = out[,eval(first.column.expr)]
+	dates = as.matrix(out[,1,with=FALSE])
+	data = out[, eval(rest.columns.expr)]
+}		
+	dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
 		dates.index = order(dates, decreasing = decreasing)
-	out = make.xts(out[dates.index, eval(rest.columns.expr)], dates[dates.index])
+	out = make.xts(data[dates.index,,drop=F], dates[dates.index])
 		indexClass(out) = index.class
 	return( out )
 }

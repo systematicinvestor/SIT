@@ -235,6 +235,183 @@ dev.off()
 }
 
 
+###############################################################################
+# How to use commission functionality
+###############################################################################
+bt.commission.test <- function() 
+{	 
+	# cents / share commission
+   	#   trade cost = abs(share - mlag(share)) * commission$cps
+	# fixed commission per trade to more effectively to penalize for turnover
+   	#   trade cost = sign(abs(share - mlag(share))) * commission$fixed
+	# percentage commission
+	#   trade cost = price * abs(share - mlag(share)) * commission$percentage
+	#
+	# commission = list(cps = 0.0, fixed = 0.0, percentage = 0/100)
+	# cps - cents per share i.e. cps = 1.5 is 1.5 cents per share commision
+	# fixed - fixed cost i.e. fixed = $15 is $15 per trade irrelevant of number of shares
+	# percentage - percentage cost i.e. percentage = 1/100 is 1% of trade value	
+	
+			
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl('EEM')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)			
+	bt.prep(data, align='keep.all', dates='2013:08::2013:09')	
+		
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 		
+	buy.date = '2013:08:14'	
+	sell.date = '2013:08:15'
+	day.after.sell.date = '2013:08:16'		
+	
+	capital = 100000
+	prices = data$prices
+	share = as.double(capital / prices[buy.date])
+	
+	# helper function to compute trade return
+	comp.ret <- function(sell.trade.cost, buy.trade.cost) { round(100 * (as.double(sell.trade.cost) / as.double(buy.trade.cost) - 1), 2) }
+	
+	#*****************************************************************
+	# Zero commission
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[buy.date] = 1
+		data$weight[sell.date] = 0
+		commission = 0.0
+	model = bt.run.share(data, commission = commission, capital = capital, silent = T)
+		
+	comp.ret( share * prices[sell.date], share * prices[buy.date] )		
+	comp.ret( model$equity[day.after.sell.date], model$equity[buy.date] )		
+			
+	#*****************************************************************
+	# 10c cps commission
+	# cents / share commission
+   	#   trade cost = abs(share - mlag(share)) * commission$cps	
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[buy.date] = 1
+		data$weight[sell.date] = 0
+		commission = 0.1
+	model = bt.run.share(data, commission = commission, capital = capital, silent = T)
+
+	comp.ret( share * (prices[sell.date] - commission), share * (prices[buy.date] + commission) )
+	comp.ret( model$equity[day.after.sell.date], model$equity[buy.date] )		
+	
+	#*****************************************************************
+	# $5 fixed commission
+	# fixed commission per trade to more effectively to penalize for turnover
+   	#   trade cost = sign(abs(share - mlag(share))) * commission$fixed	
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[buy.date] = 1
+		data$weight[sell.date] = 0
+		commission = list(cps = 0.0, fixed = 5.0, percentage = 0.0)	
+	model = bt.run.share(data, commission = commission, capital = capital, silent = T)
+
+	comp.ret( share * prices[sell.date] - commission$fixed, share * prices[buy.date] + commission$fixed )
+	comp.ret( model$equity[day.after.sell.date], model$equity[buy.date] )		
+	
+	#*****************************************************************
+	# % commission
+	# percentage commission
+	#   trade cost = price * abs(share - mlag(share)) * commission$percentage	
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[buy.date] = 1
+		data$weight[sell.date] = 0
+		commission = list(cps = 0.0, fixed = 0.0, percentage = 1/100)	
+	model = bt.run.share(data, commission = commission, capital = capital, silent = T)
+
+	comp.ret( share * prices[sell.date] * (1 - commission$percentage), share * prices[buy.date] * (1 + commission$percentage) )
+	comp.ret( model$equity[day.after.sell.date], model$equity[buy.date] )		
+
+	return
+	
+	#*****************************************************************
+	# Not Used
+	#*****************************************************************
+#	comp.ret( as.double(share * prices[sell.date] - commission$fixed)*(share * prices[buy.date] -commission$fixed), share^2 * prices[buy.date]^2 )	
+#	as.double(share * prices[sell.date] - commission$fixed) / (share * prices[buy.date]) *
+#	as.double(share * prices[buy.date] -commission$fixed) /  (share * prices[buy.date]) - 1
+#	
+	# Say following is time-line 0, A, B, C, 1, 2
+	# We open share position at 0 and close at 1
+	# 
+	# Proper Logic
+	# ret = (share * price1 - commission) / (share * price0 + commission)	
+	#
+	# Current Logic	
+	# trade start: cash = price0 * share
+	# retA = (share * priceA - commission) / (share * price0)
+	# retB = (share * priceB) / (share * priceA)
+	# retC = (share * priceC) / (share * priceB)
+	# ret1 = (share * price1 - commission) / (share * priceC)
+	# ret2 = (cash - commission) / (cash)
+	# ret = retA * retB * retC * ret1 * ret2 - 1
+	
+    #*****************************************************************
+    # Code Strategies 
+	#******************************************************************		
+    obj = portfolio.allocation.helper(data$prices,          
+    	periodicity = 'months', lookback.len = 60,              
+    	min.risk.fns = list(EW=equal.weight.portfolio)
+	)
+
+    commission = list(cps = 0.0, fixed = 0.0, percentage = 0/100)        
+    models = create.strategies(obj, data, capital = capital, commission = commission )$models
+    
+    ret = models$EW$ret
+
+    commission = list(cps = 0.0, fixed = 0.0, percentage = 4/100)        
+    models = create.strategies(obj, data, capital = capital, commission = commission )$models
+        
+    ret = cbind(ret, models$EW$ret)
+    
+    round(100 * cbind(ret, ret[,1] - ret[,2]),2)
+    write.xts(cbind(ret, ret[,1] - ret[,2]), 'diff.csv')	
+	
+    
+    
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='remove.na', dates='1990::') 
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 						
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = 'months', lookback.len = 60, 
+		min.risk.fns = list(
+			EW=equal.weight.portfolio
+		)
+	)
+	
+	capital = 100000
+	commission = list(cps = 0.0, fixed = 0.0, percentage = 0/100)
+	models = create.strategies(obj, data, capital = capital, commission = commission )$models
+				
+			
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+	strategy.performance.snapshoot(models, T)    
+}	
+	
+			
+
 
 ###############################################################################
 # Cross Pollination from Timely Portfolio
@@ -8394,3 +8571,106 @@ dev.off()
 	
 	paste(funds, collapse=',')
 }	
+
+
+
+###############################################################################
+# One of the biggest challenges for a market neutral strategy is your shorts ripping when a market 
+# bottoms and all of the (expensive/low momentum) stocks rip straight up.  That is why most factor 
+# based long short portfolios rarely survive – they are long and short the wrong things at market 
+# bottoms.  
+# 
+# Below is french fama momentum data that shows high and low momentum stocks back to the 1920s.  
+# Hi mo beats both the market and low mo.  One would think a market neutral portfolio would be 
+# really low risk, but in reality it has massive drawdowns in the 1920s and 2009.  
+# 
+# One way to rectify this situation is to simply short less the more the market goes down.  
+# Kind of makes sense as you think about it and is probably just prudent risk management.  
+# 
+# So the modified strategy below starts 100% market neutral, and depending on the drawdown bucket 
+# will reduce the shorts all the way to zero once the market has declined by 50% 
+# (in 20% steps for every 10% decline in stocks).
+#
+# http://www.mebanefaber.com/2013/10/30/the-problem-with-market-neutral-and-an-answer/
+###############################################################################
+bt.mebanefaber.modified.mn.test <- function() 
+{	
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************    
+	load.packages('quantmod')		
+	
+	data = new.env()
+		
+	# load historical market returns
+	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',download = T, clean = T)
+		ret = temp[[1]]$Mkt.RF + temp[[1]]$RF
+		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
+	data$SPY = make.stock.xts( price )
+	
+	# load historical momentum returns
+	temp = get.fama.french.data('10_Portfolios_Prior_12_2', periodicity = '',download = T, clean = T)		
+		ret = temp[[1]]
+		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
+	data$HI.MO = make.stock.xts( price$High )
+	data$LO.MO = make.stock.xts( price$Low )
+	
+	# align dates
+	bt.prep(data, align='remove.na')
+	
+	#*****************************************************************
+	# Create Plots
+	#*****************************************************************
+	# plota.matplot(data$prices, log = 'y')
+	
+	#*****************************************************************
+	# Code Strategies
+	#*****************************************************************	
+	models = list()
+	
+	data$weight[] = NA
+		data$weight$SPY[] = 1
+	models$SPY = bt.run.share(data, clean.signal=T)
+	
+	data$weight[] = NA
+		data$weight$HI.MO[] = 1
+	models$HI.MO = bt.run.share(data, clean.signal=T)
+	
+	data$weight[] = NA
+		data$weight$LO.MO[] = 1
+	models$LO.MO = bt.run.share(data, clean.signal=T)
+	
+	data$weight[] = NA
+		data$weight$HI.MO[] = 1
+		data$weight$LO.MO[] = -1
+	models$MKT.NEUTRAL = bt.run.share(data, clean.signal=F)
+
+	#*****************************************************************
+	# Modified MN
+	# The modified strategy below starts 100% market neutral, and depending on the drawdown bucket 
+	# will reduce the shorts all the way to zero once the market has declined by 50%
+	# (in 20% steps for every 10% decline in stocks)
+	#*****************************************************************	
+	market.drawdown = -100 * compute.drawdown(data$prices$SPY)
+		market.drawdown.10.step = 10 * floor(market.drawdown / 10)
+		short.allocation = 100 - market.drawdown.10.step * 2
+		short.allocation[ short.allocation < 0 ] = 0
+				
+	# cbind(market.drawdown, market.drawdown.10.step, short.allocation)
+			
+	data$weight[] = NA
+		data$weight$HI.MO[] = 1
+		data$weight$LO.MO[] = -1 * short.allocation / 100
+	models$Modified.MN = bt.run.share(data, clean.signal=F)
+	
+	#*****************************************************************
+    # Create Report
+    #*****************************************************************
+jpeg(filename = 'plot1.jpg', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    
+    strategy.performance.snapshoot(models, T)
+dev.off()    
+	
+	
+}	
+	
+

@@ -1079,8 +1079,9 @@ get.fama.french.data <- function(
 		names(map) = c('days','weeks', 'months')
 	
 	# url
-	filename.zip = paste(name[1], map[periodicity[1]], '.zip', sep='')
-	filename.txt = paste(name[1], map[periodicity[1]], '.txt', sep='')
+	period = ifna(map[periodicity[1]], periodicity[1])
+	filename.zip = paste(name[1], period, '.zip', sep='')
+	filename.txt = paste(name[1], period, '.txt', sep='')
 	url = paste('http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/', filename.zip, sep='')
 				
 	# download zip archive
@@ -1116,6 +1117,7 @@ get.fama.french.data <- function(
 	data = list()	
 	for(i in 1:nrow(data.index)) {
 		start.index = index[which( index > data.index[i,1] ) - 1][1] + 1
+		if(is.na(start.index)) start.index = index[len(index)] + 1
 		end.index = data.index[i,1] - 1
 		n.index = end.index - start.index + 1
 
@@ -1144,10 +1146,11 @@ get.fama.french.data <- function(
 		date.format.add = ''
 		date.format.n = nchar(paste(temp[1,1]))
 		
-		if( date.format.n == 6 )
+		if( date.format.n == 6 ) {
 			date.format.add = '01'		
-		else if( date.format.n == 4 )
-			date.format.add = '0101'		
+		} else if( date.format.n == 4 ) {
+			date.format.add = '0101'	
+		}	
 		
 		data[[name]] = make.xts(temp[,-1], as.Date(paste(temp[,1], date.format.add, sep=''),date.format))
 			colnames(data[[name]]) = colnames		

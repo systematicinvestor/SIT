@@ -1877,7 +1877,7 @@ portfolio.allocation.helper <- function
 	
 	start.i = which(period.ends >= (lookback.len + 1))[1]
 
-	weight = NA * prices[period.ends,]
+	weight = NA * prices[period.ends,,drop=F]
 		weight[] = 0
 		
 	weights = list()			
