@@ -451,7 +451,7 @@ rotation.strategy.test <- function()
 # Create historical input assumptions
 #' @export 
 ###############################################################################
-create.ia <- function(hist.returns, index=1:ncol(hist.returns))
+create.ia <- function(hist.returns, index=1:ncol(hist.returns), hist.all)
 {	
 	# setup input assumptions
 	ia = list()	
@@ -1735,17 +1735,25 @@ rso.portfolio <- function
 (
     weight.fn,    # function that dictates how to distribute weights
     k,            # number of assets to include, should be less than ia$n
-    s             # number of samples
+    s,            # number of samples
+	const.lb = 0, 
+	const.ub = 1,
+	const.sum = 1    
 )
 {
     weight.fn = match.fun(weight.fn)
     k = k
     s = s
     
-    constraints0 = new.constraints(k, lb = 0, ub = 1)
-        constraints0 = add.constraints(diag(k), type='>=', b=0, constraints0)
-        constraints0 = add.constraints(diag(k), type='<=', b=1, constraints0)
-    constraints0 = add.constraints(rep(1, k), 1, type = '=', constraints0)
+    const.lb = const.lb
+    const.ub = const.ub
+    const.sum = const.sum
+    
+    constraints0 = new.constraints(k, lb = const.lb, ub = const.ub)
+        constraints0 = add.constraints(diag(k), type='>=', b=const.lb, constraints0)
+        constraints0 = add.constraints(diag(k), type='<=', b=const.ub, constraints0)
+	if(!is.na(const.sum))
+    	constraints0 = add.constraints(rep(1, k), type = '=', b=const.sum, constraints0)
         
     function
     (
@@ -1753,11 +1761,22 @@ rso.portfolio <- function
         constraints    # constraints
     )
     {
-		if(k > ia$n) stop("K is greater than number of assets.")
+    	constraints1 = constraints0
+    	k1 = k
+		#if(k > ia$n) stop("K is greater than number of assets.")
+		if(k > ia$n) {
+			k1 = ia$n
+			
+		    constraints1 = new.constraints(k1, lb = const.lb, ub = const.ub)
+		        constraints1 = add.constraints(diag(k1), type='>=', b=const.lb, constraints1)
+		        constraints1 = add.constraints(diag(k1), type='<=', b=const.ub, constraints1)
+			if(!is.na(const.sum))
+		    	constraints1 = add.constraints(rep(1, k1), type = '=', b=const.sum, constraints1)
+		}
          
         # randomly select k assets; repeat s times
 		space = seq(1:ia$n)
-        index.samples =t(replicate(s, sample(space, size=k)))
+        index.samples =t(replicate(s, sample(space, size=k1)))
         weight = matrix(NA, nrow = s, ncol = ia$n)
     
         # resample across randomly selected assets
@@ -1765,7 +1784,7 @@ rso.portfolio <- function
             #ia.temp = create.ia(ia$hist.returns[, index.samples[i,], drop=F])            
 			ia.temp = create.historical.ia(ia$hist.returns[, index.samples[i,], drop=F],252)
 
-            weight[i,index.samples[i,]] = weight.fn(ia.temp, constraints0)
+            weight[i,index.samples[i,]] = weight.fn(ia.temp, constraints1)
         }
         final.weight = ifna(colMeans(weight, na.rm=T), 0)
         # normalize weights to sum up to 1
@@ -1791,9 +1810,10 @@ portfolio.allocation.helper <- function
 	period.ends = endpoints(prices, periodicity),	# rebalancing times
 	
 	lookback.len = 60,		# lookback to construct input assumptions each period
+	n.skip = 1, # number of observations required for computaions. i.e. to compute return we need at least one observation
 	prefix = '',
 	
-	universe = prices[period.ends,]>0,
+	universe = prices[period.ends,,drop=F]>0,
 	
 	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
 	custom.stats.fn = NULL,
@@ -1821,6 +1841,14 @@ portfolio.allocation.helper <- function
 	# Setup
 	#*****************************************************************
 	period.ends = period.ends[period.ends > 0]
+	
+	if( nrow(universe) != len(period.ends) ) {
+		if( nrow(universe) == nrow(prices) )
+			universe = universe[period.ends,,drop=F]
+		else
+			stop("universe incorrect number of rows")		
+	}
+			
 	
 	universe[is.na(universe)] = F
 	
@@ -1875,7 +1903,7 @@ portfolio.allocation.helper <- function
 	prices = coredata(prices)
 	ret = prices / mlag(prices) - 1
 	
-	start.i = which(period.ends >= (lookback.len + 1))[1]
+	start.i = which(period.ends >= (lookback.len + n.skip))[1]
 
 	weight = NA * prices[period.ends,,drop=F]
 		weight[] = 0
@@ -1941,7 +1969,7 @@ portfolio.allocation.helper <- function
 					constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
 							
 				# create historical input assumptions
-				ia.base = create.ia.fn(hist, index)
+				ia.base = create.ia.fn(hist, index, hist.all)
 				
 				for(c in names(shrinkage.fns)) {
 					cov.shrink = shrinkage.fns[[c]](hist, hist.all)					

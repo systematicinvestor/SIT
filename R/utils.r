@@ -1075,6 +1075,37 @@ make.xts <- function
 	return( x )
 }
 
+###############################################################################
+#' Convert \code{\link{xts}} object to \code{\link{ts}} object
+#'
+#' @param x \code{\link{ts}} object
+#'
+#' @return \code{\link{xts}} object
+#' 
+#' use as.xts(ts) to convert back
+#' 
+#' @export 
+###############################################################################
+xts2ts = function(x) {	
+	annual.factor = compute.annual.factor(x)
+
+	map = c(date.day, date.week, date.month, date.quarter)
+		names(map) = trim(spl('252, 52, 12, 4'))
+	date.fn = map[[paste(annual.factor)]]
+
+	first.date = index(first(x))
+	last.date = index(last(x))
+	
+	start = date.year(first.date)
+	end = date.year(last.date)
+	if(	!is.null(date.fn) ) {
+		start = c(start, date.fn(first.date)) 
+		end = c(end, date.fn(last.date)) 
+	} 
+		
+	ts(coredata(x[,1]), start = start, end = end, deltat = 1 / annual.factor) 	
+}
+
 
 ###############################################################################
 #' Reverse order of \code{\link{xts}} object

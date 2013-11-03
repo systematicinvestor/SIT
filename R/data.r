@@ -608,7 +608,9 @@ getQuote.google.xml <- function(tickers) {
 #' @export 
 ###############################################################################
 extend.GLD <- function(GLD) {
-	extend.data(GLD, KITCO.data('Gold.PM') / 10)
+	#extend.data(GLD, KITCO.data('Gold.PM') / 10)
+	# data$GLD = extend.GLD(data$GLD)
+	extend.data(GLD, bundes.bank.data.gold(), scale=T)
 }
 
 #' @export 
