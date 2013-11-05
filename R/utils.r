@@ -1455,6 +1455,74 @@ getSymbols.sit <- function
 
 
 ###############################################################################
+#' Helper function to extend functionality of getSymbols
+#'
+#' Syntax to specify tickers:
+#' * Basic : XLY
+#' * Rename: BOND=TLT
+#' * Extend: XLB+RYBIX
+#' * Mix above: XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX
+#' Symbols = spl('XLY, BOND=TLT,XLY+RYBIX,XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX')
+
+#' tickers=spl('XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX,
+#' XLE+RYEIX+VGENX+FSENX+PRNEX+DREVX,
+#' XLF+FIDSX+SCDGX+DREVX,
+#' XLI+FSCGX+VFINX+FEQIX+DREVX,
+#' XLK+RYTIX+KTCBX+FSPTX+FTCHX+FTRNX+DREVX,
+#' XLP+FDFAX+FSPHX+OARDX+DREVX,
+#' XLU+FSUTX+DREVX,
+#' XLV+VGHCX+VFINX+DREVX,
+#' XLY+FSRPX+DREVX,
+#' BOND+IEI+VFIUX+VFITX+FSTGX+FGOVX+STVSX+FGMNX+FKUSX')
+#' 
+#' data <- new.env()
+#'   getSymbols2(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+#' bt.start.dates(data)
+#'   for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+#' bt.prep(data, align='keep.all', fill.gaps = T) 
+#' 
+#' @export 
+######################################################################x#########
+getSymbols2 <- function 
+(
+	Symbols = NULL, 
+	env = parent.frame(), 
+	getSymbols.fn = getSymbols,
+	auto.assign = T,  
+	...
+) 
+{
+	if(is.character(Symbols)) Symbols = spl(Symbols)
+	if(len(Symbols) < 1) return(Symbols)
+	
+	Symbols = toupper(gsub('\n','',Symbols))
+		
+	# split
+	map = list()
+	for(s in Symbols) {
+		name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
+		values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
+		map[[trim(name)]] = trim(values)
+	}
+	Symbols = unique(unlist(map))
+	
+	# download
+	data <- new.env()
+	match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
+	
+	# reconstruct
+	for(s in names(map)) {
+		env[[ s ]] = data[[ map[[ s ]][1] ]]
+		if( len(map[[ s ]]) > 1)
+			for(i in 2:len(map[[ s ]])) 
+				env[[ s ]] = extend.data(env[[ s ]], data[[ map[[ s ]][i] ]], scale=T) 			
+		if (!auto.assign)
+       		return(env[[ s ]])			
+	}	
+}
+
+
+###############################################################################
 # Log (feedback) functions
 ###############################################################################
 

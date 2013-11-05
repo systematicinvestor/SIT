@@ -1795,9 +1795,115 @@ rso.portfolio <- function
     
     
 
+#*****************************************************************
+# Parallel version of Portfolio Allocation Helper
+#' @export 
+#*****************************************************************
+portfolio.allocation.helper.parallel <- function
+(
+	cores = 1,
+	
+	prices,					# prices
+	periodicity = 'weeks',	#  rebalancing frequency
+	period.ends = endpoints(prices, periodicity),	# rebalancing times
+	
+	lookback.len = 60,		# lookback to construct input assumptions each period
+	n.skip = 1, # number of observations required for computaions. i.e. to compute return we need at least one observation
+	
+	universe = prices[period.ends,,drop=F]>0,
+	
+	prefix = '',
+	
+	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
+	custom.stats.fn = NULL,
+	shrinkage.fns = 'sample.shrinkage',	# covariance Shrinkage Estimator functions
+	
+	create.ia.fn = create.ia,
+	update.ia.fn = update.ia,
+	
+	adjust2positive.definite = T,
+	silent = F,
+	
+	log = log.fn(),	
+	
+	const.lb = 0, 
+	const.ub = 1,
+	const.sum = 1
+) 
+{
+	cores = round(cores)
+	if(cores <= 1)
+		return(portfolio.allocation.helper(prices, periodicity, period.ends, lookback.len, n.skip,
+			universe, prefix,
+			min.risk.fns, custom.stats.fn, shrinkage.fns,
+			create.ia.fn, update.ia.fn,
+			adjust2positive.definite, silent, log,
+			const.lb, const.ub, const.sum))	
+	
+	# http://vikparuchuri.com/blog/parallel-r-loops-for-windows-and-linux/
+	# http://statcompute.wordpress.com/page/3/
+	load.packages('foreach,doParallel')
+	#registerDoParallel(cores = cores)
+	
+cl<-makeCluster(cores)
+registerDoParallel(cl, cores = cores)
+	
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	period.ends = period.ends[period.ends > 0]
+	start.i = which(period.ends >= (lookback.len + n.skip))[1]
+	chunks = c(1, floor(seq(start.i, len(period.ends)+1, length.out = cores + 1)[-1]))
+	temp = 1:len(period.ends)
+	
+#	i=1
+#	temp[-c(chunks[i] : (chunks[i+1]-1))]
+	
+	if( nrow(universe) != len(period.ends) ) {
+		if( nrow(universe) == nrow(prices) )
+			universe = universe[period.ends,,drop=F]
+		else
+			stop("universe incorrect number of rows")		
+	}
+				
+	universe[is.na(universe)] = F	
+	
 
 	
+	# run allocations
+	#out <- foreach(i=1:cores, .packages='quantmod') %do% {
+	# .verbose=TRUE
+	out <- foreach(i=1:cores, .packages='quantmod') %dopar% {
+		new.universe = universe
+		new.universe[temp[-c(chunks[i] : (chunks[i+1]-1))],]=F
+		portfolio.allocation.helper(prices, periodicity, period.ends, lookback.len, n.skip,
+			universe = new.universe, prefix,
+			min.risk.fns, custom.stats.fn, shrinkage.fns,
+			create.ia.fn, update.ia.fn,
+			adjust2positive.definite, silent, log,
+			const.lb, const.ub, const.sum)
+	}		
 	
+stopCluster(cl)	
+	
+	# combine
+	base.out = out[[1]]
+	for(i in 2:cores) {
+		include.index = temp[c(chunks[i] : (chunks[i+1]-1))]
+		for(v in names(out[[i]])) {
+			if(is.list(out[[i]][[v]]))
+				for(n in names(out[[i]][[v]]))
+					base.out[[v]][[n]][include.index,] = out[[i]][[v]][[n]][include.index,]
+			
+			if(is.matrix(out[[i]][[v]]))
+				base.out[[v]][include.index,] = out[[i]][[v]][include.index,]
+		}
+	}	
+	base.out	
+	
+}
+
+
 #*****************************************************************
 # Portfolio Allocation Helper - distribute portfolio weights according to 
 # the given weighting scheme (min.risk.fns)
@@ -1811,9 +1917,10 @@ portfolio.allocation.helper <- function
 	
 	lookback.len = 60,		# lookback to construct input assumptions each period
 	n.skip = 1, # number of observations required for computaions. i.e. to compute return we need at least one observation
-	prefix = '',
 	
 	universe = prices[period.ends,,drop=F]>0,
+	
+	prefix = '',
 	
 	min.risk.fns = 'min.var.portfolio',	# portfolio construction functions
 	custom.stats.fn = NULL,
@@ -2036,8 +2143,6 @@ portfolio.allocation.helper <- function
 # compute portfolio allocation additional stats
 #' @export 
 portfolio.allocation.custom.stats <- function(x,ia) {
-gx <<- x
-gia <<- ia
 	risk.contributions = portfolio.risk.contribution(x, ia)
 	return(list(
 		# vectors
