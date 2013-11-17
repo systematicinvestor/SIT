@@ -1476,18 +1476,19 @@ getSymbols.sit <- function
 #' BOND+IEI+VFIUX+VFITX+FSTGX+FGOVX+STVSX+FGMNX+FKUSX')
 #' 
 #' data <- new.env()
-#'   getSymbols2(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+#'   getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
 #' bt.start.dates(data)
 #'   for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
 #' bt.prep(data, align='keep.all', fill.gaps = T) 
 #' 
 #' @export 
 ######################################################################x#########
-getSymbols2 <- function 
+getSymbols.extra <- function 
 (
 	Symbols = NULL, 
 	env = parent.frame(), 
 	getSymbols.fn = getSymbols,
+	raw.data = new.env(),		# extra pre-loaded raw data
 	auto.assign = T,  
 	...
 ) 
@@ -1506,9 +1507,13 @@ getSymbols2 <- function
 	}
 	Symbols = unique(unlist(map))
 	
+	# find overlap with raw.data
+	Symbols = setdiff(Symbols, ls(raw.data))
+	
 	# download
 	data <- new.env()
-	match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
+	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
+	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
 	
 	# reconstruct
 	for(s in names(map)) {

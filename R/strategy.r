@@ -451,6 +451,7 @@ rotation.strategy.test <- function()
 # Create historical input assumptions
 #' @export 
 ###############################################################################
+#' @export
 create.ia <- function(hist.returns, index=1:ncol(hist.returns), hist.all)
 {	
 	# setup input assumptions
@@ -469,6 +470,7 @@ create.ia <- function(hist.returns, index=1:ncol(hist.returns), hist.all)
 	return(ia)
 }
 
+#' @export
 update.ia <- function(ia, name, cov.shrink)
 {
 	if(name != 'sample.shrinkage') {
@@ -596,7 +598,7 @@ static.weight.portfolio <- function(static.allocation)
 		set.risky.asset(x / sum(x), risk.index)
 	}	
 	
-	
+	#' @export 	
 	equal.risk.contribution.portfolio <- function
 	(
 		ia,                     # input assumptions
@@ -1582,12 +1584,16 @@ static.group <- function(group)
 	#' @export 	
 	distribute.weights <- function
 	(
-		fn,				# function that dictates how to distribute weights
-		group.fn = NA		# group factor
+		fn,				# function that dictates how to distribute weights both across and within groups
+		group.fn = NA,	# group factor
+		fn.within = NA
 	)
 	{
 		fn = match.fun(fn)
 		if(!is.function(group.fn)) if(!is.na(group.fn)) group.fn = match.fun(group.fn)
+		
+		if(!is.function(fn.within)) if(!is.na(fn.within)) fn.within = match.fun(fn.within)
+		if(!is.function(fn.within)) fn.within = fn
 	
 		function
 		(
@@ -1625,7 +1631,7 @@ static.group <- function(group)
 					constraints.temp = add.constraints(rep(1, ia.temp$n), 1, type = '=', constraints.temp)
 					
 	
-					w0 = match.fun(fn)(ia.temp, constraints.temp)
+					w0 = match.fun(fn.within)(ia.temp, constraints.temp)
 						weight0[group == g] = w0
 						# Note that: sd(return0) = portfolio.risk(weight0, ia)	
 						# return0 = ia$hist.returns	%*% weight0
@@ -1653,8 +1659,7 @@ static.group <- function(group)
 				return(weight0)
 			}
 		}
-	}
-	
+	}	
 	
 	
 	
@@ -1873,7 +1878,7 @@ registerDoParallel(cl, cores = cores)
 	# run allocations
 	#out <- foreach(i=1:cores, .packages='quantmod') %do% {
 	# .verbose=TRUE
-	out <- foreach(i=1:cores, .packages='quantmod') %dopar% {
+	out <- foreach(i=1:cores, .packages=spl('quantmod,SIT')) %dopar% {
 		new.universe = universe
 		new.universe[temp[-c(chunks[i] : (chunks[i+1]-1))],]=F
 		portfolio.allocation.helper(prices, periodicity, period.ends, lookback.len, n.skip,
@@ -2007,12 +2012,14 @@ portfolio.allocation.helper <- function
 	#****************************************************************** 		
 	dates = index(prices)[period.ends]
 	
+	weight = NA * prices[period.ends,,drop=F]
+	
 	prices = coredata(prices)
 	ret = prices / mlag(prices) - 1
 	
 	start.i = which(period.ends >= (lookback.len + n.skip))[1]
 
-	weight = NA * prices[period.ends,,drop=F]
+	#weight = NA * prices[period.ends,,drop=F]
 		weight[] = 0
 		
 	weights = list()			
@@ -2093,7 +2100,7 @@ portfolio.allocation.helper <- function
 					# find optimal portfolios under different risk measures
 					for(f in names(min.risk.fns)) {
 						fname = paste(f,c,sep='.')				
-						constraints$x0 = weights[[ fname ]][(j-1),index]			
+						constraints$x0 = as.vector( weights[[ fname ]][(j-1),index] )
 						weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
 					}
 				}							

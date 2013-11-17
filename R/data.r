@@ -412,18 +412,17 @@ nasdaq.100.components <- function()
 
 ###############################################################################
 # Get Sector SPDR Components
-# http://www.sectorspdr.com/spdr/composition/?symbol=XLE
+# http://www.sectorspdr.com/sectorspdr/IDCO.Client.Spdrs.Holdings/Export/ExportCsv?symbol=XLE
 # tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
-# tickers.desc = spl('ConsumerCyclicals,ConsumerStaples,Energy,Financials,HealthCare,Industrials,Materials,Technology,Utilities')
-#' @export 
+# tickers.desc = spl('ConsumerCyclicals,ConsumerStaples,Energy,Financials,HealthCare,Industrials,Materials,Technology,U
+#' @export
 ###############################################################################
 sector.spdr.components <- function(sector.etf = 'XLE')
 {
-	url = paste('http://www.sectorspdr.com/spdr/composition/?symbol=', sector.etf, sep='')
-	txt = join(readLines(url))
+	url = paste('http://www.sectorspdr.com/sectorspdr/IDCO.Client.Spdrs.Holdings/Export/ExportCsv?symbol=', sector.etf, sep='')
 
 	# extract table from this page
-	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = T)
+	temp = read.csv(url, skip=1, header=TRUE, stringsAsFactors=F)
 	tickers = temp[, 'Symbol']
 
 	return(tickers)
@@ -647,15 +646,25 @@ extend.data <- function
 {
 	# find Close in hist
 	close.index = find.names('Close', colnames(hist))$Close
-	if(is.na(close.index)) close.index = 1
+	if(is.na(close.index)) close.index = 1	
+	adjusted.index = find.names('Adjusted', colnames(hist))$Adjusted
+	if(is.na(adjusted.index)) adjusted.index = close.index	
 
 	if(scale) {
 		# find first common observation in current and hist series
 		common = merge(Cl(current), hist[,close.index], join='inner')
 		
 		scale = as.numeric(common[1,1]) / as.numeric(common[1,2])
-							
-		hist = hist * scale
+			
+		if( close.index == adjusted.index )	
+			hist = hist * scale
+		else {
+			hist[,-adjusted.index] = hist[,-adjusted.index] * scale
+			
+			common = merge(Ad(current), hist[,adjusted.index], join='inner')
+			scale = as.numeric(common[1,1]) / as.numeric(common[1,2])
+			hist[,adjusted.index] = hist[,adjusted.index] * scale
+		}
 	}
 	
 	# subset history before current
