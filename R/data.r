@@ -644,6 +644,9 @@ extend.data <- function
 	scale = F
 ) 
 {
+	colnames(current) = sapply(colnames(current), function(x) last(spl(x,'\\.')))
+	colnames(hist) = sapply(colnames(hist), function(x) last(spl(x,'\\.')))
+
 	# find Close in hist
 	close.index = find.names('Close', colnames(hist))$Close
 	if(is.na(close.index)) close.index = 1	

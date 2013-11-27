@@ -1478,8 +1478,6 @@ getSymbols.sit <- function
 #' data <- new.env()
 #'   getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
 #' bt.start.dates(data)
-#'   for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-#' bt.prep(data, align='keep.all', fill.gaps = T) 
 #' 
 #' @export 
 ######################################################################x#########
@@ -1516,6 +1514,7 @@ getSymbols.extra <- function
 	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
 	
 	# reconstruct
+	# env$symbolnames = names(map)
 	for(s in names(map)) {
 		env[[ s ]] = data[[ map[[ s ]][1] ]]
 		if( len(map[[ s ]]) > 1)
@@ -1523,9 +1522,41 @@ getSymbols.extra <- function
 				env[[ s ]] = extend.data(env[[ s ]], data[[ map[[ s ]][i] ]], scale=T) 			
 		if (!auto.assign)
        		return(env[[ s ]])			
-	}	
+	}			
 }
 
+getSymbols.extra.test <- function() 
+{
+	# Syntax to specify tickers:
+	# * Basic : RWX
+	# * Rename: REIT=RWX
+	# * Extend: RWX+VNQ
+	# * Mix above: REIT.LONG=RWX+VNQ+VGSIX	
+	tickers = spl('REIT=RWX, RWX+VNQ, REIT.LONG=RWX+VNQ+VGSIX')
+	data <- new.env()
+		getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	bt.start.dates(data)
+	
+	data$symbolnames = spl('REIT.LONG,RWX,REIT')
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T) 	
+   
+	plota.matplot(data$prices)
+	
+	# Use extrenal data
+	raw.data <- new.env()
+		raw.data$GOLD = bundes.bank.data.gold()
+	
+	tickers = spl('GLD, GLD.LONG=GLD+GOLD')
+	data <- new.env()
+		getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, raw.data = raw.data, auto.assign = T)
+	bt.start.dates(data)
+	data$symbolnames = spl('GLD.LONG,GLD')
+   		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T) 	
+   
+   plota.matplot(data$prices)	
+} 
 
 ###############################################################################
 # Log (feedback) functions

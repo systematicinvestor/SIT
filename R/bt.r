@@ -606,10 +606,12 @@ compute.turnover <- function
 	
 	if( bt$type == 'weight') {    	    	
 		portfolio.value = rowSums(abs(bt$weight), na.rm=T)
-		portfolio.turnover = rowSums( abs(bt$weight - mlag(bt$weight)) )
+		portfolio.turnover = rowSums( abs(bt$weight - mlag(bt$weight)), na.rm=T) 
+		portfolio.turnover[ rowSums( !is.na(bt$weight) & !is.na(mlag(bt$weight)) ) == 0 ] = NA
 	} else {
+		prices = mlag(b$prices[bt$dates.index,,drop=F])
 		# logic from bt.summary function				
-		cash = bt$capital - rowSums(bt$share * mlag(b$prices[bt$dates.index,,drop=F]), na.rm=T)
+		cash = bt$capital - rowSums(bt$share * prices, na.rm=T)
 		
 			# find trade dates
 			share.nextday = mlag(bt$share, -1)
@@ -622,9 +624,10 @@ compute.turnover <- function
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
 		
-		portfolio.value = totalcash + rowSums(bt$share * mlag(b$prices[bt$dates.index,,drop=F]), na.rm=T)		
+		portfolio.value = totalcash + rowSums(bt$share * prices, na.rm=T)
 		
-		portfolio.turnover = rowSums( mlag(b$prices[bt$dates.index,,drop=F]) * abs(bt$share - mlag(bt$share)) )				
+		portfolio.turnover = rowSums( prices * abs(bt$share - mlag(bt$share)), na.rm=T)
+		portfolio.turnover[ rowSums( !is.na(bt$share) & !is.na(mlag(bt$share)) & !is.na(prices) ) == 0 ] = NA
 	}
 	
 	portfolio.turnover[1:2] = 0
