@@ -1575,6 +1575,113 @@ static.group <- function(group)
     	group = fit$cluster
 		return( group )
 	}		
+	
+# Idea by David Varadi	
+# http://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/
+# Original code by Pierre Chretien
+# Small updates by Michael Kapler 	
+cluster.group.FTCA <- function
+(
+	threshold = 0.5
+)
+{
+	function
+	(
+	ia				# input assumptions
+	)
+	{		
+		n = ia$n
+		map.index = 1:n
+		min.cluster.group = 1
+	
+		group = rep(0, n)
+			names(group) = names(ia$risk)
+		index = rep(TRUE, n)
+			names(index) = names(ia$risk)
+			
+		while (n > 0) {			
+			if (n == 1) {
+				group[index] = min.cluster.group
+				break
+			} else {
+				cor.matrix = ia$correlation[index, index]
+				if (n == 2) {
+					if (cor.matrix[1,2] > threshold)
+						group[index] = min.cluster.group
+					else
+						group[index] = c(min.cluster.group, min.cluster.group + 1)				
+					break
+				} else {
+					avg.corr.contribution = (rowSums(cor.matrix) - 1) / (n - 1)
+					avg.rank = rank(avg.corr.contribution)
+					tip = which.min(avg.rank)
+					top = which.max(avg.rank)
+					if (cor.matrix[tip,top] > threshold) {
+						group[index] = min.cluster.group
+						break
+					} else {
+						index.top = map.index[index][cor.matrix[,top] > threshold]					
+						index.tip = map.index[index][cor.matrix[,tip] > threshold]
+							
+						group[index.tip] = min.cluster.group
+						group[index.top] = min.cluster.group + 1
+	
+						index[index.tip] = F
+						index[index.top] = F
+						
+						min.cluster.group = min.cluster.group + 2
+						n = sum(index)
+					}
+				}	
+			}
+		}
+		return(group)
+	}
+}	
+
+
+cluster.group.FTCA.test <- function() {
+	#*****************************************************************
+	# Load historical data for ETFs
+	#****************************************************************** 
+	load.packages('quantmod')
+
+	tickers = spl('GLD,UUP,SPY,QQQ,IWM,EEM,EFA,IYR,USO,TLT')	
+	tickers = spl('GLD,TLT,SPY,IWM,QQQ,EFA,EEM,IYR')
+	tickers = spl('XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU')
+	
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1900-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='keep.all')
+
+	
+	#*****************************************************************
+	# Helper function to compute portfolio allocation additional stats
+	#****************************************************************** 
+	portfolio.allocation.custom.stats.clusters <- function(x,ia) {
+		gia <<- ia
+		return(list(
+			clusters.FTCA = cluster.group.FTCA(0.5)(ia)			
+		))
+	}
+	
+	#*****************************************************************
+	# Find clusters
+	#****************************************************************** 		
+	periodicity = 'months'
+	lookback.len = 252
+		
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = periodicity, lookback.len = lookback.len,
+		min.risk.fns = list(EW=equal.weight.portfolio),
+		custom.stats.fn = portfolio.allocation.custom.stats.clusters
+	) 			
+	
+	clusters = obj$clusters.FTCA$EW	
+	
+	clusters['2012:05::']
+}	
 
 	###############################################################################
 	# Distribute Weights according to Weighting Scheme and Group Method(clusters)
@@ -2068,11 +2175,10 @@ portfolio.allocation.helper <- function
 		n = sum(index)
 		
 		if(n > 0) {
-			if(n > 1) {			
-				hist = hist[ , index]
-				hist.all = ret[ 1:i, index]		
-	
-		
+			hist = hist[ , index, drop=F]
+			hist.all = ret[ 1:i, index, drop=F]		
+
+			if(n > 1) {					
 				# 0 <= x.i <= 1
 				constraints = new.constraints(n, lb = const.lb[index], ub = const.ub[index])
 					constraints = add.constraints(diag(n), type='>=', b=const.lb[index], constraints)
@@ -2105,6 +2211,8 @@ portfolio.allocation.helper <- function
 					}
 				}							
 			} else {
+				ia = create.ia.fn(hist, index, hist.all)
+				
 				for(c in names(shrinkage.fns)) {
 					for(f in names(min.risk.fns)) {
 						fname = paste(f,c,sep='.')				
@@ -2120,7 +2228,7 @@ portfolio.allocation.helper <- function
 					temp = custom.stats.fn(x, ia)
 
 			   		for(ci in names(temp)) {
-			   			if(len(temp[[ ci ]]) > 1)
+			   			if(is.list(custom[[ ci ]]))
 			   				custom[[ ci ]][[ w ]][j, index] = temp[[ ci ]]
 			   			else
 			   				custom[[ ci ]][j, w] = temp[[ ci ]]
