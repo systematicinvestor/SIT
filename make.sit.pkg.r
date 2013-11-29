@@ -5,18 +5,29 @@ library(devtools)
 library(roxygen)
 library(roxygen2)
 
-package.name = 'sit'
+package.name = 'SIT'
+os = Sys.info()[["sysname"]]
 
 ###############################################################################
 # Create folders, copy files
 ###############################################################################
-shell('rmdir /S /Q SIT', wait = TRUE)
-shell('mkdir SIT', wait = TRUE)
-shell('copy Readme.txt SIT\\*.*', wait = TRUE)
-shell('copy Readme.pkg.txt SIT\\*.*', wait = TRUE)
+if (os == "Windows") {
+    shell('rmdir /S /Q SIT', wait = TRUE)
+    shell('mkdir SIT', wait = TRUE)
+    shell('copy Readme.txt SIT\\*.*', wait = TRUE)
+    shell('copy Readme.pkg.txt SIT\\*.*', wait = TRUE)
 
-shell('mkdir SIT\\R', wait = TRUE)
-shell('copy R\\*.* SIT\\R\\*.*', wait = TRUE)
+    shell('mkdir SIT\\R', wait = TRUE)
+    shell('copy R\\*.* SIT\\R\\*.*', wait = TRUE)
+} else {
+    unlink('SIT', recursive = T, force = T)
+    dir.create('SIT')
+    file.copy('Readme.txt', 'SIT/.')
+    file.copy('Readme.pkg.txt', 'SIT/.')
+
+    dir.create('SIT/R', recursive = T)
+    system('cp R/* SIT/R/.', wait = T)        
+}
 
 ###############################################################################
 # Create DESCRIPTION files
@@ -113,8 +124,11 @@ roxygenize(package.name, copy.package = F, unlink.target = F, overwrite = T)
 
 pkg <- as.package(package.name)
 name = devtools:::build(pkg, package.name)
-shell(paste('copy /Y /B', gsub('/','\\\\',name), 'SIT.tar.gz'), wait = TRUE)
-
+if (os == "Windows") {
+    shell(paste('copy /Y /B', gsub('/','\\\\',name), 'SIT.tar.gz'), wait = TRUE)
+} else {
+    system(paste0('cp ',name, ' SIT.tar.gz'), wait = TRUE)
+}
 
 ###############################################################################
 # Usage

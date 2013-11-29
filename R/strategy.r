@@ -1579,7 +1579,8 @@ static.group <- function(group)
 # Idea by David Varadi	
 # http://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/
 # Original code by Pierre Chretien
-# Small updates by Michael Kapler 	
+# Small updates by Michael Kapler
+#' @export
 cluster.group.FTCA <- function
 (
 	threshold = 0.5
@@ -1593,6 +1594,8 @@ cluster.group.FTCA <- function
 		n = ia$n
 		map.index = 1:n
 		min.cluster.group = 1
+		
+		if (threshold >= 1) return(map.index)
 	
 		group = rep(0, n)
 			names(group) = names(ia$risk)
@@ -1660,7 +1663,6 @@ cluster.group.FTCA.test <- function() {
 	# Helper function to compute portfolio allocation additional stats
 	#****************************************************************** 
 	portfolio.allocation.custom.stats.clusters <- function(x,ia) {
-		gia <<- ia
 		return(list(
 			clusters.FTCA = cluster.group.FTCA(0.5)(ia)			
 		))
@@ -1681,6 +1683,33 @@ cluster.group.FTCA.test <- function() {
 	clusters = obj$clusters.FTCA$EW	
 	
 	clusters['2012:05::']
+	
+	
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 					
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = periodicity, lookback.len = lookback.len, 
+		min.risk.fns = list(
+			# cluster
+			C.EW.kmeans = distribute.weights(equal.weight.portfolio, cluster.group.kmeans.90),
+			C.EW.FTCA = distribute.weights(equal.weight.portfolio, cluster.group.FTCA(0.5))			
+		)
+	)
+	
+	models = create.strategies(obj, data)$models
+						
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	strategy.performance.snapshoot(models, T)
+dev.off()
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
+dev.off()
+		
 }	
 
 	###############################################################################
