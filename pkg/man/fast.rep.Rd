@@ -1,0 +1,23 @@
+\name{fast.rep}
+\alias{fast.rep}
+\title{Faster version of rep fucntion}
+\usage{
+  fast.rep(x, times)
+}
+\arguments{
+  \item{x}{data to be repeated}
+
+  \item{times}{number of times to repeat the data}
+}
+\value{
+  new data
+}
+\description{
+  This function is a faster version of rep fucntion
+}
+\examples{
+\dontrun{
+fast.rep(c(1,NA,2,Inf,3), 4)
+}
+}
+

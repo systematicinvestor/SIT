@@ -1,0 +1,38 @@
+\name{third.friday.month}
+\alias{third.friday.month}
+\title{Compute the expiration date of stock options (3rd Friday of the month)}
+\usage{
+  third.friday.month(year, month)
+}
+\arguments{
+  \item{year}{year}
+
+  \item{month}{month}
+}
+\value{
+  date for the third Friday of the given month and year
+}
+\description{
+  Compute the expiration date of stock options (3rd Friday
+  of the month)
+}
+\examples{
+\dontrun{
+third.friday.month(2012,1)
+}
+}
+\references{
+  \url{http://bytes.com/topic/python/answers/161147-find-day-week-month-year}
+
+  \url{http://www.mysmp.com/options/options-expiration-week.html}
+  The week beginning on Monday prior to the Saturday of
+  options expiration is referred to as options expiration
+  week. Since the markets are closed on Saturday, the third
+  Friday of each month represents options expiration. If
+  the third Friday of the month is a holiday, all trading
+  dates are moved forward; meaning that Thursday will be
+  the last trading day to exercise options.
+
+  \url{http://www.cboe.com/TradTool/ExpirationCalendar.aspx}
+}
+
