@@ -1487,6 +1487,7 @@ getSymbols.extra <- function
 	env = parent.frame(), 
 	getSymbols.fn = getSymbols,
 	raw.data = new.env(),		# extra pre-loaded raw data
+	set.symbolnames = F,
 	auto.assign = T,  
 	...
 ) 
@@ -1514,7 +1515,7 @@ getSymbols.extra <- function
 	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
 	
 	# reconstruct
-	# env$symbolnames = names(map)
+	if (set.symbolnames) env$symbolnames = names(map)
 	for(s in names(map)) {
 		env[[ s ]] = data[[ map[[ s ]][1] ]]
 		if( len(map[[ s ]]) > 1)

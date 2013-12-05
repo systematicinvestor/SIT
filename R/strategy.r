@@ -481,7 +481,63 @@ update.ia <- function(ia, name, cov.shrink)
 	ia
 }
 
+# Change periodicity used for input assumptions
+#' @export
+create.ia.period <- function
+(
+	prices, 
+	periodicity = 'weeks',
+	period.ends = endpoints(prices, periodicity)
+)	
+{
+	prices = prices[period.ends,,drop=F]
+	ret = coredata(prices / mlag(prices) - 1)
+	
+	function(hist.returns, index=1:ncol(hist.returns), hist.all)
+	{
+		i = nrow(hist.all)
+		create.ia(ret[which(
+						period.ends <= i & 
+						period.ends >= (i - nrow(hist.returns) + 1)
+					), index, drop=F], 
+					index,
+					ret[which(period.ends <= i), index, drop=F])
+	}	
+}
 
+###############################################################################
+# The Averaging techniques are used to avoid over-fitting any particular frequency
+# created by pierre.c.chretien
+###############################################################################
+momentum.averaged <- function(prices, 
+	lookbacks = c(20,60,120,250) ,	# length of momentum look back
+	n.lag = 3
+) {
+	momentum = 0 * prices
+	for (n.lookback in lookbacks) {
+		part.mom = mlag(prices, n.lag) / mlag(prices, n.lookback + n.lag) - 1
+		momentum = momentum + 252 / n.lookback * part.mom
+	}
+	momentum / len(lookbacks)
+}
+	
+create.ia.averaged <- function(lookbacks, n.lag)
+{
+	lookbacks = lookbacks
+	n.lag = n.lag
+
+	function(hist.returns, index=1:ncol(hist.returns), hist.all)
+	{	
+		nperiods = nrow(hist.returns)
+		
+		temp = c()
+		for (n.lookback in lookbacks) {
+			temp = rbind(temp, hist.returns[(nperiods - n.lookback - n.lag + 1):(nperiods - n.lag), ])
+		}
+		
+		create.ia(temp, index, hist.all)
+	}	
+}
 
 ###############################################################################
 # Portfolio Construction and Optimization routines
@@ -1579,7 +1635,7 @@ static.group <- function(group)
 # Idea by David Varadi	
 # http://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/
 # Original code by Pierre Chretien
-# Small updates by Michael Kapler
+# Small updates by Michael Kapler 	
 #' @export
 cluster.group.FTCA <- function
 (
@@ -1601,7 +1657,7 @@ cluster.group.FTCA <- function
 			names(group) = names(ia$risk)
 		index = rep(TRUE, n)
 			names(index) = names(ia$risk)
-			
+					
 		while (n > 0) {			
 			if (n == 1) {
 				group[index] = min.cluster.group
@@ -1684,6 +1740,11 @@ cluster.group.FTCA.test <- function() {
 	
 	clusters['2012:05::']
 	
+	# create temp matrix with data you want to plot
+	temp1 = clusters['2011::']
+	plot.data = coredata(temp1)
+		rownames(plot.data) = format(index.xts(temp1), '%Y%m')		
+	plot.table(plot.data, highlight = plot.data + 1)
 	
 	#*****************************************************************
 	# Code Strategies
@@ -1693,7 +1754,28 @@ cluster.group.FTCA.test <- function() {
 		min.risk.fns = list(
 			# cluster
 			C.EW.kmeans = distribute.weights(equal.weight.portfolio, cluster.group.kmeans.90),
-			C.EW.FTCA = distribute.weights(equal.weight.portfolio, cluster.group.FTCA(0.5))			
+			C.EW.FTCA = distribute.weights(equal.weight.portfolio, cluster.group.FTCA(0.5)),
+
+			C.RP.kmeans = distribute.weights(risk.parity.portfolio, cluster.group.kmeans.90),
+			C.RP.FTCA = distribute.weights(risk.parity.portfolio, cluster.group.FTCA(0.5)),
+
+			C.MD.kmeans = distribute.weights(max.div.portfolio, cluster.group.kmeans.90),
+			C.MD.FTCA = distribute.weights(max.div.portfolio, cluster.group.FTCA(0.5)),
+
+			C.MV.kmeans = distribute.weights(min.var.portfolio, cluster.group.kmeans.90),
+			C.MV.FTCA = distribute.weights(min.var.portfolio, cluster.group.FTCA(0.5)),
+						
+			C.MVE.kmeans = distribute.weights(min.var.excel.portfolio, cluster.group.kmeans.90),
+			C.MVE.FTCA = distribute.weights(min.var.excel.portfolio, cluster.group.FTCA(0.5)),
+
+			C.MCE.kmeans = distribute.weights(min.corr.excel.portfolio, cluster.group.kmeans.90),
+			C.MCE.FTCA = distribute.weights(min.corr.excel.portfolio, cluster.group.FTCA(0.5)),
+
+			C.MS.kmeans = distribute.weights(max.sharpe.portfolio(), cluster.group.kmeans.90),
+			C.MS.FTCA = distribute.weights(max.sharpe.portfolio(), cluster.group.FTCA(0.5)),
+			
+			C.ERC.kmeans = distribute.weights(equal.risk.contribution.portfolio, cluster.group.kmeans.90),
+			C.ERC.FTCA = distribute.weights(equal.risk.contribution.portfolio, cluster.group.FTCA(0.5))		
 		)
 	)
 	
@@ -1711,6 +1793,8 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()
 		
 }	
+
+	
 
 	###############################################################################
 	# Distribute Weights according to Weighting Scheme and Group Method(clusters)
@@ -2195,7 +2279,7 @@ portfolio.allocation.helper <- function
 		i = period.ends[j]
 		
 		# histtory to construct input assumptions
-		hist = ret[ (i- lookback.len +1):i, ]
+		hist = ret[ (i- lookback.len +1):i,, drop=F]
 		
 		# require all assets to have full price history
 		include.index = count(hist)== lookback.len      

@@ -483,17 +483,59 @@ update.ia <- function(ia, name, cov.shrink)
 
 # Change periodicity used for input assumptions
 #' @export
-create.ia.period <- function(prices, periodicity = 'weeks')
+create.ia.period <- function
+(
+	prices, 
+	periodicity = 'weeks',
+	period.ends = endpoints(prices, periodicity)
+)	
 {
-	period.ends = endpoints(prices, periodicity)		
 	prices = prices[period.ends,,drop=F]
 	ret = coredata(prices / mlag(prices) - 1)
 	
 	function(hist.returns, index=1:ncol(hist.returns), hist.all)
+	{
+		i = nrow(hist.all)
+		create.ia(ret[which(
+						period.ends <= i & 
+						period.ends >= (i - nrow(hist.returns) + 1)
+					), index, drop=F], 
+					index,
+					ret[which(period.ends <= i), index, drop=F])
+	}	
+}
+
+###############################################################################
+# The Averaging techniques are used to avoid over-fitting any particular frequency
+# created by pierre.c.chretien
+###############################################################################
+momentum.averaged <- function(prices, 
+	lookbacks = c(20,60,120,250) ,	# length of momentum look back
+	n.lag = 3
+) {
+	momentum = 0 * prices
+	for (n.lookback in lookbacks) {
+		part.mom = mlag(prices, n.lag) / mlag(prices, n.lookback + n.lag) - 1
+		momentum = momentum + 252 / n.lookback * part.mom
+	}
+	momentum / len(lookbacks)
+}
+	
+create.ia.averaged <- function(lookbacks, n.lag)
+{
+	lookbacks = lookbacks
+	n.lag = n.lag
+
+	function(hist.returns, index=1:ncol(hist.returns), hist.all)
 	{	
-		create.ia(ret[which(period.ends <= nrow(hist.all) & 
-			period.ends >= (nrow(hist.all) - nrow(hist.returns))
-			)], index, hist.all)
+		nperiods = nrow(hist.returns)
+		
+		temp = c()
+		for (n.lookback in lookbacks) {
+			temp = rbind(temp, hist.returns[(nperiods - n.lookback - n.lag + 1):(nperiods - n.lag), ])
+		}
+		
+		create.ia(temp, index, hist.all)
 	}	
 }
 
@@ -2237,7 +2279,7 @@ portfolio.allocation.helper <- function
 		i = period.ends[j]
 		
 		# histtory to construct input assumptions
-		hist = ret[ (i- lookback.len +1):i, ]
+		hist = ret[ (i- lookback.len +1):i,, drop=F]
 		
 		# require all assets to have full price history
 		include.index = count(hist)== lookback.len      

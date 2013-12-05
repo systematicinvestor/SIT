@@ -11,22 +11,23 @@ os = Sys.info()[["sysname"]]
 ###############################################################################
 # Create folders, copy files
 ###############################################################################
+unlink('pkg', recursive = T, force = T)
+dir.create('pkg')
+#file.copy('Readme.txt', 'pkg/.')
+#file.copy('Readme.pkg.txt', 'pkg/.')
+
+dir.create('pkg/R', recursive = T)
+
 if (os == "Windows") {
-    shell('rmdir /S /Q SIT', wait = TRUE)
-    shell('mkdir SIT', wait = TRUE)
-    shell('copy Readme.txt SIT\\*.*', wait = TRUE)
-    shell('copy Readme.pkg.txt SIT\\*.*', wait = TRUE)
-
-    shell('mkdir SIT\\R', wait = TRUE)
-    shell('copy R\\*.* SIT\\R\\*.*', wait = TRUE)
+    #shell('rmdir /S /Q pkg', wait = TRUE)
+    #shell('mkdir pkg', wait = TRUE)
+    #shell('copy Readme.txt pkg\\*.*', wait = TRUE)
+    #shell('copy Readme.pkg.txt pkg\\*.*', wait = TRUE)
+    #shell('mkdir pkg\\R', wait = TRUE)
+    
+    shell('copy R\\*.* pkg\\R\\*.*', wait = TRUE)
 } else {
-    unlink('SIT', recursive = T, force = T)
-    dir.create('SIT')
-    file.copy('Readme.txt', 'SIT/.')
-    file.copy('Readme.pkg.txt', 'SIT/.')
-
-    dir.create('SIT/R', recursive = T)
-    system('cp R/* SIT/R/.', wait = T)        
+    system('cp R/* pkg/R/.', wait = T)        
 }
 
 ###############################################################################
@@ -44,7 +45,7 @@ write.dcf(list(
     Author = 'Michael Kapler <TheSystematicInvestor@gmail.com>', 
     Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>'
     ), 
-    file = file.path(package.name, "DESCRIPTION")
+    file = file.path('pkg', "DESCRIPTION")
 )
 
 cat("
@@ -115,20 +116,18 @@ cat("
 #' plotbt.custom.report.part2(models$equal.weight)
 #' }
 NULL
-", file = file.path(package.name, 'R', paste(package.name,'package.R',sep='-')))
+", file = file.path('pkg', 'R', paste(package.name,'package.R',sep='-')))
 
 ###############################################################################
 # Create documentaion and build package
 ###############################################################################
-roxygenize(package.name, copy.package = F, unlink.target = F, overwrite = T)
+roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
 
-pkg <- as.package(package.name)
-name = devtools:::build(pkg, package.name)
-if (os == "Windows") {
-    shell(paste('copy /Y /B', gsub('/','\\\\',name), 'SIT.tar.gz'), wait = TRUE)
-} else {
-    system(paste0('cp ',name, ' SIT.tar.gz'), wait = TRUE)
-}
+pkg <- as.package('pkg')
+name = devtools:::build(pkg, 'pkg')
+
+file.rename(name, paste(package.name, '.tar.gz', sep=''))
+file.remove(name)
 
 ###############################################################################
 # Usage
