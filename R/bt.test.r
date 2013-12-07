@@ -8672,6 +8672,111 @@ dev.off()
 	
 	
 }	
+
+###############################################################################
+# http://www.mebanefaber.com/2013/12/04/square-root-of-f-squared/
+###############################################################################
+bt.mebanefaber.f.squared.test <- function() 
+{	
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************    
+	load.packages('quantmod')		
+	
+	data = new.env()
+		
+	download = T
+	
+	# load historical market returns
+	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',download = download, clean = T)
+		ret = cbind(temp[[1]]$Mkt.RF + temp[[1]]$RF, temp[[1]]$RF)
+		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
+	data$SPY = make.stock.xts( price$Mkt.RF )
+	data$SHY = make.stock.xts( price$RF )
+	
+	# load historical momentum returns
+	temp = get.fama.french.data('10_Industry_Portfolios', periodicity = '',download = download, clean = T)		
+		ret = temp[[1]]
+		price = bt.apply.matrix(ret[,1:9] / 100, function(x) cumprod(1 + x))
+	for(n in names(price)) data[[n]] = make.stock.xts( price[,n] )
+	
+	# align dates
+	data$symbolnames = c(names(price), 'SHY', 'SPY')
+	bt.prep(data, align='remove.na', dates='2000::')
+
+	bt.dates = '2001:04::'
+
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 	
+	prices = data$prices  
+	n = ncol(data$prices)
+		
+	models = list()
+	
+	#*****************************************************************
+	# Benchmark Strategies
+	#****************************************************************** 			
+	data$weight[] = NA
+		data$weight$SPY[1] = 1
+	models$SPY = bt.run.share(data, clean.signal=F, dates=bt.dates)
+			
+	weight = prices
+		weight$SPY = NA
+		weight$SHY = NA
+	
+	data$weight[] = NA
+		data$weight[] = ntop(weight[], n)
+	models$EW = bt.run.share(data, clean.signal=F, dates=bt.dates)
+	
+	#*****************************************************************
+	# Code Strategies
+	# http://www.mebanefaber.com/2013/12/04/square-root-of-f-squared/
+	#****************************************************************** 			
+	sma = bt.apply.matrix(prices, SMA, 10)
+	
+	# create position score
+	position.score = sma
+	position.score[ prices < sma ] = NA
+		position.score$SHY = NA	
+		position.score$SPY = NA	
+	
+	# equal weight allocation
+	weight = ntop(position.score[], n)	
+	
+	# number of invested funds
+	n.selected = rowSums(weight != 0)
+	
+	# cash logic
+	weight$SHY[n.selected == 0,] = 1
+	
+	weight[n.selected == 1,] = 0.25 * weight[n.selected == 1,]
+	weight$SHY[n.selected == 1,] = 0.75
+	
+	weight[n.selected == 2,] = 0.5 * weight[n.selected == 2,]
+	weight$SHY[n.selected == 2,] = 0.5
+	
+	weight[n.selected == 3,] = 0.75 * weight[n.selected == 3,]
+	weight$SHY[n.selected == 3,] = 0.25
+	
+	# cbind(round(100*weight,0), n.selected)	
+	
+	data$weight[] = NA
+		data$weight[] = weight
+	models$strategy1 = bt.run.share(data, clean.signal=F, dates=bt.dates)
+	
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************       	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+	strategy.performance.snapshoot(models, one.page = T)
+dev.off()
+	
+	
+}		
+	
+
 	
 
 ###############################################################################
@@ -8798,25 +8903,25 @@ strategy.snapshot.custom <-	function(models, n = 0, title = NULL) {
 
 #pdf(file = paste('M.Paramless.Portfolio.Tests.pdf',sep=''), width=8.5, height=11)
 
-png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+png(filename = 'plot1.png', width = 900, height = 900, units = 'px', pointsize = 12, bg = 'white')		
 	# basic vs basic + momentum => momentum filter has better results
 	models.final = c(models$ia.none, models$ia.mom)
 	strategy.snapshot.custom(models.final, len(min.risk.fns), 'Momentum Filter')
 dev.off()
 
-png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')		
+png(filename = 'plot2.png', width = 900, height = 900, units = 'px', pointsize = 12, bg = 'white')		
 	# basic vs basic + avg ia => averaged ia reduce turnover
 	models.final = c(models$ia.none, models$avg_ia.none)
 	strategy.snapshot.custom(models.final, len(min.risk.fns), 'Averaged Input Assumptions')
 dev.off()
 
-png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			
+png(filename = 'plot3.png', width = 900, height = 900, units = 'px', pointsize = 12, bg = 'white')			
 	# basic + momentum vs basic + avg.momentum => mixed results for averaged momentum
 	models.final = c(models$ia.mom, models$ia.avg_mom)
 	strategy.snapshot.custom(models.final, len(min.risk.fns), 'Averaged Momentum')
 dev.off()
 
-png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')				
+png(filename = 'plot4.png', width = 900, height = 900, units = 'px', pointsize = 12, bg = 'white')				
 	# basic + momentum vs avg ia + avg.momentum
 	models.final = c(models$ia.mom, models$avg_ia.avg_mom)
 	strategy.snapshot.custom(models.final, len(min.risk.fns), 'Averaged vs Base')	
