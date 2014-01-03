@@ -636,7 +636,7 @@ compute.turnover <- function
 		temp[iyear] = sum( portfolio.turnover[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T) / 
 						mean( portfolio.value[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T)			
 	}
-	return( mean(temp, na.rm=T) )			
+	return( ifna(mean(temp, na.rm=T),0) )			
 }
 
 

@@ -56,13 +56,20 @@ extract.token <- function
 	txt, 		# source text
 	smarker,	# start key-phrase(s) to find
 	emarker,	# end key-phrase(s) to find
-	pos = 1		# position to start searching at
+	pos = 1,	# position to start searching at
+	keep.marker = F	
 )
 {
-	pos1 = find.tokens(txt, smarker, pos, pos.start = F)
+	pos1 = 1
+	if (nchar(smarker) > 0)
+		pos1 = find.tokens(txt, smarker, pos, pos.start = keep.marker)
 	if( pos1 < 0 ) return("")
-	pos2 = find.tokens(txt, emarker, pos1, pos.start = T) - 1
+	
+	pos2 = nchar(txt)
+	if (nchar(emarker) > 0)
+		pos2 = find.tokens(txt, emarker, pos1, pos.start = !keep.marker) - 1
 	if( pos2 < 0 ) return("")
+	
 	return(substr(txt,pos1,pos2))	
 }
 
@@ -537,6 +544,47 @@ ftse100.components <- function()
 				ticker2ISIN[match(ISIN, ticker2ISIN[,'ISIN']), spl('ticker,Name,Price')])
 
 	return(apply(holdings, 2, list))
+}
+
+
+###############################################################################
+# Get Google search results:
+# https://gist.github.com/Daapii/7281439
+# --- explanation of the parameters in the query ---
+#
+# ie = input encoding
+# oe = output encoding
+# q = query (our search term)
+# num = amount of search results displayed at a time
+# gws_rd=cr = redirects you to your countries version of google (required if you're not in the US)
+# url encode our query
+# query = "https://encrypted.google.com/search?ie=utf-8&oe=utf-8&q={0}&num=100&gws_rd=cr".format(query)
+# google.search("r project")
+#' @export 
+###############################################################################
+google.search <- function
+(
+	query
+)
+{  
+	url = paste("http://google.com/search?ie=utf-8&oe=utf-8&q=", URLencode(query), "&num=10&gws_rd=cr", sep='')
+	txt = join(readLines(url))
+
+	tokens = spl(txt, '<li class="g">')
+
+	if(len(tokens) < 2) return(NULL)
+
+	records = matrix('', nrow=len(tokens)-1,nc=2)
+		colnames(records) = c('label','url')
+	for(i in 2:len(tokens)) {
+		token = tokens[i]	
+		token = extract.token(token, '<a href=', '</a>', keep.marker = T)
+		url = extract.token(token, 'url\\?q=', '&amp;sa=U&amp;')	
+		label = remove.tags(token) 
+		records[i-1,] = c(label,url)
+	}
+
+	return(records)
 }
 
 
