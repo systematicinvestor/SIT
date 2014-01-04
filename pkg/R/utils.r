@@ -1062,7 +1062,7 @@ make.xts <- function
     
     # need to handle case for one row; i.e. len(orderBy) == 1
     if( is.null(dim(x)) ) {
-    	if( len(orderBy) == 1 )
+    	if( len(order.by) == 1 )
     		x = t(as.matrix(x))
     	else
 	    	dim(x) = c(len(x), 1)
