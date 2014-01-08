@@ -1480,7 +1480,7 @@ getSymbols.sit <- function
 #' bt.start.dates(data)
 #' 
 #' @export 
-######################################################################x#########
+################################################################################
 getSymbols.extra <- function 
 (
 	Symbols = NULL, 
@@ -1514,17 +1514,19 @@ getSymbols.extra <- function
 	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
 	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
 	
-	# reconstruct
+	# reconstruct, please note getSymbols replaces ^ symbols
 	if (set.symbolnames) env$symbolnames = names(map)
 	for(s in names(map)) {
-		env[[ s ]] = data[[ map[[ s ]][1] ]]
+		env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
 		if( len(map[[ s ]]) > 1)
 			for(i in 2:len(map[[ s ]])) 
-				env[[ s ]] = extend.data(env[[ s ]], data[[ map[[ s ]][i] ]], scale=T) 			
+				env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T) 			
 		if (!auto.assign)
        		return(env[[ s ]])			
 	}			
 }
+
+
 
 getSymbols.extra.test <- function() 
 {

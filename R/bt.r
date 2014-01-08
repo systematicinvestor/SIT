@@ -586,6 +586,38 @@ bt.summary <- function
     return(bt)    
 }
 
+
+# bt.run - really fast with no bells or whisles
+# working directly with xts is alot slower, so use coredata
+#' @export 	
+bt.run.weight.fast <- function
+(
+	b,					# enviroment with symbols time series
+	do.lag = 1, 		# lag signal
+	do.CarryLastObservationForwardIfNA = TRUE
+) 
+{
+    # Signal => weight
+    weight = ifna(coredata(b$weight), NA)
+    
+    # lag
+    if(do.lag > 0) weight = mlag(weight, do.lag) # Note k=1 implies a move *forward*  
+	
+	# backfill
+	if(do.CarryLastObservationForwardIfNA) weight[] = apply(coredata(weight), 2, ifna.prev)
+    
+	weight[is.na(weight)] = 0
+
+	# returns
+	prices = coredata(b$prices)
+	ret = prices / mlag(prices) - 1
+		ret[] = ifna(ret, 0)
+	ret = rowSums(ret * weight)
+	
+	# prepare output
+    list(weight = weight, ret = ret, equity = cumprod(1 + ret))
+}
+
 ###############################################################################
 # Portfolio turnover	
 # http://wiki.fool.com/Portfolio_turnover

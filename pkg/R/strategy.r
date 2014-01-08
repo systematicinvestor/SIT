@@ -451,14 +451,19 @@ rotation.strategy.test <- function()
 # Create historical input assumptions
 #' @export 
 ###############################################################################
+# index - column index in the prices matrix
+# nperiod - row index in the prices matrix
 #' @export
-create.ia <- function(hist.returns, index=1:ncol(hist.returns), hist.all)
+create.ia <- function(hist.returns, index=1:ncol(hist.returns), nperiod=nrow(hist.returns))
 {	
 	# setup input assumptions
 	ia = list()	
 		ia$hist.returns = hist.returns
-		ia$n = ncol(ia$hist.returns)
+				
+		ia$nperiod = nperiod		
 		ia$index = index
+		
+		ia$n = ncol(ia$hist.returns)
 		ia$symbols = colnames(ia$hist.returns)
 		
 		ia$risk = apply(ia$hist.returns, 2, sd, na.rm = T)
@@ -473,12 +478,35 @@ create.ia <- function(hist.returns, index=1:ncol(hist.returns), hist.all)
 #' @export
 update.ia <- function(ia, name, cov.shrink)
 {
-	if(name != 'sample.shrinkage') {
+	if(name != 'sample') {
 		ia$cov = cov.shrink
 			s0 = 1 / sqrt(diag(ia$cov))
 		ia$correlation = ia$cov * (s0 %*% t(s0))
 	}
 	ia
+}
+
+# Extract subset of ia given index
+#' @export
+create.ia.subset <- function(ia.base, index=1:ia.base$n)
+{	
+	# setup input assumptions
+	ia = list()	
+		ia$hist.returns = ia.base$hist.returns[,index,drop=F]
+				
+		ia$nperiod = ia.base$nperiod
+		ia$index = ia.base$index[index]
+		
+		ia$n = ncol(ia$hist.returns)
+		ia$symbols = colnames(ia$hist.returns)
+		
+		ia$risk = ia.base$risk[index]
+		ia$correlation = ia.base$correlation[index,index,drop=F]
+		ia$cov = ia.base$cov[index,index,drop=F]
+		
+	ia$expected.return = ia.base$expected.return[index]
+							
+	return(ia)
 }
 
 # Change periodicity used for input assumptions
@@ -493,15 +521,15 @@ create.ia.period <- function
 	prices = prices[period.ends,,drop=F]
 	ret = coredata(prices / mlag(prices) - 1)
 	
-	function(hist.returns, index=1:ncol(hist.returns), hist.all)
+	function(hist.returns, index, nperiod)
 	{
-		i = nrow(hist.all)
+		i = nperiod
 		create.ia(ret[which(
 						period.ends <= i & 
 						period.ends >= (i - nrow(hist.returns) + 1)
 					), index, drop=F], 
 					index,
-					ret[which(period.ends <= i), index, drop=F])
+					nperiod)
 	}	
 }
 
@@ -509,6 +537,18 @@ create.ia.period <- function
 # The Averaging techniques are used to avoid over-fitting any particular frequency
 # created by pierre.c.chretien
 ###############################################################################
+#' @export 	
+ia.build.hist <- function(hist.returns, lookbacks, n.lag)
+{
+	nperiods = nrow(hist.returns)
+		
+	temp = c()
+	for (n.lookback in lookbacks)
+			temp = rbind(temp, hist.returns[(nperiods - n.lookback - n.lag + 1):(nperiods - n.lag), , drop=F])
+	return(temp)
+}
+
+#' @export 	
 momentum.averaged <- function(prices, 
 	lookbacks = c(20,60,120,250) ,	# length of momentum look back
 	n.lag = 3
@@ -521,22 +561,44 @@ momentum.averaged <- function(prices,
 	momentum / len(lookbacks)
 }
 	
+#' @export	
 create.ia.averaged <- function(lookbacks, n.lag)
 {
 	lookbacks = lookbacks
 	n.lag = n.lag
 
-	function(hist.returns, index=1:ncol(hist.returns), hist.all)
-	{	
-		nperiods = nrow(hist.returns)
-		
-		temp = c()
-		for (n.lookback in lookbacks) {
-			temp = rbind(temp, hist.returns[(nperiods - n.lookback - n.lag + 1):(nperiods - n.lag), ])
-		}
-		
-		create.ia(temp, index, hist.all)
+	function(hist.returns, index, nperiod)
+	{
+		temp = ia.build.hist(hist.returns, lookbacks, n.lag)
+		create.ia(temp, index, nperiod)
 	}	
+}
+
+
+
+
+# Create basic constraints
+#' @export
+create.basic.constraints <- function(
+	n,
+	const.lb = 0, 
+	const.ub = 1,
+	const.sum = 1
+)
+{
+	if(len(const.lb) == 1) const.lb = rep(const.lb, n)
+	if(len(const.ub) == 1) const.ub = rep(const.ub, n)
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = const.lb, ub = const.ub)
+		constraints = add.constraints(diag(n), type='>=', b=const.lb, constraints)
+		constraints = add.constraints(diag(n), type='<=', b=const.ub, constraints)
+	
+	# SUM x.i = 1
+	if(!is.na(const.sum))
+		constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
+	
+	return(constraints)
 }
 
 ###############################################################################
@@ -823,13 +885,7 @@ max.sharpe.portfolio.test <- function()
 	# create long-only, fully invested efficient frontier
 	n = ia$n		
 
-	# 0 <= x.i <= 1
-	constraints = new.constraints(n, lb = 0, ub = 1)
-		constraints = add.constraints(diag(n), type='>=', b=0, constraints)
-		constraints = add.constraints(diag(n), type='<=', b=1, constraints)
-		
-	# SUM x.i = 1
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	constraints = create.basic.constraints(n, 0, 1, 1)
 	
 	# create efficient frontier
 	ef = portopt(ia, constraints, 50, 'Efficient Frontier') 
@@ -892,13 +948,7 @@ find.portfolio.given.risk.test <- function()
 	# create long-only, fully invested efficient frontier
 	n = ia$n		
 
-	# 0 <= x.i <= 1
-	constraints = new.constraints(n, lb = 0, ub = 1)
-		constraints = add.constraints(diag(n), type='>=', b=0, constraints)
-		constraints = add.constraints(diag(n), type='<=', b=1, constraints)
-		
-	# SUM x.i = 1
-	constraints = add.constraints(rep(1, n), 1, type = '=', constraints)		
+	constraints = create.basic.constraints(n, 0, 1, 1)
 
 	#*****************************************************************
 	# Look at portfolios
@@ -997,14 +1047,7 @@ min.corr.excel.portfolio.test <- function()
 				0.85, 0.70, 1), nr=3, byrow=T)
 	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
 
-
-	# 0 <= x.i <= 1
-	constraints = new.constraints(ia$n, lb = 0, ub = 1)
-		constraints = add.constraints(diag(ia$n), type='>=', b = 0, constraints)
-		constraints = add.constraints(diag(ia$n), type='<=', b = 1, constraints)
-	
-	# SUM x.i = 1
-	constraints = add.constraints(rep(1, ia$n), type = '=', b = 1, constraints)
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
 								
 	min.corr.excel.portfolio(ia,constraints)				
 	
@@ -1224,14 +1267,7 @@ data = '
 	ia$cov = matrix(scan(text=data), nc = ia$n)
 	ia$risk = sqrt(diag(ia$cov))
 	
-
-	# 0 <= x.i <= 1
-	constraints = new.constraints(ia$n, lb = 0, ub = 1)
-		constraints = add.constraints(diag(ia$n), type='>=', b = 0, constraints)
-		constraints = add.constraints(diag(ia$n), type='<=', b = 1, constraints)
-	
-	# SUM x.i = 1
-	constraints = add.constraints(rep(1, ia$n), type = '=', b = 1, constraints)
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
 								
 	min.var.excel.portfolio(ia,constraints)				
 	
@@ -1829,8 +1865,7 @@ dev.off()
 				
 				ngroups = max(group)
 				if(ngroups == 1) return(fn(ia, constraints))
-	
-				
+					
 				weight0 = rep(NA, ia$n)
 				
 				# returns for each group			
@@ -1838,39 +1873,30 @@ dev.off()
 				
 				# compute weights within each group	
 				for(g in 1:ngroups) {
-					if( sum(group == g) == 1 ) {
-						weight0[group == g] = 1
-						hist.g[,g] = ia$hist.returns[, group == g, drop=F]
+					index = group == g
+					if( sum(index) == 1 ) {
+						weight0[index] = 1
+						hist.g[,g] = ia$hist.returns[, index, drop=F]
 					} else {
-		
-					ia.temp = create.ia(ia$hist.returns[, group == g, drop=F])
-													
-					constraints.temp = new.constraints(ia.temp$n, lb = 0, ub = 1)
-						constraints.temp = add.constraints(diag(ia.temp$n), type='>=', b=0, constraints.temp)
-						constraints.temp = add.constraints(diag(ia.temp$n), type='<=', b=1, constraints.temp)
-					constraints.temp = add.constraints(rep(1, ia.temp$n), 1, type = '=', constraints.temp)
-					
-	
-					w0 = match.fun(fn.within)(ia.temp, constraints.temp)
-						weight0[group == g] = w0
-						# Note that: sd(return0) = portfolio.risk(weight0, ia)	
-						# return0 = ia$hist.returns	%*% weight0
+						ia.temp = create.ia.subset(ia, index)
+
+						constraints.temp = create.basic.constraints(ia.temp$n, 0, 1, 1)
+
+						w0 = match.fun(fn.within)(ia.temp, constraints.temp)
+							weight0[index] = w0
+							# Note that: sd(return0) = portfolio.risk(weight0, ia)	
+							# return0 = ia$hist.returns	%*% weight0
 						hist.g[,g] = ia.temp$hist.returns %*% w0
 					}
 				}
 				
 				# create GROUP input assumptions
 				ia.g = create.ia(hist.g)
-											
-				constraints.g = new.constraints(ngroups, lb = 0, ub = 1)
-					constraints.g = add.constraints(diag(ngroups), type='>=', b=0, constraints.g)
-					constraints.g = add.constraints(diag(ngroups), type='<=', b=1, constraints.g)	
-				constraints.g = add.constraints(rep(1, ngroups), 1, type = '=', constraints.g)		
+							
+				constraints.g = create.basic.constraints(ngroups, 0, 1, 1)				
 				
 				# find group weights
 				group.weights = match.fun(fn)(ia.g, constraints.g)
-					
-						
 					
 				# mutliply out group.weights by within group weights
 				for(g in 1:ngroups) {
@@ -1974,12 +2000,8 @@ rso.portfolio <- function
     const.ub = const.ub
     const.sum = const.sum
     
-    constraints0 = new.constraints(k, lb = const.lb, ub = const.ub)
-        constraints0 = add.constraints(diag(k), type='>=', b=const.lb, constraints0)
-        constraints0 = add.constraints(diag(k), type='<=', b=const.ub, constraints0)
-	if(!is.na(const.sum))
-    	constraints0 = add.constraints(rep(1, k), type = '=', b=const.sum, constraints0)
-        
+    constraints0 = create.basic.constraints(k, const.lb, const.ub, const.sum)
+            
     function
     (
         ia,            # input assumptions
@@ -1988,15 +2010,9 @@ rso.portfolio <- function
     {
     	constraints1 = constraints0
     	k1 = k
-		#if(k > ia$n) stop("K is greater than number of assets.")
 		if(k > ia$n) {
-			k1 = ia$n
-			
-		    constraints1 = new.constraints(k1, lb = const.lb, ub = const.ub)
-		        constraints1 = add.constraints(diag(k1), type='>=', b=const.lb, constraints1)
-		        constraints1 = add.constraints(diag(k1), type='<=', b=const.ub, constraints1)
-			if(!is.na(const.sum))
-		    	constraints1 = add.constraints(rep(1, k1), type = '=', b=const.sum, constraints1)
+			k1 = ia$n			
+			constraints1 = create.basic.constraints(k1, const.lb, const.ub, const.sum)
 		}
          
         # randomly select k assets; repeat s times
@@ -2006,9 +2022,7 @@ rso.portfolio <- function
     
         # resample across randomly selected assets
         for(i in 1:s){
-            #ia.temp = create.ia(ia$hist.returns[, index.samples[i,], drop=F])            
-			ia.temp = create.historical.ia(ia$hist.returns[, index.samples[i,], drop=F],252)
-
+        	ia.temp = create.ia.subset(ia, index.samples[i,])
             weight[i,index.samples[i,]] = weight.fn(ia.temp, constraints1)
         }
         final.weight = ifna(colMeans(weight, na.rm=T), 0)
@@ -2273,7 +2287,8 @@ portfolio.allocation.helper <- function
    		}
    	} 		
 		
-						
+	index.map = 1:ncol(ret)
+   				
 	# construct portfolios			
 	for( j in start.i:len(period.ends) ) {
 		i = period.ends[j]
@@ -2291,18 +2306,11 @@ portfolio.allocation.helper <- function
 			hist = hist[ , index, drop=F]
 			hist.all = ret[ 1:i, index, drop=F]		
 
-			if(n > 1) {					
-				# 0 <= x.i <= 1
-				constraints = new.constraints(n, lb = const.lb[index], ub = const.ub[index])
-					constraints = add.constraints(diag(n), type='>=', b=const.lb[index], constraints)
-					constraints = add.constraints(diag(n), type='<=', b=const.ub[index], constraints)
-	
-				# SUM x.i = 1
-				if(!is.na(const.sum))
-					constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
+			if(n > 1) {
+				constraints = create.basic.constraints(n, const.lb[index], const.ub[index], const.sum)
 							
 				# create historical input assumptions
-				ia.base = create.ia.fn(hist, index, hist.all)
+				ia.base = create.ia.fn(hist, index.map[index], i)
 				
 				for(c in names(shrinkage.fns)) {
 					cov.shrink = shrinkage.fns[[c]](hist, hist.all)					
@@ -2324,7 +2332,7 @@ portfolio.allocation.helper <- function
 					}
 				}							
 			} else {
-				ia = create.ia.fn(hist, index, hist.all)
+				ia = create.ia.fn(hist, index.map[index], i)
 				
 				for(c in names(shrinkage.fns)) {
 					for(f in names(min.risk.fns)) {
@@ -2447,13 +2455,7 @@ portfolio.allocation.helper.basic <- function
 			if(n > 1) {			
 				hist = hist[ , index]
 	
-				# 0 <= x.i <= 1
-				constraints = new.constraints(n, lb = 0, ub = 1)
-					constraints = add.constraints(diag(n), type='>=', b=0, constraints)
-					constraints = add.constraints(diag(n), type='<=', b=1, constraints)
-	
-				# SUM x.i = 1
-				constraints = add.constraints(rep(1, n), type = '=', b=1, constraints)
+				constraints = create.basic.constraints(n, 0, 1, 1)
 							
 				# create historical input assumptions
 				#ia = new.env()
