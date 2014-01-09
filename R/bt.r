@@ -587,6 +587,65 @@ bt.summary <- function
 }
 
 
+#' @export 
+bt.trim <- function
+(
+	...
+) 
+{	
+	models = variable.number.arguments( ... )
+
+	for( i in 1:len(models) ) {
+		bt = models[[i]]
+		
+		n = len(bt$equity)
+		first = which.max(!is.na(bt$equity) & bt$equity != 1)
+		if (first < n) {
+			index = first:n
+			bt$dates.index = bt$dates.index[index]
+			bt$equity = bt$equity[index]
+			bt$ret = bt$ret[index]
+			bt$weight = bt$weight[index,,drop=F]
+			if (!is.null(bt$share)) bt$share = bt$share[index,,drop=F]
+
+		    bt$best = max(bt$ret)
+			bt$worst = min(bt$ret)
+			bt$cagr = compute.cagr(bt$equity)
+		}
+		
+		models[[i]] = bt
+	}
+	return (models)
+}
+
+bt.trim.test <- function() {
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************
+    load.packages('quantmod')
+        
+    data <- new.env()
+    getSymbols(spl('SPY,GLD'), src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+    bt.prep(data, align='keep.all')
+
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************
+    models = list()
+    
+    data$weight[] = NA
+        data$weight$SPY[] = 1
+    models$SPY = bt.run.share(data, clean.signal=F)
+
+    data$weight[] = NA
+        data$weight$GLD[] = 1
+    models$GLD = bt.run.share(data, clean.signal=F)
+    
+    
+    strategy.performance.snapshoot(bt.trim(models), T)
+}
+
+
 # bt.run - really fast with no bells or whisles
 # working directly with xts is alot slower, so use coredata
 #' @export 	
