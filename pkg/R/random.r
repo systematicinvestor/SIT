@@ -478,3 +478,24 @@ dev.off()
 	mean(discounted.payoff) 
 
 }
+
+###############################################################################
+# Generate All Possible Combinations
+# there are 2^n - 1 distinct permutations
+# Please note: first row contains all zeros
+#' @export 
+###############################################################################
+all.permutations <- function(n = 1) {
+	m = matrix(F,2^n,n)
+		m[2,1] = T
+	if (n == 1) return(m)
+	
+	istart = 2
+	for(i in 2:n) {
+		index = (istart+1):(2*istart)
+		m[index, ] = m[1:istart,]
+			m[index, i] = T
+		istart = istart * 2	
+	}
+	return(m)
+}

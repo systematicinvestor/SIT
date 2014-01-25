@@ -2326,8 +2326,8 @@ portfolio.allocation.helper <- function
 					
 					# find optimal portfolios under different risk measures
 					for(f in names(min.risk.fns)) {
-						fname = paste(f,c,sep='.')				
-						constraints$x0 = as.vector( weights[[ fname ]][(j-1),index] )
+						fname = paste(f,c,sep='.')	
+						if (j > 1) constraints$x0 = as.vector( weights[[ fname ]][(j-1),index] )
 						weights[[ fname ]][j,index] = min.risk.fns[[f]](ia, constraints)
 					}
 				}							
