@@ -8930,3 +8930,102 @@ dev.off()
 
 
 }
+
+
+###############################################################################
+# Probabilistic Momentum
+# http://cssanalytics.wordpress.com/2014/01/28/are-simple-momentum-strategies-too-dumb-introducing-probabilistic-momentum/
+# http://cssanalytics.wordpress.com/2014/02/12/probabilistic-momentum-spreadsheet/
+###############################################################################
+bt.probabilistic.momentum.test <- function()
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	tickers = spl('SPY,TLT')
+		
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='remove.na', dates='2005::')
+ 
+	
+	#*****************************************************************
+	# Setup
+	#****************************************************************** 
+	lookback.len = 60
+	confidence.level = 60/100
+	
+	prices = data$prices
+		ret = prices / mlag(prices) - 1 
+	
+	models = list()
+	
+	#*****************************************************************
+	# Simple Momentum
+	#****************************************************************** 
+	momentum = prices / mlag(prices, lookback.len)
+	data$weight[] = NA
+		data$weight$SPY[] = momentum$SPY > momentum$TLT
+		data$weight$TLT[] = momentum$SPY <= momentum$TLT
+	models$Simple  = bt.run.share(data, clean.signal=T) 	
+
+	#*****************************************************************
+	# Probabilistic Momentum + Confidence Level
+	# http://cssanalytics.wordpress.com/2014/01/28/are-simple-momentum-strategies-too-dumb-introducing-probabilistic-momentum/
+	# http://cssanalytics.wordpress.com/2014/02/12/probabilistic-momentum-spreadsheet/
+	#****************************************************************** 
+	ir = sqrt(lookback.len) * runMean(ret$SPY - ret$TLT, lookback.len) / runSD(ret$SPY - ret$TLT, lookback.len)
+	momentum.p = pt(ir, lookback.len - 1)
+		
+	data$weight[] = NA
+		data$weight$SPY[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.dn(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$TLT[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+	models$Probabilistic  = bt.run.share(data, clean.signal=T) 	
+
+	data$weight[] = NA
+		data$weight$SPY[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.up(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$TLT[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+	models$Probabilistic.Leverage = bt.run.share(data, clean.signal=T) 	
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    
+    strategy.performance.snapshoot(models, T)
+dev.off()
+    
+    #*****************************************************************
+    # Visualize Signal
+    #******************************************************************        
+	cols = spl('steelblue1,steelblue')
+	prices = scale.one(data$prices)
+    
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
+	layout(1:3)
+	
+	plota(prices$SPY, type='l', ylim=range(prices), plotX=F, col=cols[1], lwd=2)
+	plota.lines(prices$TLT, type='l', plotX=F, col=cols[2], lwd=2)
+		plota.legend('SPY,TLT',cols,as.list(prices))
+
+	highlight = models$Probabilistic$weight$SPY > 0
+		plota.control$col.x.highlight = iif(highlight, cols[1], cols[2])
+	plota(models$Probabilistic$equity, type='l', plotX=F, x.highlight = highlight | T)
+		plota.legend('Probabilistic,SPY,TLT',c('black',cols))
+				
+	highlight = models$Simple$weight$SPY > 0
+		plota.control$col.x.highlight = iif(highlight, cols[1], cols[2])
+	plota(models$Simple$equity, type='l', plotX=T, x.highlight = highlight | T)
+		plota.legend('Simple,SPY,TLT',c('black',cols))		
+dev.off()
+
+    #*****************************************************************
+    # Create PDF Report
+    #******************************************************************        
+pdf(file = 'Probabilistic.Momentum.Report.pdf', width=8.5, height=11)     
+   	strategy.performance.snapshoot(bt.trim(models), data = data)
+dev.off()	
+
+}
