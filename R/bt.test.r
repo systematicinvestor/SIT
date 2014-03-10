@@ -8944,19 +8944,22 @@ bt.probabilistic.momentum.test <- function()
 	#****************************************************************** 
 	load.packages('quantmod')
 		
-	tickers = spl('SPY,TLT')
+	tickers = spl('EQ=QQQ,FI=SHY')
+	tickers = spl('EQ=SPY,FI=TLT')
 		
 	data <- new.env()
-	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-	bt.prep(data, align='remove.na', dates='2005::')
+	bt.prep(data, align='remove.na', dates='::')
  
 	
 	#*****************************************************************
 	# Setup
 	#****************************************************************** 
+	lookback.len = 120
 	lookback.len = 60
 	confidence.level = 60/100
+	
 	
 	prices = data$prices
 		ret = prices / mlag(prices) - 1 
@@ -8968,8 +8971,8 @@ bt.probabilistic.momentum.test <- function()
 	#****************************************************************** 
 	momentum = prices / mlag(prices, lookback.len)
 	data$weight[] = NA
-		data$weight$SPY[] = momentum$SPY > momentum$TLT
-		data$weight$TLT[] = momentum$SPY <= momentum$TLT
+		data$weight$EQ[] = momentum$EQ > momentum$FI
+		data$weight$FI[] = momentum$EQ <= momentum$FI
 	models$Simple  = bt.run.share(data, clean.signal=T) 	
 
 	#*****************************************************************
@@ -8977,17 +8980,17 @@ bt.probabilistic.momentum.test <- function()
 	# http://cssanalytics.wordpress.com/2014/01/28/are-simple-momentum-strategies-too-dumb-introducing-probabilistic-momentum/
 	# http://cssanalytics.wordpress.com/2014/02/12/probabilistic-momentum-spreadsheet/
 	#****************************************************************** 
-	ir = sqrt(lookback.len) * runMean(ret$SPY - ret$TLT, lookback.len) / runSD(ret$SPY - ret$TLT, lookback.len)
+	ir = sqrt(lookback.len) * runMean(ret$EQ - ret$FI, lookback.len) / runSD(ret$EQ - ret$FI, lookback.len)
 	momentum.p = pt(ir, lookback.len - 1)
 		
 	data$weight[] = NA
-		data$weight$SPY[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.dn(momentum.p, (1 - confidence.level)), 0,NA))
-		data$weight$TLT[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+		data$weight$EQ[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.dn(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$FI[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
 	models$Probabilistic  = bt.run.share(data, clean.signal=T) 	
 
 	data$weight[] = NA
-		data$weight$SPY[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.up(momentum.p, (1 - confidence.level)), 0,NA))
-		data$weight$TLT[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+		data$weight$EQ[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.up(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$FI[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
 	models$Probabilistic.Leverage = bt.run.share(data, clean.signal=T) 	
 	
     #*****************************************************************
@@ -9000,25 +9003,25 @@ dev.off()
     #*****************************************************************
     # Visualize Signal
     #******************************************************************        
-	cols = spl('steelblue1,steelblue')
+	cols = spl('steelblue,steelblue1')
 	prices = scale.one(data$prices)
     
 png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')
 	layout(1:3)
 	
-	plota(prices$SPY, type='l', ylim=range(prices), plotX=F, col=cols[1], lwd=2)
-	plota.lines(prices$TLT, type='l', plotX=F, col=cols[2], lwd=2)
-		plota.legend('SPY,TLT',cols,as.list(prices))
+	plota(prices$EQ, type='l', ylim=range(prices), plotX=F, col=cols[1], lwd=2)
+	plota.lines(prices$FI, type='l', plotX=F, col=cols[2], lwd=2)
+		plota.legend('EQ,FI',cols,as.list(prices))
 
-	highlight = models$Probabilistic$weight$SPY > 0
+	highlight = models$Probabilistic$weight$EQ > 0
 		plota.control$col.x.highlight = iif(highlight, cols[1], cols[2])
 	plota(models$Probabilistic$equity, type='l', plotX=F, x.highlight = highlight | T)
-		plota.legend('Probabilistic,SPY,TLT',c('black',cols))
+		plota.legend('Probabilistic,EQ,FI',c('black',cols))
 				
-	highlight = models$Simple$weight$SPY > 0
+	highlight = models$Simple$weight$EQ > 0
 		plota.control$col.x.highlight = iif(highlight, cols[1], cols[2])
 	plota(models$Simple$equity, type='l', plotX=T, x.highlight = highlight | T)
-		plota.legend('Simple,SPY,TLT',c('black',cols))		
+		plota.legend('Simple,EQ,FI',c('black',cols))		
 dev.off()
 
     #*****************************************************************
@@ -9026,6 +9029,218 @@ dev.off()
     #******************************************************************        
 pdf(file = 'Probabilistic.Momentum.Report.pdf', width=8.5, height=11)     
    	strategy.performance.snapshoot(bt.trim(models), data = data)
+dev.off()
+
+
+
+
+
+
+    #*****************************************************************
+    # 60 / 40 Idea
+    #******************************************************************        
+
+	#*****************************************************************
+	# Simple Momentum
+	#****************************************************************** 
+	momentum = prices / mlag(prices, lookback.len)
+	
+	signal = momentum$EQ > momentum$FI
+	
+	data$weight[] = NA
+		data$weight$EQ[] = iif(signal, 60, 40) / 100
+		data$weight$FI[] = iif(signal, 40, 60) / 100
+	models$Simple  = bt.run.share(data, clean.signal=T) 	
+
+	#*****************************************************************
+	# Probabilistic Momentum
+	#****************************************************************** 
+	ir = sqrt(lookback.len) * runMean(ret$EQ - ret$FI, lookback.len) / runSD(ret$EQ - ret$FI, lookback.len)
+	momentum.p = pt(ir, lookback.len - 1)
+		
+	signal = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.dn(momentum.p, (1 - confidence.level)), 0,NA))
+	signal = ifna.prev(signal) == 1
+	
+	data$weight[] = NA
+		data$weight$EQ[] = iif(signal, 60, 40) / 100
+		data$weight$FI[] = iif(signal, 40, 60) / 100
+	models$Probabilistic  = bt.run.share(data, clean.signal=T) 	
+
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    
+    strategy.performance.snapshoot(models, T)
 dev.off()	
 
 }
+
+
+###############################################################################
+# Testing Intraday data from http://thebonnotgang.com/tbg/historical-data/
+###############################################################################
+bt.intraday.thebonnotgang.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+
+	# data from http://thebonnotgang.com/tbg/historical-data/
+	# please save SPY and GLD 1 min data at the given path
+	spath = 'c:/Desktop/'
+	# http://stackoverflow.com/questions/14440661/dec-argument-in-data-tablefread
+		Sys.localeconv()["decimal_point"]
+		Sys.setlocale("LC_NUMERIC", "French_France.1252")
+	
+	data <- new.env()
+	data$SPY = read.xts(paste0(spath,'SPY_1m.csv'), 
+		sep = ';', date.column = 3, format='%Y-%m-%d %H:%M:%S', index.class = c("POSIXlt", "POSIXt"))
+
+	data$GLD = read.xts(paste0(spath,'GLD_1m.csv'), 
+		sep = ';', date.column = 3, format='%Y-%m-%d %H:%M:%S', index.class = c("POSIXlt", "POSIXt"))
+				
+	#*****************************************************************
+	# Create plot for Nov 1, 2012 and 2013
+	#****************************************************************** 
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+
+	layout(c(1,1,2))		
+	plota(data$SPY['2012:11:01'], type='candle', main='SPY on Nov 1st, 2012', plotX = F)
+	plota(plota.scale.volume(data$SPY['2012:11:01']), type = 'volume')	
+
+dev.off()
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	
+	layout(c(1,1,2))		
+	plota(data$SPY['2013:11:01'], type='candle', main='SPY on Nov 1st, 2013', plotX = F)
+	plota(plota.scale.volume(data$SPY['2013:11:01']), type = 'volume')	
+		
+dev.off()		
+	
+	#*****************************************************************
+	# Data check for Gaps in the series Intraday
+	#****************************************************************** 
+	i = 'GLD'
+	dates = index(data[[i]])
+	factor = format(dates, '%Y%m%d')
+	gap = tapply(dates, factor, function(x) max(diff(x)))
+	
+	gap[names(gap[gap > 4*60])]
+	data[[i]]['2013:02:19']
+
+	i = 'SPY'
+	dates = index(data[[i]])
+	factor = format(dates, '%Y%m%d')
+	gap = tapply(dates, factor, function(x) max(diff(x)))
+	
+	gap[names(gap[gap > 4*60])]
+	data[[i]]['2013:02:19']
+	
+	#*****************************************************************
+	# Data check : compare with daily
+	#****************************************************************** 
+	data.daily <- new.env()
+		quantmod::getSymbols(spl('SPY,GLD'), src = 'yahoo', from = '1970-01-01', env = data.daily, auto.assign = T)   
+     
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+		
+	layout(1)		
+	plota(data$GLD, type='l', col='blue', main='GLD')
+		plota.lines(data.daily$GLD, type='l', col='red')
+	plota.legend('Intraday,Daily', 'blue,red')	
+	
+dev.off()
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+
+	plota(data$SPY, type='l', col='blue', main='SPY')
+		plota.lines(data.daily$SPY, type='l', col='red')
+	plota.legend('Intraday,Daily', 'blue,red')	
+
+dev.off()
+
+	#*****************************************************************
+	# Round to the next minute
+	#****************************************************************** 
+	GLD.sample = data$GLD['2012:07:10::2012:07:10 09:35']
+	SPY.sample= data$SPY['2012:07:10::2012:07:10 09:35']
+	
+	merge( Cl(GLD.sample), Cl(SPY.sample) )
+	
+	# round to the next minute
+	index(GLD.sample) = as.POSIXct(format(index(GLD.sample) + 60, '%Y-%m-%d %H:%M'), format = '%Y-%m-%d %H:%M')
+	index(SPY.sample) = as.POSIXct(format(index(SPY.sample) + 60, '%Y-%m-%d %H:%M'), format = '%Y-%m-%d %H:%M')
+	
+	merge( Cl(GLD.sample), Cl(SPY.sample) )
+	
+	#*****************************************************************
+	# Clean data
+	#****************************************************************** 
+	# remove dates with gaps over 4 min
+	for(i in ls(data)) {
+		dates = index(data[[i]])
+		factor = format(dates, '%Y%m%d')
+		gap = tapply(dates, factor, function(x) max(diff(x)))
+		data[[i]] = data[[i]][ is.na(match(factor, names(gap[gap > 4*60]))) ]
+	}		
+	
+	common = unique(format(index(data[[ls(data)[1]]]), '%Y%m%d'))
+	for(i in ls(data)) {
+		dates = index(data[[i]])
+		factor = format(dates, '%Y%m%d')	
+		common = intersect(common, unique(factor))
+	}
+	
+	# remove days that are not present in both time series
+	for(i in ls(data)) {
+		dates = index(data[[i]])
+		factor = format(dates, '%Y%m%d')
+		data[[i]] = data[[i]][!is.na(match(factor, common)),]
+	}
+		
+	#*****************************************************************
+	# Round to the next minute
+	#****************************************************************** 
+	for(i in ls(data))
+		index(data[[i]]) = as.POSIXct(format(index(data[[i]]) + 60, '%Y-%m-%d %H:%M'), tz = Sys.getenv('TZ'), format = '%Y-%m-%d %H:%M')
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	prices = data$prices   
+	dates = data$dates
+		nperiods = nrow(prices)
+	
+	models = list()
+
+	#*****************************************************************
+	# Benchmarks
+	#****************************************************************** 							
+	data$weight[] = NA
+		data$weight$SPY = 1
+	models$SPY = bt.run.share(data, clean.signal=F)
+
+	data$weight[] = NA
+		data$weight$GLD = 1
+	models$GLD = bt.run.share(data, clean.signal=F)
+	
+	data$weight[] = NA
+		data$weight$SPY = 0.5
+		data$weight$GLD = 0.5
+	models$EW = bt.run.share(data, clean.signal=F)
+
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T)	
+    
+dev.off()
+	
+}	
+
+

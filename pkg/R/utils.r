@@ -1180,6 +1180,8 @@ read.xts <- function
 	date.fn = paste,
 	index.class = 'Date',
 	decreasing = FALSE,
+	sep = ',',
+	date.column = 1,
 	...
 )
 {
@@ -1190,13 +1192,13 @@ if (is.matrix(x) || is.data.frame(x) ) {
 } else {
 	filename = x
 	load.packages('data.table')
-	out = fread(filename, stringsAsFactors=F)
+	out = fread(filename, stringsAsFactors=F, sep=sep)
 		setnames(out,gsub(' ', '_', trim(colnames(out)))) 
-#		first.column.expr = parse(text = colnames(out)[1])
-		rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-1],collapse=','),')'))
+#		first.column.expr = parse(text = colnames(out)[date.column])
+		rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-(1:date.column)],collapse=','),')'))
 		
 #	dates = out[,eval(first.column.expr)]
-	dates = as.matrix(out[,1,with=FALSE])
+	dates = as.matrix(out[,date.column,with=FALSE])
 	data = out[, eval(rest.columns.expr)]
 }		
 	dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
@@ -1204,7 +1206,7 @@ if (is.matrix(x) || is.data.frame(x) ) {
 	out = make.xts(data[dates.index,,drop=F], dates[dates.index])
 		indexClass(out) = index.class
 	return( out )
-}
+} 
 
 # A few other variations to read data
 read.xts.old <- function
