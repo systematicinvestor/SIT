@@ -1222,3 +1222,53 @@ get.fama.french.data <- function(
 
 
 
+###############################################################################
+# Download historical intraday prices from Google Finance
+# http://www.mathworks.com/matlabcentral/fileexchange/32745-get-intraday-stock-price
+# http://www.mathworks.com/matlabcentral/fileexchange/36115-volume-weighted-average-price-from-intra-daily-data
+# http://www.codeproject.com/KB/IP/google_finance_downloader.aspx
+# http://www.marketcalls.in/database/google-realtime-intraday-backfill-data.h
+# getSymbol.intraday.google('GOOG','NASDAQ')
+# getSymbol.intraday.google('.DJI','INDEXDJX')
+#' @export 
+###############################################################################
+getSymbol.intraday.google <- function
+(
+	Symbol, 
+	Exchange,
+	interval = 60,	# 60 seconds
+	period = '1d'
+) 
+{
+	# download Key Statistics from yahoo	
+	url = paste('http://www.google.com/finance/getprices?q=', Symbol,
+		'&x=', Exchange,
+    	'&i=', interval,
+    	'&p=', period,
+    	'&f=', 'd,o,h,l,c,v', sep='')
+
+	load.packages('data.table')
+	out = fread(url, stringsAsFactors=F)
+	
+	if(ncol(out) < 5) {
+		cat('Error getting data from', url, '\n')
+		return(NULL)
+	}
+	
+		setnames(out, spl('Date,Open,High,Low,Close,Volume'))
+	
+	# date logic
+	date = out$Date
+		date.index = substr(out$Date,1,1) == 'a'
+		date = as.double(gsub('a','',date))	
+	temp = NA * date
+		temp[date.index] = date[date.index]
+		temp = ifna.prev(temp)
+	date = temp + date * interval
+		date[date.index] = temp[date.index]	
+	class(date) = c("POSIXt", "POSIXct")
+	
+	date = date - (as.double(format(date[1],'%H')) - 9)*60*60
+	
+	make.xts(out[, eval(expression(list( Open,High,Low,Close,Volume )))], date)
+}

@@ -8963,6 +8963,7 @@ bt.probabilistic.momentum.test <- function()
 	
 	prices = data$prices
 		ret = prices / mlag(prices) - 1 
+		#ret = log(prices / mlag(prices))
 	
 	models = list()
 	
@@ -9079,6 +9080,113 @@ dev.off()
 ###############################################################################
 # Testing Intraday data from http://thebonnotgang.com/tbg/historical-data/
 ###############################################################################
+# helper function to load and optionally clean data from thebonnotgang
+bt.load.thebonnotgang.data <- function(Symbols, folder, silent=F, clean=T) 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	# data from http://thebonnotgang.com/tbg/historical-data/
+	
+	# http://stackoverflow.com/questions/14440661/dec-argument-in-data-tablefread
+		Sys.localeconv()["decimal_point"]
+		Sys.setlocale("LC_NUMERIC", "French_France.1252")
+	
+	data <- new.env()
+	for(s in spl(Symbols))
+		data[[s]] = read.xts(paste0(folder,s,'_1m.csv'), 
+			sep = ';', date.column = 3, format='%Y-%m-%d %H:%M:%S', index.class = c("POSIXlt", "POSIXt"))	
+					
+if(!clean)return(data)
+	
+	#*****************************************************************
+	# Clean data
+	#****************************************************************** 	
+	for(i in ls(data)) {
+		# remove dates with gaps over 4 min
+		dates = index(data[[i]])
+			dates.number = as.double(dates)
+		factor = format(dates, '%Y%m%d')
+		gap = tapply(dates.number, factor, function(x) max(diff(x)))
+		ok.index = names(gap[gap <= 4*60])
+		data[[i]] = data[[i]][ !is.na(match(factor, ok.index)) ]
+	
+if(!silent)cat(i, 'removing due to gaps:', setdiff(factor,ok.index), '\n\n')
+	
+				
+		# remove dates with over 7 hours or less than 2 hours of trading
+		dates = index(data[[i]])
+			dates.number = as.double(dates)
+		factor = format(dates, '%Y%m%d')
+		nperiods = len(dates)
+		day.change = which(diff(dates.number) > 5 * 60)
+		day.start = c(1, day.change + 1)
+		day.end = c(day.change, nperiods)
+		ok.index = which(dates.number[day.end] - dates.number[day.start] < 7*60*60 &
+						dates.number[day.end] - dates.number[day.start] > 2*60*60)
+		ok.index = factor[day.start][ok.index]
+		data[[i]] = data[[i]][ !is.na(match(factor, ok.index)) ]
+		
+if(!silent)cat(i, 'removing due to trading hours:', setdiff(factor,ok.index), '\n\n')		
+		
+		# align all trading to start at 9:31
+		dates = index(data[[i]])
+			dates.number = as.double(dates)
+		factor = format(dates, '%Y%m%d')
+		nperiods = len(dates)
+		day.change = which(diff(dates.number) > 5 * 60)
+		day.start = c(1, day.change + 1)
+		day.end = c(day.change, nperiods)
+
+		add.hours = as.double(format(dates[day.start], '%H')) - 9				
+		for(h in which(add.hours != 0))
+			dates[day.start[h]:day.end[h]] = dates[day.start[h]:day.end[h]] - add.hours[h]*60*60
+		index(data[[i]]) = dates
+	}	
+	
+	
+	ok.index = unique(format(index(data[[ls(data)[1]]]), '%Y%m%d'))
+	for(i in ls(data)) {
+		dates = index(data[[i]])
+		factor = format(dates, '%Y%m%d')	
+		ok.index = intersect(ok.index, unique(factor))
+	}
+	
+	# remove days that are not present in both time series
+	for(i in ls(data)) {
+		dates = index(data[[i]])
+		factor = format(dates, '%Y%m%d')		
+		data[[i]] = data[[i]][ !is.na(match(factor, ok.index)) ]
+		
+if(!silent)cat(i, 'removing due to not being common:', setdiff(factor,ok.index), '\n\n')		
+	}
+		
+	#*****************************************************************
+	# Round to the next minute
+	#****************************************************************** 
+	for(i in ls(data))
+		index(data[[i]]) = as.POSIXct(format(index(data[[i]]) + 60, '%Y-%m-%d %H:%M'), tz = Sys.getenv('TZ'), format = '%Y-%m-%d %H:%M')
+
+	data		
+}
+
+# helper function to extract index of day start / end in intraday data
+bt.intraday.day <- function(dates) 
+{
+	dates.number = as.double(dates)		
+	
+	nperiods = len(dates)
+	
+	day.change = which(diff(dates.number) > 5 * 60)
+	list(
+		day.start = c(1, day.change + 1),
+		day.end = c(day.change, nperiods)
+	)	
+}
+
+
+
 bt.intraday.thebonnotgang.test <- function() 
 {
 	#*****************************************************************
@@ -9174,39 +9282,10 @@ dev.off()
 	merge( Cl(GLD.sample), Cl(SPY.sample) )
 	
 	#*****************************************************************
-	# Clean data
-	#****************************************************************** 
-	# remove dates with gaps over 4 min
-	for(i in ls(data)) {
-		dates = index(data[[i]])
-		factor = format(dates, '%Y%m%d')
-		gap = tapply(dates, factor, function(x) max(diff(x)))
-		data[[i]] = data[[i]][ is.na(match(factor, names(gap[gap > 4*60]))) ]
-	}		
-	
-	common = unique(format(index(data[[ls(data)[1]]]), '%Y%m%d'))
-	for(i in ls(data)) {
-		dates = index(data[[i]])
-		factor = format(dates, '%Y%m%d')	
-		common = intersect(common, unique(factor))
-	}
-	
-	# remove days that are not present in both time series
-	for(i in ls(data)) {
-		dates = index(data[[i]])
-		factor = format(dates, '%Y%m%d')
-		data[[i]] = data[[i]][!is.na(match(factor, common)),]
-	}
-		
-	#*****************************************************************
-	# Round to the next minute
-	#****************************************************************** 
-	for(i in ls(data))
-		index(data[[i]]) = as.POSIXct(format(index(data[[i]]) + 60, '%Y-%m-%d %H:%M'), tz = Sys.getenv('TZ'), format = '%Y-%m-%d %H:%M')
-	
-	#*****************************************************************
 	# Load historical data
 	#****************************************************************** 
+	data = bt.load.thebonnotgang.data('SPY,GLD', spath)
+	#plota(data$SPY['2013:10:11'], type='candle')
 	bt.prep(data, align='keep.all', fill.gaps = T)
 
 	prices = data$prices   
@@ -9243,4 +9322,185 @@ dev.off()
 	
 }	
 
+###############################################################################
+# Strategy Testing Intraday data from http://thebonnotgang.com/tbg/historical-data/
+###############################################################################
+bt.strategy.intraday.thebonnotgang.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
 
+	# data from http://thebonnotgang.com/tbg/historical-data/
+	# please save SPY and GLD 1 min data at the given path
+	spath = 'c:/Desktop/'
+spath = 'c:/Documents and Settings/mkapler/Desktop/'
+spath = 'c:/Desktop/1car/1shaun/'
+	data = bt.load.thebonnotgang.data('SPY,GLD', spath)
+	
+	data1 <- new.env()		
+		data1$FI = data$GLD
+		data1$EQ = data$SPY
+	data = data1
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+
+	lookback.len = 120
+	confidence.level = 60/100
+	
+	prices = data$prices
+		ret = prices / mlag(prices) - 1 
+		
+	models = list()
+	
+	#*****************************************************************
+	# Simple Momentum
+	#****************************************************************** 
+	momentum = prices / mlag(prices, lookback.len)
+	data$weight[] = NA
+		data$weight$EQ[] = momentum$EQ > momentum$FI
+		data$weight$FI[] = momentum$EQ <= momentum$FI
+	models$Simple  = bt.run.share(data, clean.signal=T) 	
+
+	#*****************************************************************
+	# Probabilistic Momentum + Confidence Level
+	# http://cssanalytics.wordpress.com/2014/01/28/are-simple-momentum-strategies-too-dumb-introducing-probabilistic-momentum/
+	# http://cssanalytics.wordpress.com/2014/02/12/probabilistic-momentum-spreadsheet/
+	#****************************************************************** 
+	ir = sqrt(lookback.len) * runMean(ret$EQ - ret$FI, lookback.len) / runSD(ret$EQ - ret$FI, lookback.len)
+	momentum.p = pt(ir, lookback.len - 1)
+		
+	data$weight[] = NA
+		data$weight$EQ[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.dn(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$FI[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+	models$Probabilistic  = bt.run.share(data, clean.signal=T) 	
+
+	data$weight[] = NA
+		data$weight$EQ[] = iif(cross.up(momentum.p, confidence.level), 1, iif(cross.up(momentum.p, (1 - confidence.level)), 0,NA))
+		data$weight$FI[] = iif(cross.dn(momentum.p, (1 - confidence.level)), 1, iif(cross.up(momentum.p, confidence.level), 0,NA))
+	models$Probabilistic.Leverage = bt.run.share(data, clean.signal=T) 	
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T)	
+    
+dev.off()
+    
+    #*****************************************************************
+    # Hourly Performance
+    #******************************************************************    
+    strategy.name = 'Probabilistic.Leverage'
+	ret = models[[strategy.name]]$ret	
+		ret.number = 100*as.double(ret)
+		
+	dates = index(ret)
+    factor = format(dates, '%H')
+    
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	    
+    layout(1:2)
+    par(mar=c(4,4,1,1))
+	boxplot(tapply(ret.number, factor, function(x) x),outline=T, main=paste(strategy.name, 'Distribution of Returns'), las=1)
+	barplot(tapply(ret.number, factor, function(x) sum(x)), main=paste(strategy.name, 'P&L by Hour'), las=1)
+dev.off()    	
+
+    #*****************************************************************
+    # Hourly Performance: Remove first return of the day (i.e. overnight)
+    #******************************************************************    
+   	day.stat = bt.intraday.day(dates)
+	ret.number[day.stat$day.start] = 0
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	    		
+    layout(1:2)
+    par(mar=c(4,4,1,1))
+	boxplot(tapply(ret.number, factor, function(x) x),outline=T, main=paste(strategy.name, 'Distribution of Returns'), las=1)
+	barplot(tapply(ret.number, factor, function(x) sum(x)), main=paste(strategy.name, 'P&L by Hour'), las=1)
+dev.off()    	
+	
+}
+	
+	
+bt.pair.strategy.intraday.thebonnotgang.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+
+	# data from http://thebonnotgang.com/tbg/historical-data/
+	# please save SPY and GLD 1 min data at the given path
+	spath = 'c:/Desktop/'
+spath = 'c:/Documents and Settings/mkapler/Desktop/'	
+	data = bt.load.thebonnotgang.data('USO,GLD', spath)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	prices = data$prices   
+		nperiods = nrow(prices)
+	dates = data$dates
+		day.stat = bt.intraday.day(dates)
+	
+	models = list()
+    
+	#*****************************************************************
+	# Construct signal
+	# http://systematicedge.wordpress.com/2014/02/26/energy-stat-arb/
+	#****************************************************************** 							
+	lookback = 120
+	
+	stoch = (prices - bt.apply.matrix(prices, runMin, lookback)) / (bt.apply.matrix(prices, runMax, lookback) - bt.apply.matrix(prices, runMin, lookback))	
+		stoch = bt.apply.matrix(stoch, ifna.prev)
+	
+	stat = stoch$USO - stoch$GLD
+	stat = (stat - runMean(stat,20))/runSD(stat,20)
+	
+	data$weight[] = NA
+		data$weight$USO = iif(stat >= 2, -1, iif(stat <= -2, 1, 0))
+		data$weight$GLD = iif(stat <= -2, -1, iif(stat >= 2, 1, 0))
+
+		data$weight[day.stat$day.end,] = 0
+		data$weight[as.vector(0:(lookback-1) + rep.row(day.stat$day.start,lookback)),] = 0
+		
+	models$P = bt.run.share(data, clean.signal=T, do.lag = 1)
+
+	#*****************************************************************
+	# Construct signal
+	# http://systematicedge.wordpress.com/2014/03/01/energy-stat-arb-part-2/
+	# lm(y~x+0) <=> ols(x,y)$coefficients
+	#****************************************************************** 							
+	beta = NA * prices[,1]
+	temp = coredata(prices[,spl('USO,GLD')])
+	for(i in lookback : nperiods) {
+		dummy = temp[(i- lookback +1):i,]
+		beta[i] = ols(dummy[, 1], dummy[, 2])$coefficients
+		if( i %% 1000 == 0) cat(i, nperiods, round(100*i/nperiods), '\n')	
+	}
+	
+	stat = temp[,2] - beta * temp[,1]
+	stat = -(stat - runMean(stat,20))/runSD(stat,20)
+	
+	data$weight[] = NA
+		data$weight$USO = iif(stat >= 2, -1, iif(stat <= -2, 1, 0))
+		data$weight$GLD = iif(stat <= -2, -1, iif(stat >= 2, 1, 0))
+
+		data$weight[day.stat$day.end,] = 0
+		data$weight[as.vector(0:(lookback-1) + rep.row(day.stat$day.start,lookback)),] = 0
+		
+	models$P1 = bt.run.share(data, clean.signal=T, do.lag = 1)
+	
+    #*****************************************************************
+    # Create Report
+    #******************************************************************    
+png(filename = 'plot1a.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T)	
+    
+dev.off()
+
+
+    	
+}	
+	
+	
