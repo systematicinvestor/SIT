@@ -547,6 +547,41 @@ ftse100.components <- function()
 }
 
 
+
+###############################################################################
+# Get Dow Jones Components
+# http://finance.yahoo.com/q/cp?s=^DJI+Components
+# us.ishares.components(date='2008-02-01')
+#' @export 
+###############################################################################
+us.ishares.components <- function(Symbol = 'DVY', date = NULL, debug = F)
+{
+	url = paste('http://us.ishares.com/product_info/fund/holdings/', Symbol, '.htm?periodCd=d', sep='')
+	if( !is.null(date) )
+		url = paste('http://us.ishares.com/product_info/fund/holdings/', Symbol, '.htm?asofDt=', date.end(date), '&periodCd=m', sep='')
+	txt = join(readLines(url))
+
+	# extract date from this page
+	temp = remove.tags(extract.token(txt, 'Holdings Detail', 'Holdings subject to change'))
+	date = as.Date(spl(trim(temp),' ')[3], '%m/%d/%Y')
+	
+	# extract table from this page
+	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = T)
+	
+	colnames(temp) = trim(colnames(temp))
+	temp = trim(temp)
+	
+	tickers = temp[, 'Symbol']
+		keep.index = nchar(tickers)>1
+	weights = as.double(temp[keep.index, '% Net Assets']) / 100
+ 	tickers = tickers[keep.index]
+ 	 	
+	out = list(tickers = tickers, weights = weights, date = date)
+	if(debug) out$txt = txt
+	out
+}
+
+
 ###############################################################################
 # Get Google search results:
 # https://gist.github.com/Daapii/7281439
@@ -1272,3 +1307,54 @@ getSymbol.intraday.google <- function
 	
 	make.xts(out[, eval(expression(list( Open,High,Low,Close,Volume )))], date)
 }
+
+
+###############################################################################
+# Remove extreme data points
+#' @export 
+###############################################################################
+data.clean <- function
+(
+	data, 
+	min.ratio = 2.5, 
+	min.obs = 3*252
+) 
+{	
+	# remove all series that has less than minimum number of observations
+	index = names(which(lapply(data,function(x) count(x$Close)) < min.obs))
+	if (len(index) > 0) {
+		cat('Removing', index, 'have less than', min.obs, 'observations','\n')
+		rm(list=index, envir=data)
+	}
+		
+	for(ticker in ls(data)) {
+		ticker.data = data[[ticker]]
+		ticker.data = ticker.data[ticker.data$Close > 0 & ticker.data$Adjusted > 0]
+		
+		nperiods = nrow(ticker.data)
+		price = ticker.data$Adjusted
+		
+		ratio = as.vector((price)/mlag(price))
+		index = which(ratio > min.ratio)
+				
+		if(len(index) > 0)
+			for(i in index) {
+				cat('Abnormal price found for', ticker, format(index(ticker.data)[i],'%d-%b-%Y'),'Ratio :', round(ratio[i],1),'\n')
+				for(name in spl('Open,Close,High,Low,Adjusted')) 
+					ticker.data[i:nperiods,name] = ticker.data[i:nperiods,name] / ratio[i]
+			}
+					
+		ratio = as.vector(mlag(price)/(price))
+		index = which(ratio > min.ratio)
+
+		if(len(index) > 0)
+			for(i in index) {
+				cat('Abnormal price found for', ticker, format(index(ticker.data)[i],'%d-%b-%Y'),'Inverse Ratio :', round(ratio[i],1),'\n')
+				for(name in spl('Open,Close,High,Low,Adjusted')) 
+					ticker.data[i:nperiods,name] = ticker.data[i:nperiods,name] * ratio[i]
+			}
+		data[[ticker]] = ticker.data 
+	 }
+}
+
+		

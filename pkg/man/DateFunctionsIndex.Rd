@@ -1,4 +1,5 @@
 \name{date.week.ends}
+\alias{date.end}
 \alias{date.ends.fn}
 \alias{date.ends.index}
 \alias{date.month.ends}
@@ -18,6 +19,9 @@
   date.ends.fn(periodicity)
 
   date.ends.index(out, timing)
+
+  date.end(date = Sys.Date(), periodicity = "months",
+    date.format = "\%Y-\%m-\%d")
 }
 \arguments{
   \item{dates}{collection of dates}
@@ -29,6 +33,8 @@
   Dates Index Functions
 
   out is result of the business.days.location.end
+
+  last calendar day of period date.end('2014-01-13')
 }
 \examples{
 \dontrun{

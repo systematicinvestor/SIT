@@ -453,6 +453,15 @@ date.ends.index <- function(out, timing) {
 		which(out$days.since == (timing))
 }
 	
+#' last calendar day of period
+#' date.end('2014-01-13')
+#' @export 
+#' @rdname DateFunctionsIndex	
+date.end <- function(date = Sys.Date(), periodicity = 'months', date.format = '%Y-%m-%d') {
+	date = as.Date(paste(date), date.format)
+	temp = seq(date, date + 40, 1)
+	temp[date.ends.fn(periodicity)(temp)[1]]
+}
 	
 
 # to ger proper month-end and a day before month-end

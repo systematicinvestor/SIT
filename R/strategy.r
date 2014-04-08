@@ -845,7 +845,7 @@ ef.portfolio <- function(percent = 0.5)
 			
 		# SUM x.i * expected.return = 1
 		excess.return = ia$expected.return - rf
-		if( all(excess.return < 0) )
+		if( all(excess.return <= 0) )
 			constraints = add.constraints(excess.return, -1 , type = '=', constraints)		
 		else
 			constraints = add.constraints(excess.return, 1 , type = '=', constraints)		
