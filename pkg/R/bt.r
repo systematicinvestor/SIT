@@ -118,7 +118,7 @@ bt.prep <- function
 				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
 		
 			# fill gaps logic
-			map.col = find.names('Close,Volume', colnames(b[[ symbolnames[i] ]]))
+			map.col = find.names('Close,Volume,Open,High,Low,Adjusted', colnames(b[[ symbolnames[i] ]]))
 			if(fill.gaps & !is.na(map.col$Close)) {	
 				close = coredata(b[[ symbolnames[i] ]][,map.col$Close])
 					n = len(close)
@@ -133,10 +133,13 @@ bt.prep <- function
 					b[[ symbolnames[i] ]][index1, map.col$Volume] = 0
 				}
 				
-				for(j in colnames(b[[ symbolnames[i] ]])) {
+				#for(j in colnames(b[[ symbolnames[i] ]])) {
+				for(field in spl('Open,High,Low,Adjusted')) {
+				j = map.col[[field]]
+				if(!is.na(j)) {
 					index1 = is.na(b[[ symbolnames[i] ]][,j]) & index
 					b[[ symbolnames[i] ]][index1, j] = close[index1]
-				}						
+				}}						
 			}
 		}	
 	} else {
@@ -166,7 +169,6 @@ bt.prep <- function
 	}
 	b$prices = dummy.mat	
 }
-
 
 
 

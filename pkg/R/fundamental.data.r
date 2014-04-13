@@ -194,6 +194,7 @@ get.fund.data.index <- function
 	}
 }
 
+
 ###############################################################################
 # Extract and process fundamental data item
 #' @export 
@@ -212,6 +213,7 @@ get.fund.data <- function
 	
 	# remove commas
 	temp.q = as.double(gsub(',', '', fund[index,]))
+		temp.q = ifna(temp.q, 0)
 		
 	# cash flow items, start fresh in Q1 and acummulate till Q4
 	if(cash.flow) {
@@ -222,4 +224,4 @@ get.fund.data <- function
 	temp.q = as.xts(temp.q, fund.date)
 						
 	iif(is.12m.rolling, runSum(temp.q, 4), temp.q)			
-}
+}	

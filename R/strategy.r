@@ -1856,54 +1856,51 @@ dev.off()
 			ia,			# input assumptions
 			constraints	# constraints
 		)
-		{
-		
-			if(!is.function(group.fn)) {
-				return(fn(ia, constraints))
-			} else {
-				group = as.numeric(group.fn(ia))
+		{		
+			if(!is.function(group.fn)) return(fn(ia, constraints))
+			
+			group = as.numeric(group.fn(ia))
 				
-				ngroups = max(group)
-				if(ngroups == 1) return(fn(ia, constraints))
+			ngroups = max(group)
+			if(ngroups == 1) return(fn(ia, constraints))
 					
-				weight0 = rep(NA, ia$n)
+			weight0 = rep(NA, ia$n)
 				
-				# returns for each group			
-				hist.g = NA * ia$hist.returns[,1:ngroups]
+			# returns for each group			
+			hist.g = NA * ia$hist.returns[,1:ngroups]
 				
-				# compute weights within each group	
-				for(g in 1:ngroups) {
-					index = group == g
-					if( sum(index) == 1 ) {
-						weight0[index] = 1
-						hist.g[,g] = ia$hist.returns[, index, drop=F]
-					} else {
-						ia.temp = create.ia.subset(ia, index)
+			# compute weights within each group	
+			for(g in 1:ngroups) {
+				index = group == g
+				if( sum(index) == 1 ) {
+					weight0[index] = 1
+					hist.g[,g] = ia$hist.returns[, index, drop=F]
+				} else {
+					ia.temp = create.ia.subset(ia, index)
 
-						constraints.temp = create.basic.constraints(ia.temp$n, 0, 1, 1)
+					constraints.temp = create.basic.constraints(ia.temp$n, 0, 1, 1)
 
-						w0 = match.fun(fn.within)(ia.temp, constraints.temp)
-							weight0[index] = w0
-							# Note that: sd(return0) = portfolio.risk(weight0, ia)	
-							# return0 = ia$hist.returns	%*% weight0
-						hist.g[,g] = ia.temp$hist.returns %*% w0
-					}
+					w0 = match.fun(fn.within)(ia.temp, constraints.temp)
+						weight0[index] = w0
+						# Note that: sd(return0) = portfolio.risk(weight0, ia)	
+						# return0 = ia$hist.returns	%*% weight0
+					hist.g[,g] = ia.temp$hist.returns %*% w0
 				}
-				
-				# create GROUP input assumptions
-				ia.g = create.ia(hist.g)
-							
-				constraints.g = create.basic.constraints(ngroups, 0, 1, 1)				
-				
-				# find group weights
-				group.weights = match.fun(fn)(ia.g, constraints.g)
-					
-				# mutliply out group.weights by within group weights
-				for(g in 1:ngroups) {
-					weight0[group == g] = weight0[group == g] * group.weights[g]
-				}
-				return(weight0)
 			}
+				
+			# create GROUP input assumptions
+			ia.g = create.ia(hist.g)
+							
+			constraints.g = create.basic.constraints(ngroups, 0, 1, 1)				
+				
+			# find group weights
+			group.weights = match.fun(fn)(ia.g, constraints.g)
+					
+			# mutliply out group.weights by within group weights
+			for(g in 1:ngroups)
+					weight0[group == g] = weight0[group == g] * group.weights[g]
+			
+			weight0			
 		}
 	}	
 	
