@@ -132,18 +132,25 @@ barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name'
 # Summary snapshoot of strategy perfroamnce
 #' @export 
 ###############################################################################
-strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, data = NULL) {
+strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, data = NULL,
+	control = list(main = T, comparison = T, transition = T, monthly = T)
+) {
+	for(n in spl('main,comparison,transition,monthly'))
+		if(is.null(control[[n]])) control[[n]] = F
+
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 					
+if(control$main) {	
 	layout(1:2)
 	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main = title)	    	
 		mtext('Cumulative Performance', side = 2, line = 1)
 		
 	out = plotbt.strategy.sidebyside(models, return.table=T)
-	
+}	
 	if(one.page) return()
 	
+if(control$comparison) {		
 	# Portfolio Turnover
 	if(!is.null(data)) {
 		y = 100 * sapply(models, compute.turnover, data)
@@ -152,7 +159,9 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, d
 		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD,Volatility,Turnover', c(T,T,T,T,F,F))
 	} else		
 		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
-
+}
+		
+if(control$transition) {	
 	# Plot transition maps
 	#layout(1:len(models))
 	layout(1:4)
@@ -160,13 +169,17 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, d
 		plotbt.transition.map(models[[m]]$weight, name=m)
 			legend('topright', legend = m, bty = 'n')
 	}
+}	
 	
+if(control$monthly) {	
 	# Plot monthly retunrs tables
 	layout(1:4)
 	for(n in names(models))
 		plotbt.monthly.table(models[[n]]$equity, smain=n)			
+}		
 	
-}
+}	
+
 
 
 
@@ -664,7 +677,38 @@ static.weight.portfolio <- function(static.allocation)
 		
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)
+	}
+
+#		
+# RP = risk.parity.portfolio()
+# RP.CVAR = risk.parity.portfolio(function(ia) apply(ia$hist.returns, 2, compute.cvar))
+# RP.MD = risk.parity.portfolio(function(ia) apply(apply(1+ia$hist.returns, 2, cumprod), 2, compute.max.drawdown)) 
+# RP.CDAR = risk.parity.portfolio(function(ia) apply(apply(1+ia$hist.returns, 2, cumprod), 2, compute.cdar))
+#	
+# risk.parity allocation with custom risk functions
+#' @export 
+risk.parity.custom.portfolio <- function(
+	risk.fn = function(ia) ia$risk
+)
+{
+	risk.fn = match.fun(risk.fn)
+	function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		if(is.null(ia$risk)) ia$risk = sqrt(diag(ia$cov))
+		risk.index = get.risky.asset.index(ia)
+				
+		# re-scale weights to penalize for risk		
+		x = 1 / risk.fn(ia)[risk.index]
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)
 	}	
+}	
+			
 	
 	#' @export 	
 	min.var.portfolio <- function

@@ -787,7 +787,7 @@ bundes.bank.data <- function(symbol) {
 
 #' @export 
 bundes.bank.data.gold <- function() {
-	bundes.bank.data('BBK01.WT5512')
+	bundes.bank.data('BBEX3.D.XAU.USD.EA.AC.C05')
 }
 
 
@@ -1256,6 +1256,82 @@ get.fama.french.data <- function(
 }
 
 
+###############################################################################
+# Load FOMC dates
+# http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+# http://www.federalreserve.gov/monetarypolicy/fomchistorical2008.htm
+# http://quant.stackexchange.com/questions/141/what-data-sources-are-available-online
+#' @export 
+###############################################################################
+get.FOMC.dates <- function
+(
+	download = TRUE,
+	fomc.filename = 'FOMC.Rdata'
+)
+{
+	if(!download && file.exists(fomc.filename)) {
+		load(file=fomc.filename)
+		return(FOMC)
+	}
+	
+	# download data	
+	url = 'http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'
+	txt = join(readLines(url))
+
+	# extract data from page
+	data = c()
+	for(year in 2009:(1 + date.year(Sys.Date()))) {
+		temp = extract.table.from.webpage(txt, paste(year,'FOMC Meetings'))
+		if(nrow(temp) == 0) next
+		
+		temp = tolower(trim(temp[,1:2]))
+			temp = temp[nchar(temp[,1]) > 0,]
+		month = temp[,1]
+		day = gsub('\\(','',gsub('\\)','',temp[,2]))
+			day = trim(day)
+			status = rep('', len(day))
+		index = grep('\\*',day)
+			if(any(index)) status[index] = '*'		
+		index = grep(' ',day)
+			if(any(index)) for(j in index) status[j] = spl(day[j],' ')[2]
+		day = gsub('\\*','', sapply(day,function(x) spl(x,' ')[1]))
+
+		temp = apply(cbind(day, month, status), 1, function(x) paste(year, spl(x[2],'/'), spl(x[1],'-'), '|', x[3])	)
+				
+		data = cbind(data, trim(sapply(unlist(temp),spl,'\\|')))
+	}
+	
+	day = as.Date(data[1,],'%Y %B %d')
+	status = as.vector(data[2,])
+	
+	# extract data from page
+	data = c()
+	for(year in 1936:2008) {
+		cat(year,'\n')
+		url = paste0('http://www.federalreserve.gov/monetarypolicy/fomchistorical', year, '.htm')
+		txt = join(readLines(url))
+			
+		tokens = spl(txt,'<div id="historical">')
+		days = c()
+		for(token in tokens[-1])
+			days = c(days,colnames(extract.table.from.webpage(token, 'table'))[1])
+		data = rbind(data, cbind(year, days))
+	}
+	
+	day = tolower(data[,2])
+	day = gsub(',', '-', gsub('and', '', gsub('conference call', '', gsub('meeting','',day))))
+	# remove last token
+	day = unlist(lapply(day, function(x) join(rev(rev(spl(x,' '))[-1]),' ')))
+	
+	temp = unlist(apply(cbind(day,data[,1]),1, function(x) paste(trim(spl(x[1],'-')),x[2]) ))	
+ 	temp = sapply(lapply(temp,spl,' '), function(x) iif(len(x)==3,x,c(NA,x)))
+ 		temp[1,] = ifna.prev(temp[1,])
+	days = as.Date(apply(temp,2,join,' '),'%B %d %Y ')
+	
+	FOMC = list(day = c(days,day), status=c(rep('',len(days)), status))
+	save(FOMC,file=fomc.filename)
+	FOMC
+}	
 
 ###############################################################################
 # Download historical intraday prices from Google Finance

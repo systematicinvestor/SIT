@@ -30,6 +30,8 @@ fm.fund.data.test <- function()
 	# Load historical fundamental data
 	# http://advfn.com/p.php?pid=financials&symbol=NYSE:WMT&mode=quarterly_reports
 	#****************************************************************** 
+	
+	# symbol = 'TSX:BMO' # for Canada
 	symbol = 'WMT'	
 	symbol = paste(iif( nchar(symbol) <= 3, 'NYSE:', 'NASDAQ:'), symbol, sep='')
 
@@ -458,6 +460,8 @@ fm.all.factor.test <- function()
 		load(file='data.Rdata')
 	}
 	
+	data.clean(data, min.ratio=3)
+  		tickers = ls(data)
 
 
 	#*****************************************************************
@@ -567,10 +571,13 @@ fm.all.factor.test <- function()
 		#--------------------------------------------------------------
 		
 		# merge	
-		data[[i]] = merge(data[[i]], as.xts(abind(D,along=2), fund.date))						
+		temp = abind(D,along=2)
+    		colnames(temp) = names(D)
+    	data[[i]] = merge(adjustOHLC(data[[i]], use.Adjusted=T), as.xts(temp, fund.date))
 	}
 	
-	bt.prep(data, align='keep.all', dates='1995::2011')
+	bt.prep(data, align='keep.all', fill.gaps = T, dates='1995::')
+
 
 	#*****************************************************************
 	# Create Factors
@@ -790,7 +797,7 @@ fm.all.factor.test <- function()
 	# spreads, 5 Year Avg = 60 months
 	for(i in spl('rEP,rSP,rCFP')) {
 		factors$RV[[paste('s',i,sep='')]] = factors$RV[[i]] - 
-		apply(factors$RV[[i]], 2, function(x) if(all(is.na(x))) x else SMA(x,60) )
+		bt.apply.matrix(factors$RV[[i]], function(x) if(all(is.na(x))) x else SMA(x,60)[1:len(x)])
 	}
 	
 	#*****************************************************************

@@ -514,11 +514,14 @@ bt.summary <- function
     	bt$weight = weight
     	bt$type = type
     	
-	if( type == 'weight') {    
+	# for commission calculations, un lag the signal
+	com.weight = mlag(weight,-1)	
+    	
+	if( type == 'weight') { 
 		temp = ret[,1]
 			temp[] = rowSums(ret * weight) - 
-				rowSums(abs(weight - mlag(weight)) * commission$percentage, na.rm=T)
-				- rowSums(sign(abs(weight - mlag(weight))) * commission$fixed, na.rm=T)
+				rowSums(abs(com.weight - mlag(com.weight)) * commission$percentage, na.rm=T)
+				- rowSums(sign(abs(com.weight - mlag(com.weight))) * commission$fixed, na.rm=T)
 		bt$ret = temp
     	#bt$ret = make.xts(rowSums(ret * weight) - rowSums(abs(weight - mlag(weight))*commission, na.rm=T), index.xts(ret))    	
     	#bt$ret = make.xts(rowSums(ret * weight), index.xts(ret))    	
@@ -547,7 +550,8 @@ bt.summary <- function
 			
 			index = mlag(apply(tstart, 1, any))
 				index = ifna(index, FALSE)
-								
+index[1] = T					
+							
 			totalcash = NA * cash
 				totalcash[index] = cash[index]
 			totalcash = ifna.prev(totalcash)
@@ -556,10 +560,11 @@ bt.summary <- function
 		
 		# We can introduce transaction cost to portfolio returns as
 		# abs(bt$share - mlag(bt$share)) * 0.01
+		
 		portfolio.ret = (totalcash  + rowSums(bt$share * prices, na.rm=T)
-							- rowSums(abs(bt$share - mlag(bt$share)) * commission$cps, na.rm=T)
-							- rowSums(sign(abs(bt$share - mlag(bt$share))) * commission$fixed, na.rm=T)
-							- rowSums(prices * abs(bt$share - mlag(bt$share)) * commission$percentage, na.rm=T)
+							- rowSums(abs(com.weight - mlag(com.weight)) * commission$cps, na.rm=T)
+							- rowSums(sign(abs(com.weight - mlag(com.weight))) * commission$fixed, na.rm=T)
+							- rowSums(prices * abs(com.weight - mlag(com.weight)) * commission$percentage, na.rm=T)
 		 				) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1		
 				
 		#portfolio.ret = (totalcash + rowSums(bt$share * prices, na.rm=T) ) / (totalcash + rowSums(bt$share * mlag(prices), na.rm=T) ) - 1				
@@ -588,8 +593,55 @@ bt.summary <- function
     return(bt)    
 }
 
+bt.summary.test <- function() {
+    #*****************************************************************
+    # Load historical data
+    #******************************************************************
+    load.packages('quantmod')
 
+    data <- new.env()
+    getSymbols('EEM', src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+    
+    bt.prep(data, align='keep.all', dates='2013:08::2013:08:10')
+	    buy.date = '2013:08:05'
+		sell.date = '2013:08:06'
+    
+    #*****************************************************************
+    # Code Strategies
+    #******************************************************************    
+    # set dummy prices
+	coredata(data$prices) <-c(10,20,40,60,20,160,60)
+	    prices = data$prices
+	
+	# weight back-test	
+	data$weight[] = NA
+	    data$weight[buy.date] = 1
+	    data$weight[sell.date] = 0
+	    commission = list(cps = 0.0, fixed = 0.0, percentage = 1/100)
+	model3 = bt.run(data, commission = commission, silent = T)
+	
+	model3$ret
+	#There is 1% drop on 5th due to buying stock, and on the 6th return is 0.49 = 0.5 - 0.01 (commission)
+
+	
+	# share back-test
+	data$weight[] = NA
+	    data$weight[buy.date] = 1
+	    data$weight[sell.date] = 0
+	    commission = list(cps = 0.0, fixed = 0.0, percentage = 1/100)
+	model3 = bt.run.share(data, commission = commission, capital = 100000, silent = T)
+
+	model3$ret
+	#There is 1% drop on 5th due to buying stock, and on the 6th return is 
+	#0.485 = (2500 * 60 - 2500 * 60 * 0.01) /  (2500 * 40) - 1
+	#i.e. return = (share * price + cash - total.commission) / (share * mlag(price) + cash) - 1
+
+}
+
+###############################################################################
+# Remove all leading NAs in model equity
 #' @export 
+###############################################################################
 bt.trim <- function
 (
 	...
@@ -628,6 +680,7 @@ bt.trim.test <- function() {
         
     data <- new.env()
     getSymbols(spl('SPY,GLD'), src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+    for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
     bt.prep(data, align='keep.all')
 
     #*****************************************************************
@@ -1115,10 +1168,21 @@ compute.max.drawdown <- function(x)
 #' @export 
 compute.avg.drawdown <- function(x) 
 { 
-	drawdown = c( compute.drawdown(coredata(x)), 0 )
+	drawdown = c( 0, compute.drawdown(coredata(x)), 0 )
 	dstart = which( drawdown == 0 & mlag(drawdown, -1) != 0 )
 	dend = which(drawdown == 0 & mlag(drawdown, 1) != 0 )
-	mean(apply( cbind(dstart, dend), 1, function(x){ min(drawdown[ x[1]:x[2] ], na.rm=T) } ))
+	drawdowns = apply( cbind(dstart, dend), 1, function(x) min(drawdown[ x[1]:x[2] ], na.rm=T) )
+	mean(drawdowns)
+}
+
+#' @export 
+compute.cdar <- function(x, probs=0.05) 
+{ 
+	drawdown = c( 0, compute.drawdown(coredata(x)), 0 )
+	dstart = which( drawdown == 0 & mlag(drawdown, -1) != 0 )
+	dend = which(drawdown == 0 & mlag(drawdown, 1) != 0 )
+	drawdowns = apply( cbind(dstart, dend), 1, function(x) min(drawdown[ x[1]:x[2] ], na.rm=T) )
+	mean( drawdowns[ drawdowns < quantile(drawdowns, probs=probs) ] )
 }
 
 #' @export 
