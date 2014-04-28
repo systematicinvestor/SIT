@@ -77,12 +77,13 @@ strategy.load.historical.data <- function
 
 
 
-
 ###############################################################################
 # Helper function to create Barplot with strategy stats
 #' @export 
 ###############################################################################
-performance.barchart.helper <- function(out, names, custom.order, nplots.page = len(spl(names)), nc.plot = 2) 
+performance.barchart.helper <- function(out, names, custom.order, 
+	nplots.page = len(spl(names)), nc.plot = 2, sort.performance = T
+) 
 {
 	# Bar chart
 	layout(mat=matrix(1:(nplots.page + nplots.page %% 2), nc=nc.plot, byrow=FALSE))
@@ -91,8 +92,8 @@ performance.barchart.helper <- function(out, names, custom.order, nplots.page = 
 	
 	names(custom.order) = spl(names)
 	for(i in names(custom.order)) {
-		y = as.double(out[i,])
-		index = order(y, decreasing = custom.order[i])		
+		y = as.double(out[i,])		
+		index = iif(sort.performance, order(y, decreasing = custom.order[i]), 1:len(y))
 		x = barplot(y[index], names.arg = '', 
 			col=iif(y[index] > 0, col[1], col[2]), 
 			main=i, 
@@ -105,10 +106,12 @@ performance.barchart.helper <- function(out, names, custom.order, nplots.page = 
 			text(x, 0 * x, colnames(out)[index], adj=c(1.1,1), srt=90, xpd = TRUE)
 		
 		# add best worst labels
-		mtext('worst', side = 1,line = 0, outer = F, adj = 1, font = 1, cex = 1)
-		mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
+		if(sort.performance) {			
+			mtext('worst', side = 1,line = 0, outer = F, adj = 1, font = 1, cex = 1)
+			mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
+		}
 	}				
-}
+}	
 
 ###############################################################################
 # helper function to create barplot with labels
@@ -133,7 +136,8 @@ barplot.with.labels <- function(data, main, plotX = TRUE, label=c('level','name'
 #' @export 
 ###############################################################################
 strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, data = NULL,
-	control = list(main = T, comparison = T, transition = T, monthly = T)
+	control = list(main = T, comparison = T, transition = T, monthly = T),
+	sort.performance = T
 ) {
 	for(n in spl('main,comparison,transition,monthly'))
 		if(is.null(control[[n]])) control[[n]] = F
@@ -141,6 +145,7 @@ strategy.performance.snapshoot <- function(models, one.page = F, title = NULL, d
 	#*****************************************************************
 	# Create Report
 	#****************************************************************** 					
+	out = NULL
 if(control$main) {	
 	layout(1:2)
 	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main = title)	    	
@@ -150,21 +155,22 @@ if(control$main) {
 }	
 	if(one.page) return()
 	
-if(control$comparison) {		
+if(control$comparison) {
+	if(is.null(out))
+		out = plotbt.strategy.sidebyside(models, return.table=T, make.plot = F)
 	# Portfolio Turnover
 	if(!is.null(data)) {
 		y = 100 * sapply(models, compute.turnover, data)
 			out = rbind(y, out)
 			rownames(out)[1] = 'Turnover'		
-		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD,Volatility,Turnover', c(T,T,T,T,F,F))
+		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD,Volatility,Turnover', c(T,T,T,T,F,F), sort.performance = sort.performance)
 	} else		
-		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T))
+		performance.barchart.helper(out, 'Sharpe,Cagr,DVR,MaxDD', c(T,T,T,T), sort.performance = sort.performance)
 }
 		
 if(control$transition) {	
 	# Plot transition maps
-	#layout(1:len(models))
-	layout(1:4)
+	layout(1:min(4,len(models)))
 	for(m in names(models)) {
 		plotbt.transition.map(models[[m]]$weight, name=m)
 			legend('topright', legend = m, bty = 'n')
@@ -173,7 +179,7 @@ if(control$transition) {
 	
 if(control$monthly) {	
 	# Plot monthly retunrs tables
-	layout(1:4)
+	layout(1:min(4,len(models)))
 	for(n in names(models))
 		plotbt.monthly.table(models[[n]]$equity, smain=n)			
 }		
@@ -663,7 +669,7 @@ static.weight.portfolio <- function(static.allocation)
 	
 	# equal.risk.portfolio
 	#' @export 	
-	risk.parity.portfolio <- function
+	risk.parity.portfolio.basic <- function
 	(
 		ia,				# input assumptions
 		constraints		# constraints
@@ -679,7 +685,6 @@ static.weight.portfolio <- function(static.allocation)
 		set.risky.asset(x / sum(x), risk.index)
 	}
 
-#		
 # RP = risk.parity.portfolio()
 # RP.CVAR = risk.parity.portfolio(function(ia) apply(ia$hist.returns, 2, compute.cvar))
 # RP.MD = risk.parity.portfolio(function(ia) apply(apply(1+ia$hist.returns, 2, cumprod), 2, compute.max.drawdown)) 
@@ -687,11 +692,21 @@ static.weight.portfolio <- function(static.allocation)
 #	
 # risk.parity allocation with custom risk functions
 #' @export 
-risk.parity.custom.portfolio <- function(
+risk.parity.portfolio <- function(
 	risk.fn = function(ia) ia$risk
 )
 {
-	risk.fn = match.fun(risk.fn)
+	algo.map = list(
+		'cvar' = function(ia) -apply(ia$hist.returns, 2, compute.cvar),
+		'md' = function(ia) -apply(apply(1+ia$hist.returns, 2, cumprod), 2, compute.max.drawdown),
+		'cdar' = function(ia) -apply(apply(1+ia$hist.returns, 2, cumprod), 2, compute.cdar)
+	)
+
+	fn = try( match.fun(risk.fn) , silent = TRUE)
+	if(class(fn)[1] == 'try-error' && is.character(risk.fn) && any(names(algo.map) == tolower(risk.fn)))
+		fn = algo.map[[ tolower(risk.fn) ]]
+	if(class(fn)[1] == 'try-error') stop(paste('risk.parity.portfolio', fn))
+	
 	function
 	(
 		ia,				# input assumptions
@@ -702,12 +717,13 @@ risk.parity.custom.portfolio <- function(
 		risk.index = get.risky.asset.index(ia)
 				
 		# re-scale weights to penalize for risk		
-		x = 1 / risk.fn(ia)[risk.index]
-		
+		x = 1 / fn(ia)[risk.index]
+				
 		# normalize weights to sum up to 1
 		set.risky.asset(x / sum(x), risk.index)
 	}	
-}	
+}
+
 			
 	
 	#' @export 	
@@ -715,7 +731,8 @@ risk.parity.custom.portfolio <- function(
 	(
 		ia,				# input assumptions
 		constraints,	# constraints
-		cov.matrix = ia$cov
+		cov.matrix = ia$cov,
+		dvec = rep(0, ia$n)
 	)
 	{
 		risk.index = get.risky.asset.index(ia)
@@ -723,7 +740,7 @@ risk.parity.custom.portfolio <- function(
 		# first try to solve QP with given Dmat
 		Dmat = cov.matrix[risk.index, risk.index]		
 		sol = try(solve.QP(Dmat=Dmat, 
-						dvec=rep(0, sum(risk.index)), 
+						dvec=dvec[risk.index], 
 						Amat=constraints$A[risk.index,,drop=F], 
 						bvec=constraints$b, 
 						meq=constraints$meq), silent = TRUE)
@@ -731,7 +748,7 @@ risk.parity.custom.portfolio <- function(
 		# if error, adjust Dmat to be positive definite
 		if(inherits(sol, 'try-error'))
 			sol = solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
-						dvec=rep(0, sum(risk.index)), 
+						dvec=dvec[risk.index], 
 						Amat=constraints$A[risk.index,,drop=F], 
 						bvec=constraints$b, 
 						meq=constraints$meq)
@@ -836,6 +853,92 @@ ef.portfolio <- function(percent = 0.5)
 }	
 
 
+#*****************************************************************	
+# Tracking Error minimization:
+# http://www.mathworks.com/matlabcentral/answers/59587-how-to-use-the-objective-function-minimize-te-in-quadprog
+# The objective is to minimize (w-w0)'myCov(w-w0)
+# f = -w0'*myCov
+# Expanding
+# w.'*myCov*w/2 - w0'*myCov*w
+#
+# i.e. 
+# (x - w0)'Cov(x - w0) = x'Cov(x - w0) - w0'Cov(x - w0)
+# = x'Cov x - x'Cov w0 - w0'Cov x + w0'Cov w0
+# = x'Cov x - 2 x'Cov w0 + w0'Cov w0, (w0'Cov w0 is constant)
+# min 1/2 x'Cov x - x'Cov w0
+#
+# Minimizing Tracking Error While Restricting the Number of Assets 
+# https://cs.uwaterloo.ca/~yuying/papers/indexJay.pdf
+#
+# A Hybrid Genetic Algorithm for Passive Management by Dirk Eddelb
+# dirk.eddelbuettel.com/papers/cef96.ps
+# http://www.tbm.tudelft.nl/fileadmin/Faculteit/TBM/Over_de_Faculteit/Afdelingen/Afdeling_Infrastructure_Systems_and_Services/Sectie_Informatie_en_Communicatie_Technologie/medewerkers/jan_van_den_berg/courses/Security_en_Techniek/doc/ACFM-met-Roland.pdf
+#*****************************************************************
+# solve.QP: min(x'Dx - 2*dvec*x) 
+min.te.portfolio.test <- function() 
+{
+	# minimum Tracking Error portfolios
+	min.te.portfolio <- function(ia, constraints, index.weight)	
+		min.var.portfolio(ia, constraints, dvec = index.weight %*% ia$cov)
+		
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	# tickers = dow.jones.components()
+	tickers = spl('SPY,TLT,XLP')
+		
+	data <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, set.symbolnames = T, auto.assign = T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices
+		n = ncol(prices)
+		nperiods = nrow(prices)
+		
+	ret = prices / mlag(prices) - 1
+	#*****************************************************************
+	# Create input assumptions
+	#****************************************************************** 				
+	lookback.len = 120
+	
+	hist = ret[(nperiods - lookback.len) : nperiods, , drop=F]
+	ia = create.ia(hist, nperiod=nperiods)
+
+	index.weight = coredata(last(prices))
+		index.weight = index.weight / sum(index.weight)
+
+	# packages for quadprog
+	load.packages('quadprog,corpcor,kernlab')
+	
+	# basic constraints			
+	constraints = create.basic.constraints(n, 0, 1, 1)
+	x = min.te.portfolio(ia, constraints, index.weight)	
+		x - index.weight
+	252 * portfolio.return(x, ia)
+	# x is same as index.weight
+	
+	# reduce max allocation 40%
+	constraints = create.basic.constraints(n, 0, 0.4, 1)
+	x = min.te.portfolio(ia, constraints, index.weight)	
+		x - index.weight
+	252 * portfolio.return(x, ia)
+		
+	# enforce min return
+	constraints = create.basic.constraints(n, 0, 1, 1)
+	constraints = add.constraints(ia$expected.return, type = '>=', b=0.95 * max(ia$expected.return), constraints)		
+	x = min.te.portfolio(ia, constraints, index.weight)	
+		x - index.weight
+	252 * portfolio.return(x, ia)
+}
+	
+	
+	
 		
 ###############################################################################    
 # maximum Sharpe ratio or tangency  portfolio
@@ -1959,16 +2062,20 @@ dev.off()
 	get.algo <- function(algo.name, has.param = F) {
 		algo.map = list(
 			'cluster' = distribute.weights,
-			'max.sharpe' = max.sharpe.portfolio()
+			'max.sharpe' = max.sharpe.portfolio,
+			'risk.parity' = risk.parity.portfolio
 		)
 	
 		if(any(names(algo.map) == algo.name))
-			algo.map[[ algo.name ]]
-		else {
 			if(has.param)
-				match.fun(algo.name)					
+				algo.map[[ algo.name ]]
 			else
-				match.fun(paste(algo.name, '.portfolio', sep=''))					
+				algo.map[[ algo.name ]]()
+		else {
+			fn = try( match.fun(paste0(algo.name, '.portfolio')) , silent = TRUE)
+			if(class(fn)[1] == 'try-error')	fn = try( match.fun(algo.name) , silent = TRUE)
+			if(class(fn)[1] == 'try-error') stop(paste('get.algo', fn))
+			fn
 		}
 	}
 	
@@ -1992,7 +2099,9 @@ dev.off()
 		strategys = spl(strategys,';')
 		
 		min.risk.fns = list()
-		#strategys = spl(";,EW,Equal.Weight,;,MCE,Min.Corr.Excel,1;,MC,Min.Corr,1;,MC2,Min.Corr2,1;,C.EW,Cluster,kmeans90:min.var;,Empty,Cluster,hclust:min.corr2",';')		
+		#strategys = spl(";EW,Equal.Weight,;MCE,Min.Corr.Excel,1;MC,Min.Corr,1;MC2,Min.Corr2,1;C.EW,Cluster,kmeans90:min.var;Empty,Cluster,hclust:min.corr2",';')		
+		#strategys = spl('EW-Equal.Weight,RP-Risk.Parity,RP.CvaR-Risk.Parity:CVaR,MD-Max.Div,MV-Min.Var[AAA],MCA-Min.Corr,MCA2-Min.Corr2,MVA-Min.Var.Excel,MVA2-Min.Var2')
+		#strategys = gsub(':',',',gsub('-',',',gsub('\\[.*?\\]','',strategys)))
 		strategys = strategys[ nchar(strategys) > 0]		
 		for(i in 1:len(strategys)) {
 			temp = spl(strategys[i])
@@ -2008,13 +2117,15 @@ dev.off()
 			else {
 				if(temp[1] == 'cluster') {
 					params = trim(spl(temp[2], ':'))
-					min.risk.fns[[ f.name ]] = get.algo(temp[1])( get.algo(params[2]), get.group(params[1]) )								
+					min.risk.fns[[ f.name ]] = get.algo(temp[1], T)( get.algo(params[2]), get.group(params[1]) )								
 				} else
 					min.risk.fns[[ f.name ]] = get.algo(temp[1],T)(temp[-1])
 			}
 		}					
 		min.risk.fns	
 	}
+
+
 
 			
 	#*****************************************************************

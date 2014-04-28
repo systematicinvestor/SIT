@@ -1464,6 +1464,9 @@ getSymbols.sit <- function
 # Aside : all possible combinations of list elements
 # expand.grid(a=1:10,b=2:3,KEEP.OUT.ATTRS=F)
 
+# get first element in every offset: sapply(offsets, '[', 1)
+
+
 
 ###############################################################################
 #' Helper function to extend functionality of getSymbols

@@ -1182,8 +1182,11 @@ compute.cdar <- function(x, probs=0.05)
 	dstart = which( drawdown == 0 & mlag(drawdown, -1) != 0 )
 	dend = which(drawdown == 0 & mlag(drawdown, 1) != 0 )
 	drawdowns = apply( cbind(dstart, dend), 1, function(x) min(drawdown[ x[1]:x[2] ], na.rm=T) )
-	mean( drawdowns[ drawdowns < quantile(drawdowns, probs=probs) ] )
-}
+	if(len(drawdowns)>2)
+		mean( drawdowns[ drawdowns < quantile(drawdowns, probs=probs) ] )
+	else
+		min(drawdowns)
+}	
 
 #' @export 
 compute.exposure <- function(weight) 

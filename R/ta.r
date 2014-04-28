@@ -295,6 +295,17 @@ ntop <- function
 	# work with matrix
 	temp = coredata(data)
 	
+	# equal weight all assets special case
+	if(topn == ncol(data)) {
+		index = is.na(temp)
+			temp[index] = 0
+			temp[!index] = 1
+				
+		out = data
+		out[] = ifna(temp / rowSums(temp),0)		
+		return( out )
+	}
+	
 	for( i in 1:nrow(data) ) {
 		x = temp[i,]
 		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)

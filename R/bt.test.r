@@ -9504,3 +9504,111 @@ dev.off()
 }	
 	
 	
+
+###############################################################################
+# Calendar Strategy: Month End
+###############################################################################
+bt.calendar.strategy.month.end.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	tickers = spl('SPY')
+		
+	data <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, set.symbolnames = T, auto.assign = T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices
+		n = ncol(prices)
+		
+	models = list()
+		
+	period.ends = date.month.ends(data$dates, F)
+		
+	#*****************************************************************
+	# Strategy
+	#*****************************************************************
+	key.date = NA * prices
+		key.date[period.ends] = T
+	
+	universe = prices > 0
+	signal = key.date
+
+	data$weight[] = NA
+		data$weight[] = ifna(universe & key.date, F)
+	models$T0 = bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T)  
+
+	#*****************************************************************
+	# Add helper functions
+	#*****************************************************************
+	calendar.strategy <- function(data, signal, universe = data$prices > 0) {
+		data$weight[] = NA
+			data$weight[] = ifna(universe & signal, F)
+		bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T)  	
+	}
+	
+	calendar.signal <- function(key.date, offsets = 0) {
+		signal = mlag(key.date, offsets[1])
+		for(i in offsets) signal = signal | mlag(key.date, i)
+		signal
+	}
+
+	# Trade on key.date
+	models$T0 = calendar.strategy(data, key.date)
+
+	# Trade next day after key.date
+	models$N1 = calendar.strategy(data, mlag(key.date,1))
+	# Trade two days next(after) key.date
+	models$N2 = calendar.strategy(data, mlag(key.date,2))
+
+	# Trade a day prior to key.date
+	models$P1 = calendar.strategy(data, mlag(key.date,-1))
+	# Trade two days prior to key.date
+	models$P2 = calendar.strategy(data, mlag(key.date,-2))
+	
+	# Trade: open 2 days before the key.date and close 2 days after the key.date	
+	signal = key.date | mlag(key.date,-1) | mlag(key.date,-2) | mlag(key.date,1) | mlag(key.date,2)
+	models$P2N2 = calendar.strategy(data, signal)
+
+	# same, but using helper function above	
+	models$P2N2 = calendar.strategy(data, calendar.signal(key.date, -2:2))
+		
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T)	
+    
+dev.off()
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+	
+	strategy.performance.snapshoot(models, control=list(comparison=T), sort.performance=F)
+	
+dev.off()	
+
+	#*****************************************************************
+	# Look at trades
+	#*****************************************************************
+	last.trades <- function(model, n=20, make.plot=T, return.table=F) {
+		ntrades = min(n, nrow(model$trade.summary$trades))		
+		trades = last(model$trade.summary$trades, ntrades)
+		if(make.plot) {
+			layout(1)
+			plot.table(trades)
+		}	
+		if(return.table) trades	
+	}
+	
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+
+	last.trades(models$P2)
+	
+dev.off()	
+
+}
