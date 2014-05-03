@@ -1620,6 +1620,11 @@ chr <- function(n) { rawToChar(as.raw(n)) }
 #' @rdname StringFunctions
 make.random.string <- function(nbits = 256) { chr( runif(nbits/8, 1, 255) ) }
 
+#' http://ryouready.wordpress.com/2008/12/18/generate-random-string-name/
+#' @export 
+#' @rdname StringFunctions
+random.string <- function(lenght = 12) { join(sample(c(0:9, letters, LETTERS),lenght, replace=TRUE)) }
+
 
 ###############################################################################
 #' List function / variables in enviroment
@@ -1637,3 +1642,9 @@ ls.v <- function(env=sys.frame(-1))unlist(lapply(ls(env=env),function(x)if(!is.f
 
 
 
+
+# http://r.789695.n4.nabble.com/Numeric-Characters-in-String-td3817873.html
+#' @export 
+parse.number <- function(x) {
+	as.numeric(gsub('[^0-9\\+-\\.]', '', x) )	
+}

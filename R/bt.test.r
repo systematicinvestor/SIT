@@ -9530,17 +9530,15 @@ bt.calendar.strategy.month.end.test <- function()
 		
 	models = list()
 		
-	period.ends = date.month.ends(data$dates, F)
-		
+	universe = prices > 0
+	
+	key.date.index = date.month.ends(data$dates, F)
+	key.date = NA * prices
+		key.date[key.date.index,] = T
+
 	#*****************************************************************
 	# Strategy
 	#*****************************************************************
-	key.date = NA * prices
-		key.date[period.ends] = T
-	
-	universe = prices > 0
-	signal = key.date
-
 	data$weight[] = NA
 		data$weight[] = ifna(universe & key.date, F)
 	models$T0 = bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T)  
@@ -9592,18 +9590,6 @@ png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize =
 	
 dev.off()	
 
-	#*****************************************************************
-	# Look at trades
-	#*****************************************************************
-	last.trades <- function(model, n=20, make.plot=T, return.table=F) {
-		ntrades = min(n, nrow(model$trade.summary$trades))		
-		trades = last(model$trade.summary$trades, ntrades)
-		if(make.plot) {
-			layout(1)
-			plot.table(trades)
-		}	
-		if(return.table) trades	
-	}
 	
 png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
 
@@ -9611,4 +9597,132 @@ png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize =
 	
 dev.off()	
 
+	
+	#*****************************************************************
+	# Using new functions
+	#*****************************************************************
+	signals = calendar.signal(key.date, T0=0, N1=1, N2=2, P1=-1, P2=-2, P2N2=-2:2)
+	models = calendar.strategy(data, signals, universe = universe)
+	
+	strategy.performance.snapshoot(models, control=list(main=T))
+	
+	strategy.performance.snapshoot(models, control=list(comparison=T), sort.performance=F)
+		
+	strategy.performance.snapshoot(models["P2N2"], control=list(monthly=T))
+	
+	strategy.performance.snapshoot(models, control=list(transition=T))
+
+	last.trades(models$P2)
+
 }
+
+
+###############################################################################
+# Calendar Strategy: Option Expiry
+#
+# Op-ex week in December has been the most bullish week of the year for the SPX
+#   Buy: December Friday prior to op-ex.
+#   Sell X days later: 100K/trade 1984-present
+# http://quantifiableedges.blogspot.com/2011/12/mooost-wonderful-tiiiiiiime-of.html
+# http://quantifiableedges.blogspot.com/2010/12/most-wonderful-tiiiime-of-yearrrrrr.html
+###############################################################################
+bt.calendar.strategy.option.expiry.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	tickers = spl('SPY')
+		
+	data <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, set.symbolnames = T, auto.assign = T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices
+		n = ncol(prices)
+		
+	dates = data$dates	
+	
+	models = list()
+	
+	universe = prices > 0
+		
+	# Find Friday before options expiration week in December
+	years = date.year(range(dates))
+	second.friday = third.friday.month(years[1]:years[2], 12) - 7
+		key.date.index = na.omit(match(second.friday, dates))
+				
+	key.date = NA * prices
+		key.date[key.date.index,] = T
+
+	#*****************************************************************
+	# Strategy
+	#
+	# Op-ex week in December has been the most bullish week of the year for the SPX
+	#   Buy: December Friday prior to op-ex.
+	#   Sell X days later: 100K/trade 1984-present
+	# http://quantifiableedges.blogspot.com/2011/12/mooost-wonderful-tiiiiiiime-of.html
+	# http://quantifiableedges.blogspot.com/2010/12/most-wonderful-tiiiime-of-yearrrrrr.html
+	###############################################################################
+	signals = list(T0=0)
+		for(i in 1:15) signals[[paste0('N',i)]] = 0:i	
+	signals = calendar.signal(key.date, signals)
+	models = calendar.strategy(data, signals, universe = universe)
+		names(models)
+	
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T, sort.performance=F)
+    
+dev.off()
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+
+	# custom stats	
+	out = sapply(models, function(x) list(
+		CAGR = 100*compute.cagr(x$equity),
+		MD = 100*compute.max.drawdown(x$equity),
+		Win = x$trade.summary$stats['win.prob', 'All'],
+		Profit = x$trade.summary$stats['profitfactor', 'All']
+		))	
+	performance.barchart.helper(out, sort.performance = F)
+	
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+
+	strategy.performance.snapshoot(models$N15, control=list(main=T))
+	
+dev.off()		
+	
+	#strategy.performance.snapshoot(models['N15'], control=list(transition=T))
+	
+	#strategy.performance.snapshoot(models['N15'], control=list(monthly=T))
+		
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+	
+	last.trades(models$N15)
+	
+dev.off()		
+	
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+
+	trades = models$N15$trade.summary$trades
+		trades = make.xts(parse.number(trades[,'return']), as.Date(trades[,'entry.date']))
+	layout(1:2)
+		par(mar = c(4,3,3,1), cex = 0.8) 
+	barplot(trades, main='Trades', las=1)
+	plot(cumprod(1+trades/100), type='b', main='Trades', las=1)
+	
+dev.off()			
+	
+	#plotbt.custom.report.part2(models$N15, trade.summary=F)
+	
+}	
+	
+	

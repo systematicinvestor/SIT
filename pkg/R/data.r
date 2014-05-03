@@ -1301,7 +1301,7 @@ get.FOMC.dates <- function
 		data = cbind(data, trim(sapply(unlist(temp),spl,'\\|')))
 	}
 	
-	day = as.Date(data[1,],'%Y %B %d')
+	recent.days = as.Date(data[1,],'%Y %B %d')
 	status = as.vector(data[2,])
 	
 	# extract data from page
@@ -1328,10 +1328,12 @@ get.FOMC.dates <- function
  		temp[1,] = ifna.prev(temp[1,])
 	days = as.Date(apply(temp,2,join,' '),'%B %d %Y ')
 	
-	FOMC = list(day = c(days,day), status=c(rep('',len(days)), status))
+	FOMC = list(day = c(days, recent.days), status=c(rep('',len(days)), status))
 	save(FOMC,file=fomc.filename)
 	FOMC
 }	
+
+
 
 ###############################################################################
 # Download historical intraday prices from Google Finance

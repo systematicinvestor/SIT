@@ -76,13 +76,16 @@ strategy.load.historical.data <- function
 }
 
 
-
 ###############################################################################
 # Helper function to create Barplot with strategy stats
 #' @export 
 ###############################################################################
-performance.barchart.helper <- function(out, names, custom.order, 
-	nplots.page = len(spl(names)), nc.plot = 2, sort.performance = T
+performance.barchart.helper <- function(out, 
+	names = rownames(out),
+	custom.order=rep(T,len(spl(names))), 
+	nplots.page = len(spl(names)), 
+	nc.plot = 2, 
+	sort.performance = T
 ) 
 {
 	# Bar chart
@@ -90,8 +93,10 @@ performance.barchart.helper <- function(out, names, custom.order,
 	par(mar=c(4, 3, 2, 2))
 	col = spl('lightgray,red')
 	
-	names(custom.order) = spl(names)
-	for(i in names(custom.order)) {
+	names = spl(names)
+	names(custom.order) = names
+	
+	for(i in names) {
 		y = as.double(out[i,])		
 		index = iif(sort.performance, order(y, decreasing = custom.order[i]), 1:len(y))
 		x = barplot(y[index], names.arg = '', 
@@ -111,7 +116,8 @@ performance.barchart.helper <- function(out, names, custom.order,
 			mtext('best', side = 1,line = 0, outer = F, adj = 0, font = 1, cex = 1)		
 		}
 	}				
-}	
+}
+	
 
 ###############################################################################
 # helper function to create barplot with labels
@@ -2755,3 +2761,77 @@ target.vol.strategy <- function(model, weight,
 		
 	return(weight.target)	
 }
+
+
+#*****************************************************************
+# Calendar Strategy
+#*****************************************************************
+	#signals = calendar.signal(key.date, 0, 1, 2, -1, -2)
+	#names(signals)
+	#signals = calendar.signal(key.date, T0=0, 1, 2, N1=-1, -2,P2N2=-2:2)
+	#names(signals)	
+	# advanced ... - offsets
+	calendar.signal <- function(key.date, ...) {
+		offsets = list( ... )
+		if( is.list(offsets[[1]]) ) offsets = offsets[[1]]
+		else {
+			default.names = as.character(substitute(c(...))[-1])
+			default.names = paste0('L(', default.names, ')')
+			
+			# replace missing names for offsets
+			if(is.null(names(offsets))) names(offsets) = default.names
+			else names(offsets) = iif(nchar(names(offsets))==0, default.names, names(offsets))
+		}
+
+		signals = list()
+		for(n in names(offsets)) {
+			offset = offsets[[n]]
+			signal = mlag(key.date, offset[1])
+			for(i in offset) signal = signal | mlag(key.date, i)
+			signals[[n]] = signal
+		}
+		signals
+	}
+
+	#models = calendar.strategy(data, signals, universe = universe)
+	#names(models)	
+	#models = calendar.strategy(data, A=signals[[1]], signals[[1]])
+	#names(models)	
+	# advanced ... - signals
+	calendar.strategy <- function(data, ..., universe = data$prices > 0) {
+		signals = list( ... )		
+		if( is.list(signals[[1]]) ) signals = signals[[1]]
+		else {
+			default.names = as.character(substitute(c(...))[-1])
+			if(is.null(names(signals))) names(signals) = default.names
+			else names(signals) = iif(nchar(names(signals))==0, default.names, names(signals))
+		}
+
+		models = list()
+		nassets = ncol(prices)
+		for(n in names(signals)) {
+			data$weight[] = NA
+			temp = ifna(universe & signals[[n]], F)
+				if(nassets == 1)
+					data$weight[] = temp
+				else
+					data$weight[] = ifna(temp / rowSums(temp),0)
+					#data$weight[] = ntop(iif(temp,1,NA), nassets)
+			models[[n]] = bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T, silent=T)  	
+		}
+		models
+	}	
+	
+	#*****************************************************************
+	# Look at trades
+	#*****************************************************************
+	last.trades <- function(model, n=20, make.plot=T, return.table=F) {
+		ntrades = min(n, nrow(model$trade.summary$trades))		
+		trades = last(model$trade.summary$trades, ntrades)
+		if(make.plot) {
+			layout(1)
+			plot.table(trades)
+		}	
+		if(return.table) trades	
+	}	
+		
