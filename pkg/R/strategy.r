@@ -2222,6 +2222,7 @@ portfolio.allocation.helper.parallel <- function
 	silent = F,
 	
 	log = log.fn(),	
+	log.frequency = 10,		
 	
 	const.lb = 0, 
 	const.ub = 1,
@@ -2277,7 +2278,7 @@ registerDoParallel(cl, cores = cores)
 			universe = new.universe, prefix,
 			min.risk.fns, custom.stats.fn, shrinkage.fns,
 			create.ia.fn, update.ia.fn,
-			adjust2positive.definite, silent, log,
+			adjust2positive.definite, silent, log, log.frequency, 
 			const.lb, const.ub, const.sum)
 	}		
 	
@@ -2330,6 +2331,8 @@ portfolio.allocation.helper <- function
 	silent = F,
 	
 	log = log.fn(),	
+	log.frequency = 10,	
+
 	
 	const.lb = 0, 
 	const.ub = 1,
@@ -2517,8 +2520,7 @@ portfolio.allocation.helper <- function
 			
 		}
 			
-		if( j %% 10 == 0) if(!silent) log(j, percent = (j - start.i) / (len(period.ends) - start.i))
-		
+		if( j %% log.frequency == 0) if(!silent) log(j, percent = (j - start.i) / (len(period.ends) - start.i))			
 	}
 	
 	if( len(shrinkage.fns) == 1 ) {

@@ -9725,4 +9725,102 @@ dev.off()
 	
 }	
 	
+		
+###############################################################################
+# Calendar Strategy: Fed Days
+#
+# http://quantifiableedges.blogspot.ca/search/label/Fed%20Study
+###############################################################################
+bt.calendar.strategy.fed.days.test <- function() 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	tickers = spl('SPY')
+		
+	data <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, set.symbolnames = T, auto.assign = T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices
+		n = ncol(prices)
+		
+	dates = data$dates	
 	
+	models = list()
+	
+	universe = prices > 0
+		universe = universe & prices > SMA(prices,100)
+		
+	# Find Fed Days
+	info = get.FOMC.dates(F)
+		key.date.index = na.omit(match(info$day, dates))
+	
+	key.date = NA * prices
+		key.date[key.date.index,] = T
+		
+	#*****************************************************************
+	# Strategy
+	#*****************************************************************
+	signals = list(T0=0)
+		for(i in 1:15) signals[[paste0('N',i)]] = 0:i	
+	signals = calendar.signal(key.date, signals)
+	models = calendar.strategy(data, signals, universe = universe)
+		names(models)
+	
+
+png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+    
+    strategy.performance.snapshoot(models, T, sort.performance=F)
+    
+dev.off()
+	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
+
+	# custom stats	
+	out = sapply(models, function(x) list(
+		CAGR = 100*compute.cagr(x$equity),
+		MD = 100*compute.max.drawdown(x$equity),
+		Win = x$trade.summary$stats['win.prob', 'All'],
+		Profit = x$trade.summary$stats['profitfactor', 'All']
+		))	
+	performance.barchart.helper(out, sort.performance = F)
+	
+dev.off()	
+
+png(filename = 'plot3.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+
+	strategy.performance.snapshoot(models$N15, control=list(main=T))
+	
+dev.off()		
+	
+	#strategy.performance.snapshoot(models['N15'], control=list(transition=T))
+	
+	#strategy.performance.snapshoot(models['N15'], control=list(monthly=T))
+		
+	
+png(filename = 'plot4.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+	
+	last.trades(models$N15)
+	
+dev.off()		
+	
+png(filename = 'plot5.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    		
+		
+	trades = models$N15$trade.summary$trades
+		trades = make.xts(parse.number(trades[,'return']), as.Date(trades[,'entry.date']))
+	layout(1:2)
+		par(mar = c(4,3,3,1), cex = 0.8) 
+	barplot(trades, main='N15 Trades', las=1)
+	plot(cumprod(1+trades/100), type='b', main='N15 Trades', las=1)
+	
+dev.off()			
+
+}
+
