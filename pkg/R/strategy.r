@@ -2810,7 +2810,7 @@ target.vol.strategy <- function(model, weight,
 		}
 
 		models = list()
-		nassets = ncol(prices)
+		nassets = ncol(data$prices)
 		for(n in names(signals)) {
 			data$weight[] = NA
 			temp = ifna(universe & signals[[n]], F)
