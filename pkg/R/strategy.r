@@ -2800,7 +2800,7 @@ target.vol.strategy <- function(model, weight,
 	#models = calendar.strategy(data, A=signals[[1]], signals[[1]])
 	#names(models)	
 	# advanced ... - signals
-	calendar.strategy <- function(data, ..., universe = data$prices > 0) {
+	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1) {
 		signals = list( ... )		
 		if( is.list(signals[[1]]) ) signals = signals[[1]]
 		else {
@@ -2809,6 +2809,8 @@ target.vol.strategy <- function(model, weight,
 			else names(signals) = iif(nchar(names(signals))==0, default.names, names(signals))
 		}
 
+		universe = mlag(universe, do.lag.universe)
+		
 		models = list()
 		nassets = ncol(data$prices)
 		for(n in names(signals)) {

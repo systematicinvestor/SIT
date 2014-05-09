@@ -9772,7 +9772,6 @@ bt.calendar.strategy.fed.days.test <- function()
 		for(i in 1:15) signals[[paste0('N',i)]] = 0:i	
 	signals = calendar.signal(key.date, signals)
 	models = calendar.strategy(data, signals, universe = universe)
-		names(models)
 	
 
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
