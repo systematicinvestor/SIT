@@ -85,22 +85,31 @@ performance.barchart.helper <- function(out,
 	custom.order=rep(T,len(spl(names))), 
 	nplots.page = len(spl(names)), 
 	nc.plot = 2, 
-	sort.performance = T
+	sort.performance = T,
+	custom.col = NULL
+	
 ) 
 {
 	# Bar chart
-	layout(mat=matrix(1:(nplots.page + nplots.page %% 2), nc=nc.plot, byrow=FALSE))
+	layout(mat=matrix(1:(nplots.page + nplots.page %% nc.plot), nc=nc.plot, byrow=FALSE))
 	par(mar=c(4, 3, 2, 2))
-	col = spl('lightgray,red')
+	#col = spl('lightgray,red')
+	col = spl('ivory2,red')
 	
 	names = spl(names)
 	names(custom.order) = names
 	
 	for(i in names) {
-		y = as.double(out[i,])		
+		y = as.double(out[i,])
 		index = iif(sort.performance, order(y, decreasing = custom.order[i]), 1:len(y))
+		
+		cols = iif(y[index] > 0, col[1], col[2])
+			names(cols) = colnames(out)[index]
+		if(!is.null(custom.col))
+			cols[names(custom.col)] = custom.col
+		
 		x = barplot(y[index], names.arg = '', 
-			col=iif(y[index] > 0, col[1], col[2]), 
+			col=cols, 
 			main=i, 
 			border = 'darkgray',las=2)
 		grid(NA,NULL)
@@ -753,11 +762,15 @@ risk.parity.portfolio <- function(
 						
 		# if error, adjust Dmat to be positive definite
 		if(inherits(sol, 'try-error'))
-			sol = solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
+			sol = try(solve.QP(Dmat=make.positive.definite(Dmat, 0.000000001), 
 						dvec=dvec[risk.index], 
 						Amat=constraints$A[risk.index,,drop=F], 
 						bvec=constraints$b, 
-						meq=constraints$meq)
+						meq=constraints$meq), silent = TRUE)
+		if(inherits(sol, 'try-error')) {
+			gia <<- ia
+			stop(sol)
+		}
 						
 		set.risky.asset(sol$solution, risk.index)
 	}	
@@ -1621,10 +1634,11 @@ min.var2 <- function(power.function = 1)
 		  		
 		  	c = tawny::shrinkage.c(prior, S)
 	  		k = (p$sum - r) / c
+	  		#k = tawny::shrinkage.intensity(h, prior, S) 	  		
 			shrinkage = max(0, min(k/T, 1))
 		}	  		
 		return(list(sigma = shrinkage * prior + (1 - shrinkage) * S, shrinkage = shrinkage))  
-	}
+	}	
 	
 	
 	# cov(h, use='complete.obs', method='pearson') *(T - 1)/T
@@ -1646,7 +1660,7 @@ min.var2 <- function(power.function = 1)
 		n = ncol(h)
 		var = diag(sample)
 		cov.mat = sqrt(var) %*% t(sqrt(var))	
-		avg.rho = (sum(sample / cov.mat)-n)/(n*(n-1))
+		avg.rho = (sum(sample / iif(cov.mat==0,1,cov.mat))-n)/(n*(n-1))
 		
 		# compute prior
 		prior = avg.rho * cov.mat
@@ -2078,8 +2092,13 @@ dev.off()
 			else
 				algo.map[[ algo.name ]]()
 		else {
-			fn = try( match.fun(paste0(algo.name, '.portfolio')) , silent = TRUE)
-			if(class(fn)[1] == 'try-error')	fn = try( match.fun(algo.name) , silent = TRUE)
+			if(has.param) {
+				fn = try( match.fun(algo.name) , silent = TRUE)				
+				if(class(fn)[1] == 'try-error')	fn = try( match.fun(paste0(algo.name, '.portfolio')) , silent = TRUE)			
+			} else {
+				fn = try( match.fun(paste0(algo.name, '.portfolio')) , silent = TRUE)
+				if(class(fn)[1] == 'try-error')	fn = try( match.fun(algo.name) , silent = TRUE)
+			}
 			if(class(fn)[1] == 'try-error') stop(paste('get.algo', fn))
 			fn
 		}
@@ -2809,6 +2828,9 @@ target.vol.strategy <- function(model, weight,
 			else names(signals) = iif(nchar(names(signals))==0, default.names, names(signals))
 		}
 
+		# we need to manually lag universe = prices > SMA(prices,100) because
+		# it is based on our knowledge of price today and back-test
+		# below is run with do.lag = 0		
 		universe = mlag(universe, do.lag.universe)
 		
 		models = list()

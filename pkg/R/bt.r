@@ -577,6 +577,7 @@ index[1] = T
 		#bt$ret = make.xts(ifna(portfolio.ret,0), index.xts(ret))
 		temp = ret[,1]
 			temp[] = ifna(portfolio.ret,0)
+temp[1] = 0
 		bt$ret = temp
 
     }
