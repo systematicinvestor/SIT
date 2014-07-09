@@ -21,7 +21,7 @@
 
 
 ###############################################################################
-# Align dates, faster version of merge function
+#' Align dates, faster version of merge function
 #' @export 
 ###############################################################################
 bt.merge <- function
@@ -83,7 +83,7 @@ bt.merge <- function
 	return( list(all.dates = unique.dates, date.map = date.map))
 }
 
-# find location of given names in all names
+#' find location of given names in all names
 find.names <- function(find.names, all.names) 
 { 
 	as.list(sapply(spl(find.names), function(x) {
@@ -93,7 +93,7 @@ find.names <- function(find.names, all.names)
 }
 
 ###############################################################################
-# Prepare backtest data
+#' Prepare backtest data
 #' @export 
 ###############################################################################
 bt.prep <- function
@@ -173,7 +173,7 @@ bt.prep <- function
 
 
 
-# matrix form
+#' matrix form
 #' @export 
 bt.prep.matrix <- function
 (
@@ -255,7 +255,7 @@ bt.prep.matrix.test <- function() {
 }
 
 ###############################################################################
-# Remove symbols from enviroment
+#' Remove symbols from enviroment
 #' @export 
 ###############################################################################
 bt.prep.remove.symbols.min.history <- function
@@ -306,7 +306,7 @@ bt.prep.trim <- function
 }
  
 ###############################################################################
-# Helper function to backtest for type='share'
+#' Helper function to backtest for type='share'
 #' @export 
 ###############################################################################
 bt.run.share <- function
@@ -375,8 +375,8 @@ bt.run.share <- function
 #   portfolio.returns = lag(shares,1) * ( p - lag(p,1) ) / ( lag(shares,1) * lag(p,1) )
 # 
 ###############################################################################
-# some operators do not work well on xts
-# weight[] = apply(coredata(weight), 2, ifna_prev)
+#' some operators do not work well on xts
+#' weight[] = apply(coredata(weight), 2, ifna_prev)
 #' @export 
 ###############################################################################
 bt.run <- function
@@ -472,7 +472,7 @@ bt.run <- function
 }
 
 ###############################################################################
-# Backtest summary
+#' Backtest summary
 #' @export 
 ###############################################################################
 bt.summary <- function
@@ -640,7 +640,7 @@ bt.summary.test <- function() {
 }
 
 ###############################################################################
-# Remove all leading NAs in model equity
+#' Remove all leading NAs in model equity
 #' @export 
 ###############################################################################
 bt.trim <- function
@@ -702,8 +702,8 @@ bt.trim.test <- function() {
 }
 
 
-# bt.run - really fast with no bells or whisles
-# working directly with xts is alot slower, so use coredata
+#' bt.run - really fast with no bells or whisles
+#' working directly with xts is alot slower, so use coredata
 #' @export 	
 bt.run.weight.fast <- function
 (
@@ -734,9 +734,9 @@ bt.run.weight.fast <- function
 }
 
 ###############################################################################
-# Portfolio turnover	
-# http://wiki.fool.com/Portfolio_turnover
-# sales or purchases and dividing it by the average monthly value of the fund's assets
+#' Portfolio turnover	
+#' http://wiki.fool.com/Portfolio_turnover
+#' sales or purchases and dividing it by the average monthly value of the fund's assets
 #' @export 
 ###############################################################################
 compute.turnover <- function
@@ -788,7 +788,7 @@ compute.turnover <- function
 
 
 ###############################################################################
-# Compute Portfolio Maximum Deviation
+#' Compute Portfolio Maximum Deviation
 #' @export 
 ###############################################################################
 compute.max.deviation <- function
@@ -802,7 +802,7 @@ compute.max.deviation <- function
 }
 
 ###############################################################################
-# Backtest Trade summary
+#' Backtest Trade summary
 #' @export 
 ###############################################################################
 bt.trade.summary <- function
@@ -888,7 +888,7 @@ bt.trade.summary <- function
 	return(out)
 }
 
-# helper function
+#' helper function
 #' @export 
 bt.trade.summary.helper <- function(trades) 
 {		
@@ -920,7 +920,7 @@ bt.trade.summary.helper <- function(trades)
 }		
 
 ###############################################################################
-# Apply given function to bt enviroment
+#' Apply given function to bt enviroment
 #' @export 
 ###############################################################################
 bt.apply <- function
@@ -971,8 +971,8 @@ bt.apply.matrix <- function
 }
 
 ###############################################################################
-# Remove excessive signal
-# http://www.amibroker.com/guide/afl/exrem.html
+#' Remove excessive signal
+#' http://www.amibroker.com/guide/afl/exrem.html
 #' @export 
 ###############################################################################
 exrem <- function(x) {        
@@ -995,7 +995,7 @@ bt.exrem <- function(weight)
 
 
 ###############################################################################
-# Backtest Test function
+#' Backtest Test function
 ###############################################################################
 bt.test <- function()
 {
@@ -1083,7 +1083,7 @@ dev.off()
 ###############################################################################
 # Analytics Functions
 ###############################################################################
-# CAGR - geometric return
+#' CAGR - geometric return
 #' @export 
 ###############################################################################
 compute.cagr <- function(equity) 
@@ -1118,17 +1118,17 @@ compute.sharpe <- function(x)
 	return(sqrt(temp) * mean(x)/sd(x) )
 }
 
-# http://alumnus.caltech.edu/~amir/mdd-risk.pdf
-# The Calmar Ratio is equal to the compounded annual growth rate divided by the maximum drawdown.
-# The maximum drawdown is typically measured over a three year period.
-# Calmar Ratio = CAGR / MAXDD
+#' http://alumnus.caltech.edu/~amir/mdd-risk.pdf
+#' The Calmar Ratio is equal to the compounded annual growth rate divided by the maximum drawdown.
+#' The maximum drawdown is typically measured over a three year period.
+#' Calmar Ratio = CAGR / MAXDD
 #' @export 
 compute.calmar <- function(x)
 {
     compute.cagr(x) / compute.max.drawdown(x)
 }
 
-# R2 equals the square of the correlation coefficient
+#' R2 equals the square of the correlation coefficient
 #' @export 
 compute.R2 <- function(equity) 
 {
@@ -1138,8 +1138,8 @@ compute.R2 <- function(equity)
 	return( cor(y,x)^2 )
 }
 
-# http://cssanalytics.wordpress.com/2009/10/15/ft-portfolio-with-dynamic-hedging/
-# DVR is the Sharpe Ratio times the R-squared of the equity curve
+#' http://cssanalytics.wordpress.com/2009/10/15/ft-portfolio-with-dynamic-hedging/
+#' DVR is the Sharpe Ratio times the R-squared of the equity curve
 #' @export 
 compute.DVR <- function(bt) 
 {
@@ -1231,7 +1231,7 @@ else
 }
 
 ###############################################################################
-# Example to illustrate a simeple backtest
+#' Example to illustrate a simeple backtest
 #' @export 
 ###############################################################################
 bt.simple <- function(data, signal) 
