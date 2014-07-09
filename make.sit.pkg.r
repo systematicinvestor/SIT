@@ -121,8 +121,8 @@ NULL
 ###############################################################################
 # Create documentaion and build package
 ###############################################################################
-roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
-
+#roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
+roxygenize('pkg')
 pkg <- as.package('pkg')
 name = devtools:::build(pkg, 'pkg')
 

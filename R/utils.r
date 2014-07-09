@@ -1330,7 +1330,7 @@ read.xts.test <- function() {
 #' \dontrun{ 
 #' index.xts(make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1)))
 #' }
-#' @export 
+#' @export index.xts
 ###############################################################################
 # maybe rename to bt.index.xts
 index.xts <- function
@@ -1629,7 +1629,7 @@ random.string <- function(lenght = 12) { join(sample(c(0:9, letters, LETTERS),le
 ###############################################################################
 #' List function / variables in enviroment
 #'
-#' http://www.mail-archive.com/r-help@stat.math.ethz.ch/msg22679.html
+#' http://www.mail-archive.com/r-help <at> stat.math.ethz.ch/msg22679.html
 #'
 #' @export 
 #' @rdname ListEnvFunctions
