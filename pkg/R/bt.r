@@ -353,32 +353,33 @@ bt.run.share <- function
 }
 
 ###############################################################################
-# Run backtest
-#
-# Inputs are assumed as if they were computed at point in time (i.e. no lags)
-#
-# For 'weight' back-test, the default action is to lage weights by one day,
-# because weights are derived using all the information avalaible today, 
-# so we can only implement these weights tomorrow:
-#   portfolio.returns = lag(weights,1) * returns = weights * ( p / lag(p,1) - 1 )
-# user can specify a different lag for weights, by changing the do.lag parameter.
-#
-# For example, for the end of the month strategy: if we open position at the close
-# on the 30th, hold position on the 31st and sell it at the close on the 1st. If our
-# weights have 0 on the 30th, 1 on the 31st, 1 on the 1st, and 0 on the 2nd, we
-# can specify do.lag = 0 to get correct portfolio.returns
-#
-# Alternatively, if our weights have 0 on the 29th, 1 on the 30st, 1 on the 31st, and 0 on the 1nd, we
-# can leave do.lag = 1 to get correct portfolio.returns
-#
-# For 'share' back-test, the portfolio returns:
-#   portfolio.returns = lag(shares,1) * ( p - lag(p,1) ) / ( lag(shares,1) * lag(p,1) )
-# 
-###############################################################################
-#' some operators do not work well on xts
+#' Run backtest
+#' 
+#' Inputs are assumed as if they were computed at point in time (i.e. no lags)
+#' 
+#' For 'weight' back-test, the default action is to lage weights by one day,
+#' because weights are derived using all the information avalaible today, 
+#' so we can only implement these weights tomorrow:
+#' 
+#' portfolio.returns = lag(weights,1) * returns = weights * ( p / lag(p,1) - 1 )
+#' 
+#' user can specify a different lag for weights, by changing the do.lag parameter.
+#' 
+#' For example, for the end of the month strategy: if we open position at the close
+#' on the 30th, hold position on the 31st and sell it at the close on the 1st. If our
+#' weights have 0 on the 30th, 1 on the 31st, 1 on the 1st, and 0 on the 2nd, we
+#' can specify do.lag = 0 to get correct portfolio.returns
+#' 
+#' Alternatively, if our weights have 0 on the 29th, 1 on the 30st, 1 on the 31st, and 0 on the 1nd, we
+#' can leave do.lag = 1 to get correct portfolio.returns
+#' 
+#' For 'share' back-test, the portfolio returns:
+#' portfolio.returns = lag(shares,1) * ( p - lag(p,1) ) / ( lag(shares,1) * lag(p,1) )
+#' 
+#' Some operators do not work well on xts
 #' weight[] = apply(coredata(weight), 2, ifna_prev)
 #' @export 
-###############################################################################
+##############################################################
 bt.run <- function
 (
 	b,					# enviroment with symbols time series
