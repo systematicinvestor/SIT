@@ -23,11 +23,8 @@
 
 
 ###############################################################################
-# Backfill NA's with last non NA value, similar to na.locf(y,na.rm=FALSE)	
-# http://r.789695.n4.nabble.com/Vector-replace-0-elements-without-using-a-loop-td2
-############################################################################### 
-
-###############################################################################
+#' Backfill NA's with last non NA value, similar to na.locf(y,na.rm=FALSE)	
+#' http://r.789695.n4.nabble.com/Vector-replace-0-elements-without-using-a-loop-td2
 #' @export 
 ###############################################################################
 ifna.prev <- function(y)
@@ -40,8 +37,7 @@ ifna.prev <- function(y)
 	return( y[cummax( (1:length(y)) * y1 )]	)
 }
 
-# index of non NAs filled from left to right
-###############################################################################
+#' index of non NAs filled from left to right
 #' @export 
 ###############################################################################
 ifna.prevx <- function(y) { 	
@@ -52,9 +48,8 @@ ifna.prevx <- function(y) {
 	
 	return( cummax( (1:length(y)) * y1 ) )
 }
-
-# index of non NAs filled from right to left
 ###############################################################################
+#' index of non NAs filled from right to left
 #' @export 
 ###############################################################################
 ifna.prevx.rev <- function(y) {
@@ -66,7 +61,7 @@ ifna.prevx.rev <- function(y) {
     rev(cummin(rev((1:length(y)) * y1)))
 }
 
-# test
+#' test
 ifna.prevx.test <- function() {
 	y = c(NA,1,1,NA,2,2,NA,NA)
 
@@ -75,11 +70,9 @@ ifna.prevx.test <- function() {
 }
 
 ###############################################################################
-# Cross - gives a "1" or true on the day that ARRAY1 crosses above ARRAY2. Otherwise the result is "0".
-# To find out when ARRAY1 crosses below ARRAY2, use the formula cross(ARRAY2, ARRAY1)
-# http://www.amibroker.com/guide/afl/afl_view.php?id=34
-############################################################################### 
-###############################################################################
+#' Cross - gives a "1" or true on the day that ARRAY1 crosses above ARRAY2. Otherwise the result is "0".
+#' To find out when ARRAY1 crosses below ARRAY2, use the formula cross(ARRAY2, ARRAY1)
+#' http://www.amibroker.com/guide/afl/afl_view.php?id=34
 #' @export 
 ###############################################################################
 cross <- function( array1, array2 ) {
@@ -99,8 +92,8 @@ cross.dn <- function( array1, array2 ) { cross( array2, array1 ) }
 
 
 ###############################################################################
-# Percentile Rank over given window, works for both single column and matrix
-# If data is matrix, lookup value in the first column across all columns
+#' Percentile Rank over given window, works for both single column and matrix
+#' If data is matrix, lookup value in the first column across all columns
 #' @export 
 ############################################################################### 
 percent.rank <- function
@@ -126,7 +119,7 @@ percent.rank <- function
 
 
 ###############################################################################
-# Percentile Rank over given window, multiple arrays version
+#' Percentile Rank over given window, multiple arrays version
 #' @export 
 ############################################################################### 
 percent.rankM <- function
@@ -158,9 +151,9 @@ percent.rankM <- function
 }
 
 ###############################################################################
-# DV2 indicator (DVB)
-# http://blog.fosstrading.com/2009/07/david-varadis-rsi2-alternative.html
-# http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
+#' DV2 indicator (DVB)
+#' http://blog.fosstrading.com/2009/07/david-varadis-rsi2-alternative.html
+#' http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
 #' @export 
 ############################################################################### 
 DV <- function
@@ -183,13 +176,13 @@ DV <- function
 }
 
 ###############################################################################
-# DVI indicator
-# http://cssanalytics.wordpress.com/2010/07/29/dvi-and-spy-performance/
-# http://marketsci.wordpress.com/2010/07/29/exploring-the-dvi-indicator-extreme-readings/
-# http://marketsci.wordpress.com/2010/07/27/css-analytics%E2%80%99-dvi-indicator-revealed/
-# http://dvindicators.cssanalytics.com/community/?vasthtmlaction=viewtopic&t=47.0
-# http://quantingdutchman.wordpress.com/2010/07/28/dvi-indicator-for-amibroker/
-# http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
+#' DVI indicator
+#' http://cssanalytics.wordpress.com/2010/07/29/dvi-and-spy-performance/
+#' http://marketsci.wordpress.com/2010/07/29/exploring-the-dvi-indicator-extreme-readings/
+#' http://marketsci.wordpress.com/2010/07/27/css-analytics%E2%80%99-dvi-indicator-revealed/
+#' http://dvindicators.cssanalytics.com/community/?vasthtmlaction=viewtopic&t=47.0
+#' http://quantingdutchman.wordpress.com/2010/07/28/dvi-indicator-for-amibroker/
+#' http://davesbrain.blogs.com/mindmoneymarkets/2010/08/dvib-combo-.html
 #' @export 
 ############################################################################### 
 DVI <- function
@@ -216,8 +209,8 @@ DVI <- function
 
 
 ###############################################################################
-# TSI indicator
-# http://engineering-returns.com/tsi/
+#' TSI indicator
+#' http://engineering-returns.com/tsi/
 #' @export 
 ############################################################################### 
 TSI <- function
@@ -236,9 +229,9 @@ TSI <- function
 
 
 ###############################################################################
-# Ulcer Index: alternative to Standard Devation
-# http://en.wikipedia.org/wiki/Ulcer_index
-# http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ulcer_index
+#' Ulcer Index: alternative to Standard Devation
+#' http://en.wikipedia.org/wiki/Ulcer_index
+#' http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ulcer_index
 #' @export 
 ############################################################################### 
 ulcer.index <- function
@@ -252,10 +245,10 @@ ulcer.index <- function
 
 
 ###############################################################################    
-# Rolling EV Ratio: A Trend Indicator or Performance Measurement Statistic
-# cumulative W% (up periods/total periods) x W/L ratio (sum of wins/sum of losses)            
-# http://cssanalytics.wordpress.com/2010/06/02/rolling-ev-ratio-a-trend-indicator-or-performance-measurement-statistic/    
-# http://davesbrain.blogs.com/mindmoneymarkets/2010/07/will-mean-reversion-bounce-back.html
+#' Rolling EV Ratio: A Trend Indicator or Performance Measurement Statistic
+#' cumulative W% (up periods/total periods) x W/L ratio (sum of wins/sum of losses)            
+#' http://cssanalytics.wordpress.com/2010/06/02/rolling-ev-ratio-a-trend-indicator-or-performance-measurement-statistic/    
+#' http://davesbrain.blogs.com/mindmoneymarkets/2010/07/will-mean-reversion-bounce-back.html
 #' @export 
 ###############################################################################
 ev.ratio <- function
@@ -279,10 +272,9 @@ ev.ratio <- function
 
 
 ###############################################################################
-# Sample rotation Strategies
-############################################################################### 
-# Select top N for each period
-# http://www.etfscreen.com/sectorstrategy.php
+#' Sample rotation Strategies
+#' Select top N for each period
+#' http://www.etfscreen.com/sectorstrategy.php
 #' @export 
 ############################################################################### 
 ntop <- function
@@ -389,8 +381,8 @@ toc(12)
 }
 
 ############################################################################### 
-# Select top N for each period, and keep them till they drop below keepn rank
-# http://www.etfscreen.com/sectorstrategy.php
+#' Select top N for each period, and keep them till they drop below keepn rank
+#' http://www.etfscreen.com/sectorstrategy.php
 #' @export 
 ############################################################################### 
 ntop.keep <- function
@@ -444,7 +436,7 @@ ntop.keep <- function
 
 
 ############################################################################### 
-# Rank observations in each row
+#' Rank observations in each row
 #' @export 
 ############################################################################### 
 br.rank <- function(x)
@@ -454,8 +446,8 @@ br.rank <- function(x)
 
 
 ############################################################################### 
-# SuperSmoother filter 2013 John F. Ehlers
-# http://www.stockspotter.com/files/PredictiveIndicators.pdf
+#' SuperSmoother filter 2013 John F. Ehlers
+#' http://www.stockspotter.com/files/PredictiveIndicators.pdf
 #' @export 
 ############################################################################### 
 super.smoother.filter <- function(x) {
@@ -478,7 +470,7 @@ super.smoother.filter <- function(x) {
 #    out[i] = c1 * (x[i] + x[(i-1)])/2 + c2* out[(i-1)]+ c3* out[(i-2)]     
 
 
-# Roofing filter 2013 John F. Ehlers
+#' Roofing filter 2013 John F. Ehlers
 #' @export 
 roofing.filter <- function(x) {
     # Highpass filter cyclic components whose periods are shorter than 48 bars
@@ -493,7 +485,7 @@ roofing.filter <- function(x) {
     super.smoother.filter(HP)
 }
 
-# My Stochastic Indicator 2013 John F. Ehlers
+#' My Stochastic Indicator 2013 John F. Ehlers
 #' @export 
 roofing.stochastic.indicator  <- function(x, lookback = 20) {
     Filt = roofing.filter(x)
