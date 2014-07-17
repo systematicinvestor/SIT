@@ -2792,6 +2792,7 @@ target.vol.strategy <- function(model, weight,
 	#signals = calendar.signal(key.date, T0=0, 1, 2, N1=-1, -2,P2N2=-2:2)
 	#names(signals)	
 	# advanced ... - offsets
+#' @export
 	calendar.signal <- function(key.date, ...) {
 		offsets = list( ... )
 		if( is.list(offsets[[1]]) ) offsets = offsets[[1]]
