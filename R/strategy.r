@@ -2815,11 +2815,13 @@ target.vol.strategy <- function(model, weight,
 		signals
 	}
 
-	#models = calendar.strategy(data, signals, universe = universe)
-	#names(models)	
-	#models = calendar.strategy(data, A=signals[[1]], signals[[1]])
-	#names(models)	
-	# advanced ... - signals
+  #' Calendar Strategy
+	#' models = calendar.strategy(data, signals, universe = universe)
+	#' names(models)	
+	#' models = calendar.strategy(data, A=signals[[1]], signals[[1]])
+	#' names(models)	
+	#' advanced ... - signals
+  #' @export
 	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1) {
 		signals = list( ... )		
 		if( is.list(signals[[1]]) ) signals = signals[[1]]
