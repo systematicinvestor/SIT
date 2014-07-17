@@ -125,7 +125,7 @@ NULL
 roxygenize('pkg', clean=TRUE)
 pkg <- as.package('pkg')
 name = devtools:::build(pkg, 'pkg')
-#devtools:::install(pkg,'pkg')
+devtools:::install(pkg,'pkg')
 file.rename(name, paste(package.name, '.tar.gz', sep=''))
 file.remove(name)
 
