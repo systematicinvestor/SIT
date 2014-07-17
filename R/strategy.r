@@ -2785,13 +2785,14 @@ target.vol.strategy <- function(model, weight,
 
 
 #*****************************************************************
-# Calendar Strategy
-#*****************************************************************
-	#signals = calendar.signal(key.date, 0, 1, 2, -1, -2)
-	#names(signals)
-	#signals = calendar.signal(key.date, T0=0, 1, 2, N1=-1, -2,P2N2=-2:2)
-	#names(signals)	
-	# advanced ... - offsets
+#' Calendar Strategy
+#'
+#' signals = calendar.signal(key.date, 0, 1, 2, -1, -2)
+#' names(signals)
+#' signals = calendar.signal(key.date, T0=0, 1, 2, N1=-1, -2,P2N2=-2:2)
+#' names(signals)	
+#' advanced ... - offsets
+#' @export
 	calendar.signal <- function(key.date, ...) {
 		offsets = list( ... )
 		if( is.list(offsets[[1]]) ) offsets = offsets[[1]]
@@ -2814,11 +2815,13 @@ target.vol.strategy <- function(model, weight,
 		signals
 	}
 
-	#models = calendar.strategy(data, signals, universe = universe)
-	#names(models)	
-	#models = calendar.strategy(data, A=signals[[1]], signals[[1]])
-	#names(models)	
-	# advanced ... - signals
+  #' Calendar Strategy
+	#' models = calendar.strategy(data, signals, universe = universe)
+	#' names(models)	
+	#' models = calendar.strategy(data, A=signals[[1]], signals[[1]])
+	#' names(models)	
+	#' advanced ... - signals
+  #' @export
 	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1) {
 		signals = list( ... )		
 		if( is.list(signals[[1]]) ) signals = signals[[1]]

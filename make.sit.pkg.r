@@ -121,11 +121,11 @@ NULL
 ###############################################################################
 # Create documentaion and build package
 ###############################################################################
-roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
-
+#roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
+roxygenize('pkg', clean=TRUE)
 pkg <- as.package('pkg')
 name = devtools:::build(pkg, 'pkg')
-
+devtools:::install(pkg,'pkg')
 file.rename(name, paste(package.name, '.tar.gz', sep=''))
 file.remove(name)
 
