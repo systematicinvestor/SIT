@@ -1959,8 +1959,8 @@ cluster.group.FTCA.test <- function() {
 			C.EW.kmeans = distribute.weights(equal.weight.portfolio, cluster.group.kmeans.90),
 			C.EW.FTCA = distribute.weights(equal.weight.portfolio, cluster.group.FTCA(0.5)),
 
-			C.RP.kmeans = distribute.weights(risk.parity.portfolio, cluster.group.kmeans.90),
-			C.RP.FTCA = distribute.weights(risk.parity.portfolio, cluster.group.FTCA(0.5)),
+			C.RP.kmeans = distribute.weights(risk.parity.portfolio(), cluster.group.kmeans.90),
+			C.RP.FTCA = distribute.weights(risk.parity.portfolio(), cluster.group.FTCA(0.5)),
 
 			C.MD.kmeans = distribute.weights(max.div.portfolio, cluster.group.kmeans.90),
 			C.MD.FTCA = distribute.weights(max.div.portfolio, cluster.group.FTCA(0.5)),
@@ -1991,7 +1991,7 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 	strategy.performance.snapshoot(models, T)
 dev.off()
 
-png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
+png(filename = 'plot2.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')	
 	barplot.with.labels(sapply(models, compute.turnover, data), 'Average Annual Portfolio Turnover')
 dev.off()
 		

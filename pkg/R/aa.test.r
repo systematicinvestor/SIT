@@ -1235,7 +1235,7 @@ aa.control.risk.return.test <- function()
 	weight = max.return.portfolio(ia,constraints)	
 	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='green')
 
-	weight = risk.parity.portfolio(ia,constraints)	
+	weight = risk.parity.portfolio()(ia,constraints)	
 	points(100 * risk.fn(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='green')
 
 	#*****************************************************************

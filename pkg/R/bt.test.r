@@ -1535,7 +1535,7 @@ bt.aa.test.new <- function()
 		periodicity = 'months', lookback.len = 60, 
 		min.risk.fns = list(
 			EW=equal.weight.portfolio,
-			RP=risk.parity.portfolio,
+			RP=risk.parity.portfolio(),
 			MD=max.div.portfolio,						
 			
 			MV=min.var.portfolio,
@@ -1555,10 +1555,10 @@ bt.aa.test.new <- function()
 		
 			# cluster
 			C.EW = distribute.weights(equal.weight.portfolio, cluster.group),
-			C.RP = distribute.weights(risk.parity.portfolio, cluster.group),
+			C.RP = distribute.weights(risk.parity.portfolio(), cluster.group),
 			
 			# rso
-			RSO.RP.5 = rso.portfolio(risk.parity.portfolio, 5, 500), 
+			RSO.RP.5 = rso.portfolio(risk.parity.portfolio(), 5, 500), 
 			
 			# others
 			MMaxLoss = min.maxloss.portfolio,
@@ -5727,7 +5727,7 @@ n.top = 4
 	obj = portfolio.allocation.helper(data$prices, period.ends=period.ends,
 		lookback.len = n.vol, universe = ntop(momentum[period.ends,], n.top) > 0,
 		min.risk.fns = list(EW=equal.weight.portfolio,
-						RP=risk.parity.portfolio,
+						RP=risk.parity.portfolio(),
 						MV=min.var.portfolio,
 						MD=max.div.portfolio,
 						MC=min.corr.portfolio,
@@ -5797,7 +5797,7 @@ bt.rso.portfolio.test <- function()
 		periodicity = 'months', lookback.len = 120, 
 		min.risk.fns = list(
 			EW = equal.weight.portfolio,
-			# RP = risk.parity.portfolio,
+			# RP = risk.parity.portfolio(),
 			
 			# MV = min.var.portfolio,
 			# RSO.MV = rso.portfolio(min.var.portfolio, 3, 100),
@@ -6513,7 +6513,7 @@ bt.mca.test <- function()
 	
 	obj = portfolio.allocation.helper(data$prices, periodicity = 'weeks',
 		min.risk.fns = list(EW=equal.weight.portfolio,
-						RP=risk.parity.portfolio,
+						RP=risk.parity.portfolio(),
 						MV=min.var.portfolio,
 						MD=max.div.portfolio,
 						MC=min.corr.portfolio,
@@ -6800,7 +6800,7 @@ bt.crp.test <- function()
 	
 	obj = portfolio.allocation.helper(data$prices, periodicity = 'weeks',
 		min.risk.fns = list(EW=equal.weight.portfolio,
-						RP=risk.parity.portfolio,
+						RP=risk.parity.portfolio(),
 						MC=min.corr.portfolio,
 						MC2=min.corr2.portfolio)
 	) 
@@ -8027,10 +8027,10 @@ bt.cluster.portfolio.allocation.test1 <- function()
 		periodicity = periodicity, lookback.len = lookback.len,
 		min.risk.fns = list(
 						EW=equal.weight.portfolio,
-						RP=risk.parity.portfolio,
+						RP=risk.parity.portfolio(),
 						
 						C.EW = distribute.weights(equal.weight.portfolio, cluster.group),
-						C.RP=distribute.weights(risk.parity.portfolio, cluster.group)
+						C.RP=distribute.weights(risk.parity.portfolio(), cluster.group)
 			)
 	) 		
 	
@@ -8111,7 +8111,7 @@ load.hist.stock.data <- function()
        
 	obj = portfolio.allocation.helper(data$prices, period.ends=period.ends, lookback.len = 250, 
 		min.risk.fns = list(EW=equal.weight.portfolio,
-						RP=risk.parity.portfolio,
+						RP=risk.parity.portfolio(),
 						MV=min.var.portfolio,
 						MC=min.corr.portfolio)
 	) 

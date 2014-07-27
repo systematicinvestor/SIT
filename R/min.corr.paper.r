@@ -153,7 +153,7 @@ min.corr.paper.examples <- function()
 		load(file = paste(name, '.Rdata', sep=''))
 		
 		obj = portfolio.allocation.helper(data$prices, periodicity, lookback.len = lookback.len, prefix = prefix,
-			min.risk.fns = 'min.corr.portfolio,min.corr2.portfolio,max.div.portfolio,min.var.portfolio,risk.parity.portfolio,equal.weight.portfolio',
+			min.risk.fns = 'min.corr.portfolio,min.corr2.portfolio,max.div.portfolio,min.var.portfolio,risk.parity.portfolio(),equal.weight.portfolio',
 			custom.stats.fn = 'portfolio.allocation.custom.stats')		
 			
 		save(obj, file=paste(name, lookback.len, periodicity, '.bt', '.Rdata', sep=''))
