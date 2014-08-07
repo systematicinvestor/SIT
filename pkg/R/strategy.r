@@ -2743,10 +2743,15 @@ asset.allocation.strategy.test <- function()
 	#****************************************************************** 
 	data = strategy.load.historical.data(tickers, dates)
 	
-	obj = portfolio.allocation.helper(data$prices,
-		min.risk.fns = 'equal.weight.portfolio,risk.parity.portfolio,min.var.portfolio',
+	obj = portfolio.allocation.helper(data$prices, 
+		periodicity = 'months', lookback.len = 60, 
+		min.risk.fns = list(
+			EW=equal.weight.portfolio,
+			RP=risk.parity.portfolio(),
+			MV=min.var.portfolio
+		),
 		custom.stats.fn = 'portfolio.allocation.custom.stats'
-	) 
+	)
 	
 	models = create.strategies(obj, data)$models
 	

@@ -5285,6 +5285,7 @@ bt.aaa.combo <- function
 	data,
 	period.ends,
 	n.top = 5,		# number of momentum positions
+	n.top.keep = n.top, # only change position if it drops from n.top.keep
 	n.mom = 6*22,	# length of momentum look back
 	n.vol = 1*22 	# length of volatility look back
 ) 
@@ -5299,7 +5300,7 @@ bt.aaa.combo <- function
     
     momentum = prices / mlag(prices, n.mom)
     
-    weight = ntop(momentum[period.ends,], n.top) * adj.vol
+    weight = ntop.keep(momentum[period.ends,], n.top, n.top.keep) * adj.vol
 		n.skip = max(n.mom, n.vol)
    
     data$weight[] = NA
