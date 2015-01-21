@@ -43,12 +43,13 @@ find.tokens <- function
 			if( pos < 2 ) pos = pos1
 			else pos = pos1 + pos - 1			
 		}
+		pos = pos + attr(pos1, 'match.length')
+	}	
+	if( pos.start ) pos = pos - attr(pos1, 'match.length')
 		
-		if( !pos.start ) pos = pos + attr(pos1, 'match.length')
-	}
-	
 	return(pos)
 }	
+
 
 
 extract.token <- function
@@ -684,38 +685,92 @@ getQuote.google.xml <- function(tickers) {
 }
 	
 ###############################################################################
-# extend GLD and SLV historical prices with data from KITCO
-# http://wikiposit.org/w?filter=Finance/Commodities/
-# http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
+# Download historical intraday prices from Google Finance
+# http://www.mathworks.com/matlabcentral/fileexchange/32745-get-intraday-stock-price
+# http://www.mathworks.com/matlabcentral/fileexchange/36115-volume-weighted-average-price-from-intra-daily-data
+# http://www.codeproject.com/KB/IP/google_finance_downloader.aspx
+# http://www.marketcalls.in/database/google-realtime-intraday-backfill-data.h
+# getSymbol.intraday.google('GOOG','NASDAQ')
+# getSymbol.intraday.google('.DJI','INDEXDJX')
+#' @export 
+###############################################################################
+getSymbol.intraday.google <- function
+(
+	Symbol, 
+	Exchange,
+	interval = 60,	# 60 seconds
+	period = '1d'
+) 
+{
+	# download Key Statistics from yahoo	
+	url = paste('http://www.google.com/finance/getprices?q=', Symbol,
+		'&x=', Exchange,
+    	'&i=', interval,
+    	'&p=', period,
+    	'&f=', 'd,o,h,l,c,v', sep='')
+
+	load.packages('data.table')
+	out = fread(url, stringsAsFactors=F)
+	
+	if(ncol(out) < 5) {
+		cat('Error getting data from', url, '\n')
+		return(NULL)
+	}
+	
+		setnames(out, spl('Date,Open,High,Low,Close,Volume'))
+	
+	# date logic
+	date = out$Date
+		date.index = substr(out$Date,1,1) == 'a'
+		date = as.double(gsub('a','',date))	
+	temp = NA * date
+		temp[date.index] = date[date.index]
+		temp = ifna.prev(temp)
+	date = temp + date * interval
+		date[date.index] = temp[date.index]	
+	class(date) = c("POSIXt", "POSIXct")
+	
+	date = date - (as.double(format(date[1],'%H')) - 9)*60*60
+	
+	make.xts(out[,-1,with=F], date)
+}
+
+
+###############################################################################
+# getSymbols interface to Yahoo today's delayed qoutes
+# based on getQuote.yahoo from quantmod package
+#' @export 
+###############################################################################            
+getQuote.yahoo.today <- function(Symbols) {
+	require('data.table')
+    what = yahooQF(names = spl('Name,Symbol,Last Trade Time,Last Trade Date,Open,Days High,Days Low,Last Trade (Price Only),Volume,Previous Close'))
+    names = spl('Name,Symbol,Time,Date,Open,High,Low,Close,Volume,Yesterday')
+    
+    all.symbols = lapply(seq(1, len(Symbols), 100), function(x) na.omit(Symbols[x:(x + 99)]))
+    out = c()
+    
+    for(i in 1:len(all.symbols)) {
+        # download
+        url = paste('http://download.finance.yahoo.com/d/quotes.csv?s=',
+            join( trim(all.symbols[[i]]), ','),
+            '&f=', what[[1]], sep = '')
+        
+		txt = join(readLines(url),'\n') 
+		data = fread(paste0(txt,'\n'), stringsAsFactors=F, sep=',')
+      		setnames(data,names)
+      		setkey(data,'Symbol')      	
+      	out = rbind(out, data)
+    }
+    out
+}
+
+###############################################################################
+# extend GLD and SLV historical prices
 #' @export 
 ###############################################################################
 extend.GLD <- function(GLD) {
-	#extend.data(GLD, KITCO.data('Gold.PM') / 10)
-	# data$GLD = extend.GLD(data$GLD)
 	extend.data(GLD, bundes.bank.data.gold(), scale=T)
 }
-
-#' @export 
-extend.SLV <- function(SLV) {
-	extend.data(SLV, KITCO.data('Silver'))
-}
-
-#' @export 
-KITCO.data <- function
-(
-	symbol = spl('Gold.AM,Gold.PM,Silver,Platinum.AM,Platinum.PM,Palladium.AM,Palladium.PM')
-)
-{
-	url = 'http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO'
-	temp = read.csv(url, skip=4, header=TRUE, stringsAsFactors=F)
-		
-	#hist = make.xts(as.double(temp[,symbol]), as.Date(temp[,1], '%d-%b-%Y'))
-	hist = make.xts(as.double(temp[,symbol]), as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%d-%b-%Y'))	
-		indexClass(hist) = 'Date'
-		colnames(hist)='Close'
-	return( hist[!is.na(hist)] )
-}
-
 
 # gold = extend.GLD(data$GLD)
 # comm = extend.data(data$DBC, get.CRB(), scale=T)
@@ -731,9 +786,9 @@ extend.data <- function
 	colnames(hist) = sapply(colnames(hist), function(x) last(spl(x,'\\.')))
 
 	# find Close in hist
-	close.index = find.names('Close', colnames(hist))$Close
+	close.index = find.names('Close', hist)
 	if(is.na(close.index)) close.index = 1	
-	adjusted.index = find.names('Adjusted', colnames(hist))$Adjusted
+	adjusted.index = find.names('Adjusted', hist)
 	if(is.na(adjusted.index)) adjusted.index = close.index	
 
 	if(scale) {
@@ -758,7 +813,7 @@ extend.data <- function
 	
 	
 	if( ncol(hist) != ncol(current) )	
-		hist = make.xts( rep.col(hist[,close.index], ncol(current)), index(hist))
+		hist = make.xts( rep.col(hist[,adjusted.index], ncol(current)), index(hist))
 	else
 		hist = hist[, colnames(current)]
 	
@@ -768,10 +823,23 @@ extend.data <- function
 }
 
 
+
+# extend data from the previously saved proxies
+#' @export 
+extend.data.proxy <- function(data, data.proxy = NULL, proxy.filename = 'data.proxy.Rdata') {
+	if(is.null(data.proxy) && file.exists(proxy.filename))
+		load(file=proxy.filename)
+		
+  	if(!is.null(data.proxy))
+		for(n in ls(data.proxy))
+    		if( !is.null(data[[n]]) )
+    			data[[n]] = extend.data(data[[n]], data.proxy[[n]], scale=T)
+}  
+	
+
 ###############################################################################
 # Bundes Bank - long history of gold prices
 # http://www.bundesbank.de/Navigation/EN/Statistics/Time_series_databases/Macro_economic_time_series/its_list_node.html?listId=www_s331_b01015_3
-# http://wikiposit.org/w?filter=Finance/Commodities/
 #' @export 
 ###############################################################################  
 bundes.bank.data <- function(symbol) {
@@ -882,10 +950,12 @@ getSymbols.fxhistoricaldata <- function
 	type = spl('hour,day'),
 	env = .GlobalEnv, 
 	auto.assign = TRUE,
-	download = FALSE	
+	download = FALSE,
+	name.has.type = TRUE
 ) 
 {		
 	type = type[1]
+	type0 = paste0(type,'_')
 	
 	# setup temp folder
 	temp.folder = paste(getwd(), 'temp', sep='/')
@@ -913,7 +983,7 @@ getSymbols.fxhistoricaldata <- function
 cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')					
 			
 		if (auto.assign) {		
-			assign(paste(gsub('\\^', '', Symbols[i]), type, sep='_'), out, env)	
+			assign(paste0(gsub('\\^', '', Symbols[i]), iif(name.has.type,type0,'')), out, env)	
 		}	
 	}
 	if (!auto.assign) {
@@ -922,6 +992,7 @@ cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')
 		return(env)				
 	}	
 }
+
 
 
 
@@ -984,6 +1055,7 @@ DEXSZUS     Switzerland/U.S.
 	# load fx from fred
 	data.fx <- new.env()
 	quantmod::getSymbols(map$FX, src = 'FRED', from = '1970-01-01', env = data.fx, auto.assign = T)		
+		for(i in ls(data.fx)) data.fx[[i]] = na.omit(data.fx[[i]])
 		for(i in convert.index) data.fx[[i]] = 1 / data.fx[[i]]
 
 	# extract fx where all currencies are available
@@ -1257,6 +1329,200 @@ get.fama.french.data <- function(
 
 
 ###############################################################################
+# CBOE Futures
+#' @export 
+###############################################################################
+download.helper <- function(url,download) {
+	# setup temp folder
+	temp.folder = paste(getwd(), 'temp', sep='/')
+	dir.create(temp.folder, F)
+
+  filename = paste0(temp.folder, '/', basename(url))
+  if(download || !file.exists(filename))
+    try(download.file(url, filename, mode='wb'), TRUE)
+  filename
+}
+
+
+# Update files, download = T
+#for(y in date.year(Sys.Date()):(1+date.year(Sys.Date())))
+#	for(m in 1:12) {
+#		temp = getSymbol.CBOE('VX', m, y, T)
+#' @export 
+getSymbol.CBOE <- function
+(
+	Symbol, 
+	Month,
+	Year,
+	download = FALSE
+) 
+{
+
+  # month codes of the futures
+  m.codes = spl('F,G,H,J,K,M,N,Q,U,V,X,Z')
+  
+  url = paste0("http://cfe.cboe.com/Publish/ScheduledTask/MktData/datahouse/CFE_",
+    m.codes[Month], substring(Year,3,4), '_', Symbol, '.csv')
+  
+  filename = download.helper(url, download)   
+  if(file.exists(filename) && file.info(filename)$size > 1)
+    read.xts(filename, format='%m/%d/%Y')
+  else
+    NULL
+}
+
+
+# SPX Volatility Term Structure
+#' @export 
+cboe.volatility.term.structure.SPX <- function(make.plot = T) {
+  url = 'http://www.cboe.com/data/volatilityindexes/volatilityindexes.aspx'
+  txt = join(readLines(url))
+
+  temp.table = extract.table.from.webpage(txt, 'Trade Date', hasHeader = T)
+    colnames(temp.table) = gsub(' ','.',trim(tolower(colnames(temp.table))))
+    temp.table = data.frame(temp.table)
+    temp.table$trade.date = as.POSIXct(temp.table$trade.date, format="%m/%d/%Y %I:%M:%S %p")
+    temp.table$expiration.date = as.Date(temp.table$expiration.date, "%d-%b-%y")
+    temp.table[,3] = as.numeric(as.character(temp.table[,3]))
+    temp.table[,4] = as.numeric(as.character(temp.table[,4]))
+  temp.table
+
+  if(make.plot) {
+    plot(temp.table$expiration.date, temp.table$vix, type = 'b', 
+      main=paste('VIX Term Structure, generated ',  max(temp.table$trade.date)), 
+      xlab = 'Expiration Month', ylab='VIX Index Level')
+    grid()
+  }
+  
+  temp.table
+}
+
+
+#' @export 
+load.VXX.CBOE <- function() {
+	# https://r-forge.r-project.org/scm/viewvc.php/pkg/qmao/R/getSymbols.cfe.R?view=markup&root=twsinstrument
+	index = "::2007-03-25"
+	fields = spl('Open,High,Low,Close,Settle')
+ 
+	# days remaining before settlement, on a given date
+	dr <- function(index, date) sum(index>date)
+
+	data <- new.env()
+	futures = list()  
+	i = 1
+	for(y in 2004:(1+date.year(Sys.Date())))
+		for(m in 1:12) {
+			temp = getSymbol.CBOE('VX', m, y)
+			if(is.null(temp)) next    
+			
+			temp = temp[temp$Settle > 0]
+			if(nrow(temp)==0) next    
+			if(len(temp[index,1])> 0)
+	        	temp[index,fields] = temp[index,fields]/10
+	      	
+	      	label = paste0(y*100+m)
+	      	dates = index(temp)
+	      		      	      	      
+			futures[[ i ]] = list()
+			futures[[ i ]]$data = temp
+			futures[[ i ]]$label = label
+			futures[[ i ]]$index = dates
+			futures[[ i ]]$settle.date = last(dates)
+			# set roll period of each future
+			if(i==1)
+				futures[[ i ]]$dt = len(dates)
+			else	
+				futures[[ i ]]$dt = dr(dates, futures[[ i-1 ]]$settle.date)
+					
+	        temp$i = i
+	        #number of business days in roll period
+	        temp$dt = futures[[ i ]]$dt
+	        # number of remaining dates in the first futures contract
+	        temp$dr = (len(dates)-1):0
+			data[[ label ]] = temp
+					      	
+	      	i = i + 1    
+		}
+	  	
+	bt.prep(data, align='keep.all')
+	
+	# debug
+	# bt.apply(data, function(x) x[,'dr'])[1150:1160,48:55]
+	# count(t(coredata(bt.apply(data, function(x) x[,'Settle']))))
+	
+	data
+}
+	
+#' @export 
+extract.VXX.CBOE <- function(data, field, index, exact.match=T) {
+	map  = 1:ncol(data$prices)
+	
+	temp = bt.apply(data, function(x) x[,field])
+		temp = coredata(temp)
+		
+	t(apply(temp, 1, function(x) {
+		if(exact.match) {
+			pos = map[!is.na(x)][1] - 1
+			x[(index + pos)]
+		} else {
+			pos = map[!is.na(x)][index]
+			x[pos]			
+		}
+	}))
+}
+
+
+
+# Reconstructing VXX from CBOE futures data 
+# http://tradingwithpython.blogspot.ca/2012/01/reconstructing-vxx-from-cboe-futures.html
+# for VXX calculation see http://www.ipathetn.com/static/pdf/vix-prospectus.pdf
+# page PS-20
+#' @export 
+reconstruct.VXX.CBOE <- function(exact.match=T) {
+	data = load.VXX.CBOE()
+
+	dt = extract.VXX.CBOE(data, 'dt', 1, exact.match)[1,]
+	dr = extract.VXX.CBOE(data, 'dr', 1, exact.match)[1,]
+	x  = extract.VXX.CBOE(data, 'Settle', 1:2, exact.match)
+		
+	# for VXX calculation see http://www.ipathetn.com/static/pdf/vix-prospectus.pdf
+	# page PS-20: 1/2 months		
+	# VXX Short-Term
+	w = cbind(dr / dt, (dt - dr) / dt)	
+	val.cur = rowSums(x * mlag(w))
+	val.yest = rowSums(mlag(x) * mlag(w))
+	ret = val.cur / val.yest - 1
+	
+	# on roll it is simply future2's return
+	index = ifna(mlag(dr) == 0, F)
+	ret[index] = (x[,1] / mlag(x[,2]) - 1)[index]
+	
+	Close = cumprod(1+ifna(ret,0))
+	VXX = make.xts(cbind(Close,x,dt,dr,ret), data$dates)
+	
+	# VXZ Mid-Term: 4,5,6,7 months
+	x  = extract.VXX.CBOE(data, 'Settle', 4:7, exact.match)
+	
+	w = cbind(dr / dt, 1, 1, (dt - dr) / dt)	
+	val.cur = rowSums(x * mlag(w))
+	val.yest = rowSums(mlag(x) * mlag(w))
+	ret = val.cur / val.yest - 1
+	
+	index = ifna(mlag(dr) == 0, F)
+	ret[index] = (rowSums(x[,-4]) / mlag(rowSums(x[,-1])) - 1)[index]
+		
+	Close = cumprod(1+ifna(ret,0))	
+	VXZ = make.xts(cbind(Close,x,dt,dr,ret), data$dates)
+	
+	# debug
+	# plota(VXZ,type='l',lwd=2)	
+	# write.xts(VXZ, file='vix-mid.txt')	
+		
+	list(VXX = VXX, VXZ = VXZ)
+}  
+
+
+###############################################################################
 # Load FOMC dates
 # http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
 # http://www.federalreserve.gov/monetarypolicy/fomchistorical2008.htm
@@ -1334,57 +1600,6 @@ get.FOMC.dates <- function
 }	
 
 
-
-###############################################################################
-# Download historical intraday prices from Google Finance
-# http://www.mathworks.com/matlabcentral/fileexchange/32745-get-intraday-stock-price
-# http://www.mathworks.com/matlabcentral/fileexchange/36115-volume-weighted-average-price-from-intra-daily-data
-# http://www.codeproject.com/KB/IP/google_finance_downloader.aspx
-# http://www.marketcalls.in/database/google-realtime-intraday-backfill-data.h
-# getSymbol.intraday.google('GOOG','NASDAQ')
-# getSymbol.intraday.google('.DJI','INDEXDJX')
-#' @export 
-###############################################################################
-getSymbol.intraday.google <- function
-(
-	Symbol, 
-	Exchange,
-	interval = 60,	# 60 seconds
-	period = '1d'
-) 
-{
-	# download Key Statistics from yahoo	
-	url = paste('http://www.google.com/finance/getprices?q=', Symbol,
-		'&x=', Exchange,
-    	'&i=', interval,
-    	'&p=', period,
-    	'&f=', 'd,o,h,l,c,v', sep='')
-
-	load.packages('data.table')
-	out = fread(url, stringsAsFactors=F)
-	
-	if(ncol(out) < 5) {
-		cat('Error getting data from', url, '\n')
-		return(NULL)
-	}
-	
-		setnames(out, spl('Date,Open,High,Low,Close,Volume'))
-	
-	# date logic
-	date = out$Date
-		date.index = substr(out$Date,1,1) == 'a'
-		date = as.double(gsub('a','',date))	
-	temp = NA * date
-		temp[date.index] = date[date.index]
-		temp = ifna.prev(temp)
-	date = temp + date * interval
-		date[date.index] = temp[date.index]	
-	class(date) = c("POSIXt", "POSIXct")
-	
-	date = date - (as.double(format(date[1],'%H')) - 9)*60*60
-	
-	make.xts(out[, eval(expression(list( Open,High,Low,Close,Volume )))], date)
-}
 
 
 ###############################################################################

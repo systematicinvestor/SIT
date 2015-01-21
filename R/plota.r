@@ -42,7 +42,7 @@
 #' \dontrun{ 
 #' plota.theme.blue.red()
 #' }
-#' @export 
+#' @export
 #' @rdname PlotaColorTheme
 ###############################################################################
 plota.theme <- function
@@ -724,6 +724,7 @@ plota.hl.lwd <- function
 
 ###############################################################################
 # plota.volume - plot volume
+#' @export
 ###############################################################################
 plota.volume <- function
 (
@@ -752,6 +753,7 @@ plota.volume <- function
 
 ###############################################################################
 # plota.scale.volume - scale volume, (c) quanmod package
+#' @export
 ###############################################################################
 plota.scale.volume <- function(y) 
 {

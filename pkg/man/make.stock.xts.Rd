@@ -2,7 +2,7 @@
 \alias{make.stock.xts}
 \title{Create stock like \code{\link{xts}} object from one column time series}
 \usage{
-  make.stock.xts(out, column = 1, ...)
+  make.stock.xts(out, column = 1)
 }
 \arguments{
   \item{out}{\code{\link{xts}} time series}

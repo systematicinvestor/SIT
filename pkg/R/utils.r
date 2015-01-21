@@ -92,10 +92,10 @@ trim <- function
 	s	# string
 )
 {
-  s = sub(pattern = '^ +', replacement = '', x = s)
-  s = sub(pattern = ' +$', replacement = '', x = s)
+  s = sub(pattern = '^\\s+', replacement = '', x = s)
+  s = sub(pattern = '\\s+$', replacement = '', x = s)
   return(s)
-}
+}  
 
 ###############################################################################
 #' Shortcut for length function
@@ -156,7 +156,10 @@ iif <- function
 			falsepart[cond] = truepart 
 		else {
 			cond = ifna(cond,F)
-			falsepart[cond] = truepart[cond]
+			if(is.xts(truepart))
+				falsepart[cond] = coredata(truepart)[cond]
+			else
+				falsepart[cond] = truepart[cond]
 		}
 			
 		#falsepart[!is.na(cond)] = temp
@@ -682,49 +685,60 @@ create.monthly.table <- function(monthly.data)
 #' }
 #' @export 
 ###############################################################################
-third.friday.month <- function(year, month)
-{
+third.friday.month <- function(years, months)
+{	
+helper <- function(year, month) {
 	day = date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )
 	day = c(20,19,18,17,16,15,21)[1 + day]
-	return(as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1])
+	as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1]
+}
+	if(len(years) > 1 && len(months) > 1) {
+		out = c()
+		for(month in months)
+			out = c(out, helper(years,month))
+		as.Date(out)
+	} else
+		helper(years,months) 
+}	
+
+# Special days
+# http://www.cboe.com/AboutCBOE/xcal2014.pdf
+# third.friday.month(2010:2013, 4)	
+# key.date = map.spx.expiration(data$prices) 	
+# VIX settles 30 days prior to SPY
+# key.date = map.spx.expiration(data$prices, offset=30) 	
+# na.omit(key.date['2014'])
+#' @export
+map.spx.expiration <- function(data, backfill = T, offset = 0) {
+	dates = as.Date(index(data))
+	
+	# 3rd Friday of the month is last trading day for equity options
+	years = date.year(range(dates))
+	friday = third.friday.month(years[1]:(years[2]+1), 1:12)
+		friday.future = friday[friday > last(dates)]
+		friday = friday[friday <= last(dates)]
+	
+	key.date.index = match(friday, dates)
+	na.index = which(is.na(key.date.index))
+	
+	# backfill NA's
+	if(backfill && len(na.index)>0)
+		key.date.index[na.index] = match(friday[na.index]-1, dates)
+
+	if(offset != 0) {
+		friday = c(dates[key.date.index], friday.future)
+		offset.date = friday - offset
+		key.date.index = match(offset.date, dates)
+	}
+	
+	key.date.index = na.omit(key.date.index)
+	
+	key.date = NA * data[,1]
+		key.date[key.date.index,] = T
+	key.date
 }
 
-###############################################################################
-#' Determine the index of subset of dates in the time series
-#'
-#' @param x xts time series
-#' @param dates string represnting subset of dates i.e. '2010::2012'
-#'
-#' @return index of subset of dates in the time series
-#'
-#' @examples
-#' \dontrun{ 
-#' dates2index(data$prices, '2010::2012') 
-#' 
-#' data = textConnection('
-#' date,Close
-#' 2013-03-18,    154.97
-#' 2013-03-19,    154.61
-#' 2013-03-20,    155.69
-#' 2013-03-21,    154.36
-#' 2013-03-22,    155.60
-#' 2013-03-25,    154.95')
-#' 
-#' x = read.xts(data)
-#' dates2index(x, '2013-03-19')
-#' 
-#' }
-#' @export 
-###############################################################################
-dates2index <- function( x, dates = 1:nrow(x) ) {
-	dates.index = dates
-	if(!is.numeric(dates)) {
-		temp = x[,1]
-		temp[] = 1:nrow(temp)
-		dates.index = as.numeric(temp[dates])
-	}
-	return(dates.index)
-} 
+
 
 ###############################################################################
 #' Load Packages that are available and install ones that are not available
@@ -808,12 +822,12 @@ toc <- function
 	if( exists(paste('saved.time', identifier, sep=''), envir = .GlobalEnv) ) {
 	    prevTime = get(paste('saved.time', identifier, sep=''), envir = .GlobalEnv)
     	diffTimeSecs = proc.time()[3] - prevTime
-    	cat('Elapsed time is', round(diffTimeSecs, 2), 'seconds\n')
+    	print(paste('Elapsed time is', round(diffTimeSecs, 2), 'seconds\n'))
     } else {
-    	cat('Toc error\n')
-    }    
-    return (paste('Elapsed time is', round(diffTimeSecs,2), 'seconds', sep=' '))
+    	print('Toc error\n')
+    }
 }
+
 
 test.tic.toc <- function()
 {
@@ -1084,6 +1098,13 @@ make.xts <- function
 	return( x )
 }
 
+
+# convience function: take list of xts objects with 1 column and combine them into
+# one xts object with column names beign names in the input list
+#' @export 
+as.xts.list <- function(data) { for(n in names(data)) colnames(data[[n]])=n; do.call(cbind, data)}
+
+
 ###############################################################################
 #' Convert \code{\link{xts}} object to \code{\link{ts}} object
 #'
@@ -1191,31 +1212,43 @@ read.xts <- function
 	decreasing = FALSE,
 	sep = ',',
 	date.column = 1,
+	skip = -1L,
 	...
 )
 {
-if (is.matrix(x) || is.data.frame(x) ) {
+if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
 	data = x
-	dates = as.matrix(data[,1,drop=F])
-	data  = data[,-1,drop=F]
+	dates = as.matrix(data[,date.column,drop=F])
+	data  = data[,-date.column,drop=F]
 } else {
 	filename = x
 	load.packages('data.table')
-	out = fread(filename, stringsAsFactors=F, sep=sep)
+if(!is.data.table(x)) {
+	# set autostart
+	out = fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
 		setnames(out,gsub(' ', '_', trim(colnames(out)))) 
+} else out = x	
+
+	
 #		first.column.expr = parse(text = colnames(out)[date.column])
-		rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-(1:date.column)],collapse=','),')'))
-		
+		#rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-(1:date.column)],collapse=','),')'))
+	# remove non-numeric columns
+    rest.columns.expr = parse(text = paste('list(', paste(names(which(sapply(out,class)[-(1:date.column)] != 'character')),collapse=','),')'))		
 #	dates = out[,eval(first.column.expr)]
-	dates = as.matrix(out[,date.column,with=FALSE])
-	data = out[, eval(rest.columns.expr)]
+#	data = out[, eval(rest.columns.expr)]
+
+	dates = as.matrix(out[,date.column,with=FALSE])		
+	index = which(sapply(out,class) != 'character')
+		index = index[ index > date.column ]	
+	data =  as.matrix(out[,index,with=FALSE]+0)	
 }		
 	dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
-		dates.index = order(dates, decreasing = decreasing)
+		dates.index = iif(is.null(decreasing), 1:nrow(data), order(dates, decreasing = decreasing) )
 	out = make.xts(data[dates.index,,drop=F], dates[dates.index])
 		indexClass(out) = index.class
 	return( out )
-} 
+}  
+
 
 # A few other variations to read data
 read.xts.old <- function
@@ -1316,7 +1349,8 @@ read.xts.test <- function() {
 	 )
 	 
 }
-   	
+   
+	
 ###############################################################################
 #' Fast alternative to index() function for \code{\link{xts}} object
 #'
@@ -1368,6 +1402,144 @@ index2date.time <- function(temp) {
 	} else {
 		as.POSIXct(temp, tz = Sys.getenv('TZ'))
 	}
+}
+
+###############################################################################
+#' Determine the index of subset of dates in the time series
+#'
+#' @param x xts time series
+#' @param dates string represnting subset of dates i.e. '2010::2012'
+#'
+#' @return index of subset of dates in the time series
+#'
+#' @examples
+#' \dontrun{ 
+#' dates2index(data$prices, '2010::2012') 
+#' 
+#' data = textConnection('
+#' date,Close
+#' 2013-03-18,    154.97
+#' 2013-03-19,    154.61
+#' 2013-03-20,    155.69
+#' 2013-03-21,    154.36
+#' 2013-03-22,    155.60
+#' 2013-03-25,    154.95')
+#' 
+#' x = read.xts(data)
+#' dates2index(x, '2013-03-19')
+#' 
+#' }
+#' @export 
+###############################################################################
+dates2index <- function( x, dates = 1:nrow(x) ) {
+	dates.index = dates
+	if(!is.numeric(dates)) {
+		temp = x[,1]
+		temp[] = 1:nrow(temp)
+		dates.index = as.numeric(temp[dates])
+	}
+	return(dates.index)
+} 
+
+
+###############################################################################
+#' Determine location of given names in column names of data
+#'
+#' @param names names to find
+#' @param data xts/matrix/data.frame that column names to search
+#' @param return.index optional parameter that indicates whether to return names or indexes of names matched
+#'
+#' @return name/index if names is just one element; otherwise list of found matches for each name
+#'
+#' @export 
+###############################################################################
+find.names <- function(names, data, return.index = T) 
+{ 
+	names = spl(names)
+	all.names = colnames(data)
+	out = list()
+	for(n in names) {
+		loc = grep(n, all.names, ignore.case = TRUE)
+	
+		# special logic for Close and Adjusted	
+		if(len(loc) == 0 && ncol(data) == 1 && 
+			(grepl(n,'close',ignore.case = TRUE) || grepl(n,'adjusted',ignore.case = TRUE))
+			) loc = 1
+		
+		if(len(loc) > 0) out[[n]] = iif(return.index, loc, all.names[loc])
+	}
+		
+	iif(len(names) == 1 && len(out) == 1, out[[1]][1], out)
+}
+
+
+###############################################################################
+#' Create stock like \code{\link{xts}} object from one column time series
+#'
+#' @param out \code{\link{xts}} time series 
+#' @param column column index to use, \strong{defaults to 1} 
+#'
+#' @return stock like \code{\link{xts}} object
+#'
+#' @export 
+############################################################################### 
+make.stock.xts <- function(out, column=1) {
+	# try to be smart about mapping columns in out
+	names = spl('Open,High,Low,Close,Volume,Adjusted')
+	names.index = find.names(names, out)
+	
+	temp= list()
+	for(n in names)
+		if( !is.null(names.index[[n]]) )
+			temp[[n]] = out[,names.index[[n]][1]]
+	
+	if(is.null(temp$Close) && is.null(temp$Adjusted))
+		temp$Close = temp$Adjusted = out[,column]
+	if(is.null(temp$Adjusted)) temp$Adjusted = temp$Close
+	if(is.null(temp$Close)) temp$Close = temp$Adjusted
+	
+	if(is.null(temp$Open)) temp$Open = temp$Close
+	if(is.null(temp$High)) temp$High = temp$Close
+	if(is.null(temp$Low)) temp$Low = temp$Close
+	if(is.null(temp$Volume)) temp$Volume = 0
+	
+	out = cbind(temp$Open,temp$High,temp$Low,temp$Close,temp$Volume,temp$Adjusted)
+		colnames(out) = names
+	out
+}
+
+
+###############################################################################
+#' Normilize all timeseries to start at one
+#'
+#' @param x \code{\link{xts}} time series 
+#'
+#' @return scaled \code{\link{xts}} time series, so that each timeseries starts at one
+#'
+#' @examples
+#' \dontrun{ 
+#' plota.matplot(scale.one(data$prices))
+#' }
+#' @export 
+############################################################################### 
+# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))	
+scale.one <- function
+(
+	x, 
+	overlay = F, 
+	main.index = which(!is.na(x[1,]))[1] 
+) 
+{
+	index = 1:nrow(x)
+	if( overlay )
+		x / rep.row(apply(x, 2, 
+				function(v) {
+					i = index[!is.na(v)][1]
+					v[i] / as.double(x[i,main.index])
+				}
+		), nrow(x))
+	else
+		x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
 }
 
 ###############################################################################
@@ -1509,20 +1681,49 @@ getSymbols.extra <- function
 	if(is.character(Symbols)) Symbols = spl(Symbols)
 	if(len(Symbols) < 1) return(Symbols)
 	
-	Symbols = toupper(gsub('\n','',Symbols))
+	Symbols = spl(toupper(gsub('\n',',',join(Symbols, ','))))
 		
 	# split
 	map = list()
 	for(s in Symbols) {
-		name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
-		values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
-		map[[trim(name)]] = trim(values)
+		if(nchar(trim(s)) == 0) next
+		if(substring(trim(s)[1],1,1) == '#') next
+	
+		temp = spl(s, '=')
+		if ( len(temp) > 1 ) { 
+			name = temp[1]
+			values = trim(spl(temp[2], '\\+'))
+			
+			value1 = values[1]
+				value1.name = grepl('\\[', value1)			
+			value1 = gsub('\\]','',gsub('\\[','',value1))
+			value1 = trim(spl(value1,';'))
+			
+			values = values[-1]
+			
+			for(n in trim(spl(name,';')))
+				map[[ n  ]] = c(value1[1], values)
+				
+			if( len(value1) > 1 || value1.name)
+				for(n in value1)
+					map[[ n  ]] = c(n, values)			
+		} else {
+			temp = spl(s, '\\+')
+			name = temp[1]
+			values = trim(temp[-1])
+			for(n in trim(spl(name,';')))
+				map[[ n  ]] = c(n, values)
+		}
+		
+		#name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
+		#values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
+		#map[[trim(name)]] = trim(values)		
 	}
 	Symbols = unique(unlist(map))
 	
 	# find overlap with raw.data
 	Symbols = setdiff(Symbols, ls(raw.data))
-	
+
 	# download
 	data <- new.env()
 	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
@@ -1533,11 +1734,14 @@ getSymbols.extra <- function
 	for(s in names(map)) {
 		env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
 		if( len(map[[ s ]]) > 1)
-			for(i in 2:len(map[[ s ]])) 
-				env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T) 			
+			for(i in 2:len(map[[ s ]]))
+				if(is.null(data[[ gsub('\\^', '', map[[ s ]][i]) ]]))
+					cat('Not Downloaded, main =', s, 'missing' , gsub('\\^', '', map[[ s ]][i]), '\n', sep='\t')		
+				else
+					env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T)
 		if (!auto.assign)
        		return(env[[ s ]])			
-	}			
+	}	
 }
 
 
@@ -1574,6 +1778,27 @@ getSymbols.extra.test <- function()
    
    plota.matplot(data$prices)	
 } 
+
+
+###############################################################################
+#' Helper function to add Intraday prices
+#' @export 
+################################################################################
+getSymbols.intraday <- function 
+(
+	Symbols = NULL, 
+	env = parent.frame(), 
+	getSymbols.fn = getSymbols,
+	auto.assign = T,  
+	...
+) 
+{
+	if(len(Symbols) > 0) {
+		match.fun(getSymbols.fn)(Symbols, env = env, auto.assign = auto.assign, ...)
+		data.today = getQuote.yahoo.today(ls(env))
+		bt.append.today(env, data.today)
+	}
+}
 
 ###############################################################################
 # Log (feedback) functions

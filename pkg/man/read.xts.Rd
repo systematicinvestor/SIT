@@ -3,7 +3,8 @@
 \title{Read \code{\link{xts}} object from file}
 \usage{
   read.xts(x, date.fn = paste, index.class = "Date",
-    decreasing = FALSE, sep = ",", date.column = 1, ...)
+    decreasing = FALSE, sep = ",", date.column = 1,
+    skip = -1L, ...)
 }
 \arguments{
   \item{filename}{file name}

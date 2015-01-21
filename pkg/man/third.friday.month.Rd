@@ -2,7 +2,7 @@
 \alias{third.friday.month}
 \title{Compute the expiration date of stock options (3rd Friday of the month)}
 \usage{
-  third.friday.month(year, month)
+  third.friday.month(years, months)
 }
 \arguments{
   \item{year}{year}

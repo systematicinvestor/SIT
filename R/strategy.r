@@ -2720,7 +2720,7 @@ if(!silent) log(i, percent = j / n)
 
 			if( !is.null(close.all.positions.index) ) data$weight[close.all.positions.index,] = 0
 
-		models[[i]] = bt.run.share(data, clean.signal = clean.signal, ...)
+		models[[i]] = bt.run.share(data, clean.signal = clean.signal, silent = silent, ...)
 		
 #		models[[i]]$risk.contribution = obj$risk.contributions[[j]]
 		models[[i]]$period.weight = obj$weights[[j]]
@@ -2797,6 +2797,7 @@ target.vol.strategy <- function(model, weight,
 	#signals = calendar.signal(key.date, T0=0, 1, 2, N1=-1, -2,P2N2=-2:2)
 	#names(signals)	
 	# advanced ... - offsets
+	#' @export 
 	calendar.signal <- function(key.date, ...) {
 		offsets = list( ... )
 		if( is.list(offsets[[1]]) ) offsets = offsets[[1]]
@@ -2824,6 +2825,7 @@ target.vol.strategy <- function(model, weight,
 	#models = calendar.strategy(data, A=signals[[1]], signals[[1]])
 	#names(models)	
 	# advanced ... - signals
+	#' @export 
 	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1) {
 		signals = list( ... )		
 		if( is.list(signals[[1]]) ) signals = signals[[1]]
@@ -2855,10 +2857,12 @@ target.vol.strategy <- function(model, weight,
 	
 	#*****************************************************************
 	# Look at trades
+	#' @export 
 	#*****************************************************************
-	last.trades <- function(model, n=20, make.plot=T, return.table=F) {
+	last.trades <- function(model, n=20, make.plot=T, return.table=F, smain = NULL) {
 		ntrades = min(n, nrow(model$trade.summary$trades))		
 		trades = last(model$trade.summary$trades, ntrades)
+		if(!is.null(smain)) colnames(trades)[1] = smain
 		if(make.plot) {
 			layout(1)
 			plot.table(trades)

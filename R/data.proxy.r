@@ -20,56 +20,6 @@
 ###############################################################################
 
 
-###############################################################################
-#' Normilize all timeseries to start at one
-#'
-#' @param x \code{\link{xts}} time series 
-#'
-#' @return scaled \code{\link{xts}} time series, so that each timeseries starts at one
-#'
-#' @examples
-#' \dontrun{ 
-#' plota.matplot(scale.one(data$prices))
-#' }
-#' @export 
-############################################################################### 
-# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))	
-scale.one <- function
-(
-	x, 
-	overlay = F, 
-	main.index = which(!is.na(x[1,]))[1] 
-) 
-{
-	index = 1:nrow(x)
-	if( overlay )
-		x / rep.row(apply(x, 2, 
-				function(v) {
-					i = index[!is.na(v)][1]
-					v[i] / as.double(x[i,main.index])
-				}
-		), nrow(x))
-	else
-		x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
-}
-
-###############################################################################
-#' Create stock like \code{\link{xts}} object from one column time series
-#'
-#' @param out \code{\link{xts}} time series 
-#' @param column column index to use, \strong{defaults to 1} 
-#'
-#' @return stock like \code{\link{xts}} object
-#'
-#' @export 
-############################################################################### 
-make.stock.xts <- function(out, column=1, ...) {
-	out = out[,column]
-		colnames(out) = 'Close'
-	out$Adjusted = out$Open = out$High = out$Low = out$Close
-		out$Volume = 0
-	return(out[,spl('Open,High,Low,Close,Volume,Adjusted')])
-}	    
 
 ###############################################################################
 #' Compute correlations
@@ -126,7 +76,8 @@ proxy.test <- function(data.all, names = ls(data.all), price.fn=Ad)
 	prices = data$prices
 	
 	# Plot side by side
-	layout(1:2, heights=c(4,1))
+#	layout(1:2, heights=c(4,1))
+layout(1)
 		plota.matplot(scale.one(prices))
 
 	rets = (prices/mlag(prices)-1)[-1,]
@@ -151,8 +102,10 @@ proxy.test <- function(data.all, names = ls(data.all), price.fn=Ad)
 
 	# plot	
 	out = rbind(out,NA,temp)
-	plot.table(out)	
+#	plot.table(out)	
+  print(out)
 }
+
 	
 ###############################################################################
 #' Plot all proxies overlaying the longest one
@@ -218,7 +171,8 @@ proxy.prices <- function(data, names = ls(data)) {
 	n.names = len(names)
 	temp = list()
 	
-	layout(1:(n.names+1))	
+#	layout(1:(n.names+1))	
+	layout(1:n.names)
 	for(n in names) {
 		plota.matplot(cbind(Cl(data[[n]]),Ad(data[[n]])),main=n)
 		temp[[ paste(n, 'Price') ]] = Cl(data[[n]])
@@ -235,10 +189,27 @@ proxy.prices <- function(data, names = ls(data)) {
 			
 	# plot	
 	temp[] = plota.format(100 * temp, 1, '', '%')	
-	plot.table(temp)			
+#	plot.table(temp)			
+	print(temp)
 }
 
-
+#' @export 
+proxy.map <- function(raw.data, tickers)
+{
+	#*****************************************************************
+	# Prepare data
+	#******************************************************************
+  data <- new.env()
+  tickers = spl(tickers)     
+  tickers = tickers[order(sapply(tickers, nchar),decreasing =T)]
+  
+  getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, raw.data = raw.data, set.symbolnames = T, auto.assign = T)
+    for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+  bt.prep(data, align='keep.all')    
+      
+  layout(1)
+  plota.matplot(data$prices)
+}
 
 proxy.example.test <- function() {
     #*****************************************************************

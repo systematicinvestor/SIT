@@ -5991,124 +5991,6 @@ png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize =
 dev.off()
 }
 
-###############################################################################
-# Extending Gold time series
-# http://wikiposit.org/w?filter=Finance/Commodities/
-# http://www.hardassetsinvestor.com/interviews/2091-golds-paper-price.html
-###############################################################################
-bt.extend.GLD.test <- function() 
-{
-	#*****************************************************************
-	# Load historical data
-	#****************************************************************** 
-	load.packages('quantmod')	
-	GLD = getSymbols('GLD', src = 'yahoo', from = '1970-01-01', auto.assign = F)			
-		GLD = adjustOHLC(GLD, use.Adjusted=T)
-		
-	# get Gold.PM - London Gold afternoon fixing prices
-	temp = read.csv('http://wikiposit.org/w?action=dl&dltypes=comma%20separated&sp=daily&uid=KITCO',skip=4,header=TRUE, stringsAsFactors=F)
-	Gold.PM = make.xts(as.double(temp$Gold.PM) / 10, as.Date(temp$Date, '%d-%b-%Y'))
-		Gold.PM = Gold.PM[ !is.na(Gold.PM), ]
-
-	# merge GLD and Gold.PM
-	data <- new.env()
-		data$GLD = GLD
-		data$Gold.PM = Gold.PM
-	bt.prep(data, align='remove.na')
-	
-
-	#*****************************************************************
-	# Plot GLD and Gold.PM
-	#****************************************************************** 
-png(filename = 'plot1.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
-	
-	layout(1:2)
-	plota(data$GLD, type='l', col='black', plotX=F)	
-		plota.lines(data$Gold.PM, col='blue')	
-	plota.legend('GLD,Gold.PM', 'black,blue', list(data$GLD, data$Gold.PM))
-		
-	# plot GLD and London afternoon gold fix spread
-	spread = 100 * (Cl(data$GLD) - data$Gold.PM) / data$Gold.PM
-	plota(spread , type='l', col='black')	
-		plota.legend('GLD vs Gold.PM % spread', 'black', spread)
-	
-dev.off()		
-	
-		
-	#*****************************************************************
-	# Look at Silver
-	#****************************************************************** 
-	SLV = getSymbols('SLV', src = 'yahoo', from = '1970-01-01', auto.assign = F)
-		SLV = adjustOHLC(SLV, use.Adjusted=T)
-	Silver = make.xts(as.double(temp$Silver), as.Date(temp$Date, '%d-%b-%Y'))
-		Silver = Silver[ !is.na(Silver), ]
-
-	data <- new.env()
-		data$SLV = SLV
-		data$Silver = Silver
-	bt.prep(data, align='remove.na')
-		
-		
-png(filename = 'plot2.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
-	
-	layout(1:2)
-	plota(data$SLV, type='l', col='black')	
-		plota.lines(data$Silver, col='blue')	
-	plota.legend('SLV,Silver', 'black,blue', list(data$SLV, data$Silver))
-
-	spread = 100*(Cl(data$SLV) - data$Silver) / data$Silver
-	plota(spread , type='l', col='black')	
-		plota.legend('SLV vs Silver % spread', 'black', spread)
-	
-dev.off()
-		
-	#*****************************************************************
-	# Create simple equal weight back-test
-	#****************************************************************** 
-	tickers = spl('GLD,TLT')
-
-	data <- new.env()
-	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
-		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-		
-		# extend GLD with Gold.PM - London Gold afternoon fixing prices
-		data$GLD = extend.GLD(data$GLD)
-		
-	bt.prep(data, align='remove.na')
- 
-    #*****************************************************************
-    # Code Strategies
-    #******************************************************************
-    prices = data$prices      
-    n = ncol(prices)
-  
-    # find period ends
-    period.ends = endpoints(prices, 'months')
-        period.ends = period.ends[period.ends > 0]
-        
-    models = list()
-   
-    #*****************************************************************
-    # Equal Weight
-    #******************************************************************
-    data$weight[] = NA
-        data$weight[period.ends,] = ntop(prices[period.ends,], n)   
-    models$equal.weight = bt.run.share(data, clean.signal=F)
-
-    
-    #*****************************************************************
-    # Create Report
-    #******************************************************************       
-png(filename = 'plot3.png', width = 600, height = 600, units = 'px', pointsize = 12, bg = 'white')		    
-    plotbt.custom.report.part1(models)       
-dev.off()		
-
-png(filename = 'plot4.png', width = 1200, height = 800, units = 'px', pointsize = 12, bg = 'white')		               
-    plotbt.custom.report.part2(models)       
-dev.off()		
-
-				
-}
 
 
 
@@ -9900,3 +9782,123 @@ png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize =
 dev.off()
 }	
 	
+
+
+
+###############################################################################
+# Execution price: buy low sell high
+###############################################################################
+bt.execution.price.high.low.test <- function
+(
+	symbols = 'SPY,XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU',
+	n.top = 4,
+	mom.lag = 126,
+	dates = '2001::'
+) 
+{
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')	
+	tickers = spl(symbols)	
+
+	data <- new.env()
+	getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)		
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	prices = data$prices  
+	n = len(tickers)  
+
+	# find month ends
+	month.ends = endpoints(prices, 'months')
+		month.ends = month.ends[month.ends > 0]		
+
+	models = list()
+				
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+				
+	# Rank on Momentum lag return
+	position.score = prices / mlag(prices, mom.lag)	
+	
+	frequency = month.ends
+	# Select Top N funds
+	weight = ntop(position.score, n.top)
+	
+	#*****************************************************************
+	# Code Strategies, please note that there is only one price per day
+	# so all transactions happen at selected price
+	# i.e. below both buys and sells take place at selected price
+	#****************************************************************** 
+	for(name in spl('Cl,Op,Hi,Lo')) {
+		fun = match.fun(name)
+	
+		exec.prices = bt.apply(data, fun)
+		
+		data$weight[] = NA
+			data$execution.price[] = NA
+		  	data$execution.price[frequency,] = exec.prices[frequency,]
+		  	data$weight[frequency,] = weight[frequency,]
+		models[[name]] = bt.run.share(data, trade.summary=T, dates=dates, silent=T, clean.signal=F)
+	}	
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	low.prices = bt.apply(data, Lo)
+	high.prices = bt.apply(data, Hi)
+	
+	# buy at low price
+	execution.price = low.prices[frequency,]
+	
+	# sell(i.e. weight=0) at high price
+	index = (weight[frequency,])==0
+	execution.price[index] = coredata(high.prices[frequency,])[index]
+	
+	data$weight[] = NA
+		data$execution.price[] = NA		
+	  	data$execution.price[frequency,] = execution.price	  		  	
+	  	data$weight[frequency,] = weight[frequency,]
+	models$Buy.Low.Sell.High = bt.run.share(data, trade.summary=T, dates=dates, silent=T, clean.signal=F)
+
+	#*****************************************************************
+	# Code Strategies
+	#****************************************************************** 
+	low.prices = bt.apply(data, Lo)
+	high.prices = bt.apply(data, Hi)
+	
+	# buy at high price
+	execution.price = high.prices[frequency,]
+	
+	# sell(i.e. weight=0) at low price
+	index = (weight[frequency,])==0
+	execution.price[index] = coredata(low.prices[frequency,])[index]
+	
+	data$weight[] = NA
+		data$execution.price[] = NA		
+	  	data$execution.price[frequency,] = execution.price	  		  	
+	  	data$weight[frequency,] = weight[frequency,]
+	models$Buy.High.Sell.Low = bt.run.share(data, trade.summary=T, dates=dates, silent=T, clean.signal=F)
+
+	#*****************************************************************
+	# Create Report
+	#****************************************************************** 
+	#strategy.performance.snapshoot(models, T)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main = NULL)	    	
+		mtext('Cumulative Performance', side = 2, line = 1)
+		
+	m = names(models)[1]
+	plotbt.transition.map(models[[m]]$weight, name=m)
+		legend('topright', legend = m, bty = 'n')
+
+print('Strategy Performance:')			
+print(plotbt.strategy.sidebyside(models, make.plot=F, return.table=T))
+
+print('Monthly Results for', m, ':')
+print(plotbt.monthly.table(models[[m]]$equity, make.plot = F))
+}

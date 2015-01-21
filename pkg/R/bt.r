@@ -68,11 +68,14 @@ bt.merge <- function
 	}
 	
 	# trim logic
+	index = c()
 	if( align == 'remove.na' ) { 
 		index = which(count(date.map, side=1) < nsymbols )
-	} else {
-		index = which(count(date.map, side=1) < max(1, 0.1 * nsymbols) )
-	}
+	} 
+	# keep all
+#	else {
+#		index = which(count(date.map, side=1) < max(1, 0.1 * nsymbols) )
+#	}
 	
 	if(len(index) > 0) { 
 		date.map = date.map[-index,, drop = FALSE]
@@ -83,14 +86,6 @@ bt.merge <- function
 	return( list(all.dates = unique.dates, date.map = date.map))
 }
 
-# find location of given names in all names
-find.names <- function(find.names, all.names) 
-{ 
-	as.list(sapply(spl(find.names), function(x) {
-			loc = grep(x, all.names, ignore.case = TRUE)
-			iif(len(loc) > 0, loc, NA)
-		}))
-}
 
 ###############################################################################
 # Prepare backtest data
@@ -118,7 +113,7 @@ bt.prep <- function
 				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
 		
 			# fill gaps logic
-			map.col = find.names('Close,Volume,Open,High,Low,Adjusted', colnames(b[[ symbolnames[i] ]]))
+			map.col = find.names('Close,Volume,Open,High,Low,Adjusted', b[[ symbolnames[i] ]])
 			if(fill.gaps & !is.na(map.col$Close)) {	
 				close = coredata(b[[ symbolnames[i] ]][,map.col$Close])
 					n = len(close)
@@ -645,7 +640,8 @@ bt.summary.test <- function() {
 ###############################################################################
 bt.trim <- function
 (
-	...
+	...,
+	dates = '::'
 ) 
 {	
 	models = variable.number.arguments( ... )
@@ -655,10 +651,17 @@ bt.trim <- function
 		
 		n = len(bt$equity)
 		first = which.max(!is.na(bt$equity) & bt$equity != 1)
+		if(first > 1 && !is.na(bt$equity[(first-1)]))
+			first = first - 1
 		if (first < n) {
 			index = first:n
+
+			dates.range = range(dates2index(bt$equity[index],dates))
+			index = index[dates.range[1]] : index[dates.range[2]]
+
 			bt$dates.index = bt$dates.index[index]
 			bt$equity = bt$equity[index]
+				bt$equity = bt$equity / as.double(bt$equity[1])
 			bt$ret = bt$ret[index]
 			bt$weight = bt$weight[index,,drop=F]
 			if (!is.null(bt$share)) bt$share = bt$share[index,,drop=F]
@@ -672,6 +675,7 @@ bt.trim <- function
 	}
 	return (models)
 }
+
 
 bt.trim.test <- function() {
     #*****************************************************************
@@ -941,7 +945,7 @@ bt.apply <- function
 		if (class(msg)[1] != 'try-error') {
 			out[,i] = msg
 		} else {
-			cat(i, msg, '\n')
+			warning(i, msg, '\n')
 		}
 	}
 	return(out)
@@ -964,7 +968,7 @@ bt.apply.matrix <- function
 		if (class(msg)[1] != 'try-error') {
 			out[,i] = msg
 		} else {
-			cat(i, msg, '\n')
+			warning(i, msg, '\n')
 		}
 	}
 	return(out)
@@ -1234,7 +1238,7 @@ else
 # Example to illustrate a simeple backtest
 #' @export 
 ###############################################################################
-bt.simple <- function(data, signal) 
+bt.simple <- function(data, signal, silent = F) 
 {
 	# lag singal
 	signal = Lag(signal, 1)
@@ -1257,8 +1261,10 @@ bt.simple <- function(data, signal)
     	bt$cagr = bt$equity[n] ^ (1/nyears(data)) - 1
     
     # print
+    if( !silent) {
 	cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
     cat('', sapply(cbind(bt$cagr, bt$best, bt$worst), function(x) round(100*x,1)), '\n', sep = '\t')  
+    }
     	    	
 	return(bt)
 }
@@ -1408,11 +1414,31 @@ bt.start.dates <- function
 		temp$symbolnames = NULL
 	temp = temp[order( sapply(temp, function(x) x) )]
 	
-	t(t( sapply(temp, function(x) as.character(x)) ))
+	out = t(t( sapply(temp, function(x) as.character(x)) ))
+    colnames(out) = 'Start'
+  out
 }
 	
 
-
-
-
-
+###############################################################################
+#' Append today's quotes
+#' 
+#' data.today = getQuote.yahoo.today(ls(data))
+#' 	print(data.today)
+#' bt.append.today(data, data.today)
+#' 
+#' @export 
+###############################################################################
+bt.append.today <- function(b, data.today) {
+	tickers = data.today$Symbol
+	Yesterday = data.today$Yesterday	
+	data = make.stock.xts(read.xts(data.today, date.column=find.names('Date',data.today),format='%m/%d/%Y', decreasing=NULL))
+	
+	# todo, better logic for merging Intraday and EOD data
+	for(i in 1:len(tickers)) {
+		if(is.null(b[[ tickers[i] ]])) next
+		if( last(index(data[i,])) > last(index(b[[ tickers[i] ]])) )
+			b[[ tickers[i] ]] = rbind(data[i,], b[[ tickers[i] ]])
+		#b[[ tickers[i] ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T)
+	}
+}
