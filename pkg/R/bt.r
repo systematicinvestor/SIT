@@ -335,9 +335,9 @@ bt.run.share <- function
 		weight[] = (capital / prices) * weight
 	}
 	
-	bt.run(b, 
-		trade.summary = trade.summary, 
-		do.lag = do.lag, 
+	bt.run(b,
+		trade.summary = trade.summary,
+		do.lag = do.lag,
 		do.CarryLastObservationForwardIfNA = do.CarryLastObservationForwardIfNA,
 		type='share',
 		silent = silent,
@@ -394,28 +394,19 @@ bt.run <- function
 	# setup
 	type = type[1]
 
-	# print last signal / weight observation
-	if( !silent ) {
-		cat('Latest weights :\n')
-			print( last(weight) )
-		cat('\n')
-	}
-		
-    # create signal
-    weight[] = ifna(weight, NA)
-    
-    # lag
-    if(do.lag > 0) {
+	# create signal
+ weight[] = ifna(weight, NA)
+
+	# lag
+ if(do.lag > 0)
 		weight = mlag(weight, do.lag) # Note k=1 implies a move *forward*  
-	}
 
 	# backfill
-	if(do.CarryLastObservationForwardIfNA) {			
+	if(do.CarryLastObservationForwardIfNA)
 		weight[] = apply(coredata(weight), 2, ifna.prev)
-    }
+
 	weight[is.na(weight)] = 0
 
-	
 	# find trades
 	weight1 = mlag(weight, -1)
 	tstart = weight != weight1 & weight1 != 0
@@ -457,6 +448,11 @@ bt.run <- function
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
 	if( !silent ) {
+		# print last signal / weight observation
+		cat('Latest weights :\n')
+		print(round(100*last(bt$weight),2))
+		cat('\n')
+
 		cat('Performance summary :\n')
 		cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
     	cat('', sapply(cbind(bt$cagr, bt$best, bt$worst), function(x) round(100*x,1)), '\n', sep = '\t')  

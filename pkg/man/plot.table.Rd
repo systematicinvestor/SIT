@@ -2,7 +2,7 @@
 \alias{plot.table}
 \title{Plot Table}
 \usage{
-  plot.table(plot.matrix, smain = "", text.cex = 1,
+  plot.table(plot.matrix, smain = NULL, text.cex = 1,
     frame.cell = T, highlight = F, colorbar = FALSE,
     keep_all.same.cex = FALSE)
 }

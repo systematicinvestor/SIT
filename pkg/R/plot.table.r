@@ -247,7 +247,7 @@ plot.table.helper.colorbar <- function
 plot.table <- function
 (
 	plot.matrix,				# matrix to plot
-	smain = '', 				# text to draw in top,left cell
+	smain = NULL, 				# text to draw in top,left cell
 	text.cex = 1, 				# text size
 	frame.cell = T, 			# flag to draw border
 	highlight = F, 				# either flag to highlight or matrix with 
@@ -265,7 +265,7 @@ plot.table <- function
 		plot.matrix = temp.matrix[-1, -1, drop = FALSE]
 		colnames(plot.matrix) = temp.matrix[1, -1]
 		rownames(plot.matrix) = temp.matrix[-1, 1]
-		smain = temp.matrix[1, 1]
+		smain = iif(is.null(smain), temp.matrix[1, 1], smain)
 		
 	} else if( is.null(rownames(plot.matrix)) ) {
 		temp.matrix = plot.matrix
@@ -274,7 +274,7 @@ plot.table <- function
 		plot.matrix = temp.matrix[, -1, drop = FALSE]
 		colnames(plot.matrix) = colnames(temp.matrix)[-1]
 		rownames(plot.matrix) = temp.matrix[,1]
-		smain = colnames(temp.matrix)[1]
+		smain = iif(is.null(smain), colnames(temp.matrix)[1], smain)
 		
 	} else if( is.null(colnames(plot.matrix)) ) {
 		temp.matrix = plot.matrix
@@ -283,8 +283,10 @@ plot.table <- function
 		plot.matrix = temp.matrix[-1, , drop = FALSE]
 		rownames(plot.matrix) = rownames(temp.matrix)[-1]
 		colnames(plot.matrix) = temp.matrix[1, ]
-		smain = rownames(temp.matrix)[1]
+		smain = iif(is.null(smain), rownames(temp.matrix)[1], smain)
 	}
+	
+	smain = iif(is.null(smain), '', smain)
 		
 	# remove N/As
 	plot.matrix[which(trim(plot.matrix) == 'NA')] = ''

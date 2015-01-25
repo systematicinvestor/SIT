@@ -963,6 +963,38 @@ rep.col <- function
 	matrix(m, nr=len(m), nc=nc, byrow=F)
 }
 
+
+# move column name to first row
+#' @export 
+col.name2row = function(x, move.name=T) {
+	if(move.name && !is.null(colnames(x))) {
+		x = rbind(colnames(x), x)
+		colnames(x) = NULL
+		x
+	} else {
+		colnames(x) = x[1,]
+		x[-1,]
+	}
+}
+
+
+# move row name to first column
+#' @export 
+row.name2col = function(x, move.name=T) {
+	if(move.name && !is.null(rownames(x))) {
+		x = cbind(rownames(x), x)
+		rownames(x) = NULL
+		x
+	} else {
+		rownames(x) = x[,1]
+		x[,-1]
+	}
+}
+
+
+
+
+
 ###############################################################################
 #' Find location: row, col in the matrix, given index of of observation
 #'
@@ -1016,6 +1048,40 @@ beta.degree <- function(beta)
 { 
 	atan(beta)*360/(2*pi) 
 }
+
+
+###############################################################################
+# Formatting helper functions
+###############################################################################
+#' @export 
+to.nice = function(out,nround=2,sprefix='',eprefix='') {
+	if( !is.null(dim(out)) ) {		
+		temp = matrix('', nrow(out),ncol(out))
+			rownames(temp) = rownames(out)
+			colnames(temp) = colnames(out)
+			temp.n = apply(out,2,as.double)
+			index = is.na(temp.n)
+		
+		temp[] = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
+			temp[index] = out[index]
+		temp
+	} else {
+		temp.n = as.double(out)
+		index = is.na(temp.n)
+	
+		temp = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
+			temp[index] = out[index]
+		temp		
+	}
+}
+
+#' @export 
+to.percent = function(x, nround=2) to.nice(100*x,nround,'','%')
+
+#' @export 
+to.cash = function(x, nround=2) to.nice(x,nround,'$')
+
+
 
 ###############################################################################
 # XTS helper functions

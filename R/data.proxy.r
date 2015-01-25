@@ -106,7 +106,51 @@ layout(1)
   print(out)
 }
 
-	
+###############################################################################
+#' Plot 12 Month Spread for 2 symbols over common period
+#'
+#' @param data.all list or enviroment that holds proxy time series 
+#' @param names names or indexs of time series, \strong{defaults to all time series} 
+#' @param price.fn name of price function, \strong{defaults to Ad} 
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' tickers = spl('HYG,VWEHX')
+#' data = new.env()
+#'   getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)   
+#'
+#' proxy.spread(data)
+#' }
+#' @export 
+############################################################################### 
+plot12month.rolling.spread <- function(data.all, names = ls(data.all), price.fn=Ad)
+{
+	#*****************************************************************
+	# Prepare data
+	#****************************************************************** 	
+	data = new.env()
+		data$symbolnames = names[1:2]
+	for(n in data$symbolnames)
+		data[[n]] = make.stock.xts( price.fn( data.all[[n]] ) )	
+	bt.prep(data, align='remove.na')
+
+	#*****************************************************************
+	# Prepare data
+	#****************************************************************** 	
+	prices = data$prices
+	rets.12m.rolling = 100 * (prices / mlag(prices, 252) - 1)
+	spread.12m.rolling = rets.12m.rolling[,1] - rets.12m.rolling[,2]
+		
+	# Plot side by side
+	layout(1)
+	plota(spread.12m.rolling, type='l', 
+		main = paste('12 Month Rolling Returns Spread % for', names[1], 'and', names[2]))
+		abline(h=0, col='gray')
+}
+
+
 ###############################################################################
 #' Plot all proxies overlaying the longest one
 #'
