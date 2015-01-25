@@ -854,14 +854,15 @@ bt.trade.summary <- function
 				
 				trades = rbind(trades, 
 								cbind(i, weight[(tstarti+1), i], 
-								tstarti, tendi, 
+								tstarti, tendi, tendi-tstarti,
 								as.vector(prices[tstarti, i]), as.vector(prices[tendi,i])
 								)
 							)
 			}
 		}
-		colnames(trades) = spl('symbol,weight,entry.date,exit.date,entry.price,exit.price')
+		colnames(trades) = spl('symbol,weight,entry.date,exit.date,nhold,entry.price,exit.price')
 
+		
 		# prepare output		
 		out = list()
 		out$stats = cbind(
@@ -875,14 +876,15 @@ bt.trade.summary <- function
 		
 		trades = data.frame(coredata(trades))
 			trades$symbol = symbolnames[trades$symbol]
+			trades$nhold = as.numeric(temp.x[trades$exit.date] - temp.x[trades$entry.date])
 			trades$entry.date = temp.x[trades$entry.date]
-			trades$exit.date = temp.x[trades$exit.date]
+			trades$exit.date = temp.x[trades$exit.date]			
 			trades$return = round(100*(trades$weight) * (trades$exit.price/trades$entry.price - 1),2)			
 			trades$entry.price = round(trades$entry.price, 2)
 			trades$exit.price = round(trades$exit.price, 2)			
 			trades$weight = round(100*(trades$weight),1)		
 
-		out$trades = as.matrix(trades)		
+		out$trades = as.matrix(trades)				
 	}
 	
 	return(out)

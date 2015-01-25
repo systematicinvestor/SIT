@@ -60,16 +60,17 @@ plotbt.custom.report <- function
 		mtext('Drawdown', side = 2, line = 1)
 			
 	model = models[[1]]
+	name=ifnull(names(models),'')[1]
 	
 	# Additional Info
-	plotbt.transition.map(model$weight, x.highlight = x.highlight)			
-	temp = plotbt.monthly.table(model$equity)	
-	plotbt.holdings.time(model$weight)
+	plotbt.transition.map(model$weight, x.highlight = x.highlight, name=name)
+	temp = plotbt.monthly.table(model$equity, smain=name)		
+	plotbt.holdings.time(model$weight, smain=name)	
 	
 	if ( !is.null(model$trade.summary) ) {
-		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE)		
+		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE, smain=name)
 	} else {
-		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE)
+		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE, smain=name)
 	}
 			
 	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
@@ -134,24 +135,27 @@ plotbt.custom.report.part2 <- function
 {	
 	models = variable.number.arguments( ... )
 	model = models[[1]]
+	name=ifnull(names(models),'')[1]
 		
 	# create layout	
 	ilayout = 
-		'1,3		
-		2,4
-		2,5'
+		'1,1,3,4		
+		2,2,5,5
+		2,2,6,6'
 	plota.layout(ilayout)
 	
 			
 	# Additional Info
-	plotbt.transition.map(model$weight, x.highlight = x.highlight)			
-	temp = plotbt.monthly.table(model$equity)	
-	plotbt.holdings.time(model$weight)
+	plotbt.transition.map(model$weight, x.highlight = x.highlight, name=name)
+	temp = plotbt.monthly.table(model$equity, smain=name)	
+	plotbt.holdings.time(model$weight, smain=name)
 	
+	plot.table(to.percent(t(last(models[[1]]$weight))), smain=name)
+		
 	if ( !is.null(model$trade.summary) ) {
-		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE)		
+		plot.table( list2matrix(bt.detail.summary(model, model$trade.summary)), keep_all.same.cex = TRUE, smain=name)
 	} else {
-		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE)
+		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE, smain=name)	
 	}
 			
 	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
@@ -412,10 +416,10 @@ plotbt.holdings <- function
 # Plot Pie Chart for holdings throught out time
 #' @export 
 ###############################################################################
-plotbt.holdings.time <- function(weight) 
+plotbt.holdings.time <- function(weight, smain='') 
 {
 	weight = as.matrix( apply(abs(weight), 2, sum, na.rm = T) )
-	if( sum(abs(weight)) > 0 ) plotbt.holdings( t(weight) / sum(abs(weight), na.rm = T), smain = 'in time')
+	if( sum(abs(weight)) > 0 ) plotbt.holdings( t(weight) / sum(abs(weight), na.rm = T), smain = paste0(smain, ' in time'))
 }
 
 

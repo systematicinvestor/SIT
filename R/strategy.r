@@ -2859,14 +2859,42 @@ target.vol.strategy <- function(model, weight,
 	# Look at trades
 	#' @export 
 	#*****************************************************************
-	last.trades <- function(model, n=20, make.plot=T, return.table=F, smain = NULL) {
-		ntrades = min(n, nrow(model$trade.summary$trades))		
-		trades = last(model$trade.summary$trades, ntrades)
-		if(!is.null(smain)) colnames(trades)[1] = smain
-		if(make.plot) {
-			layout(1)
-			plot.table(trades)
-		}	
-		if(return.table) trades	
+	last.trades <- function(..., n=20, make.plot=T, return.table=F, smain = NULL) {
+		models = variable.number.arguments( ... )
+		model = models[[1]]
+		name=ifnull(names(models),NULL)[1]
+	
+		if(!is.null(model$trade.summary)) {		
+			ntrades = min(n, nrow(model$trade.summary$trades))		
+			trades = last(model$trade.summary$trades, ntrades)
+			if(!is.null(smain) || !is.null(name)) colnames(trades)[1] = iif(is.null(smain),name,smain)
+			if(make.plot) {
+				layout(1)
+				plot.table(trades)
+			}	
+			if(return.table) trades	
+		}
 	}	
-		
+
+	#*****************************************************************
+	# Look at signals
+	#' @export 
+	#*****************************************************************	
+	last.signals <- function(..., n=20, make.plot=T, return.table=F, smain = NULL) {
+		models = variable.number.arguments( ... )
+		model = models[[1]]
+		name=ifnull(names(models),NULL)[1]
+	
+		if(!is.null(model$period.weight)) {			
+	      	data = round(100*model$period.weight,0)
+	      	ntrades = min(n, nrow(data))		
+	      	trades = last(data, ntrades)
+	      	colnames(trades)[1] = 'Date'
+	      	if(!is.null(smain) || !is.null(name)) colnames(trades)[1] = iif(is.null(smain),name,smain)
+	      	if(make.plot) {
+	        	layout(1)
+	        	plot.table(as.matrix(trades))
+	      	}	
+	      	if(return.table) trades	
+      	}
+}		
