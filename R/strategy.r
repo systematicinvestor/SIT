@@ -1103,6 +1103,37 @@ dev.off()
 		
 }
 
+
+#*****************************************************************
+# Max Sharpe portfolio using non-linear solver, based on
+# http://stackoverflow.com/questions/10526243/quadprog-optimization
+#' @export 
+#*****************************************************************
+	max.sharpe.nlp.portfolio <- function
+	(
+		ia,                     # input assumptions
+	    constraints             # constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+		cov = ia$cov[risk.index, risk.index]		
+		er = ia$expected.return[risk.index]		
+		
+	    # obj
+	    fn <- function(x){
+	        (-x %*% er / sqrt( x %*% cov %*% x ))[1]
+		}
+        
+		x0 = constraints$ub[risk.index] / sum(constraints$ub[risk.index])
+	
+		load.packages('Rsolnp')
+		x = solnp(x0, fn, eqfun = function(w) sum(w), eqB   = 1,
+  			LB = constraints$lb[risk.index], UB = constraints$ub[risk.index],
+  			control = list(trace=0))
+				
+		set.risky.asset(x$pars, risk.index)	
+	}
+
 find.portfolio.given.risk.test <- function() 
 {
 	#*****************************************************************
