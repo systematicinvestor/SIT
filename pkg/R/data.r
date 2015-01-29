@@ -19,7 +19,7 @@
 # or drop me a line at TheSystematicInvestor at gmail
 ###############################################################################
 
-
+#' @export 
 find.tokens <- function
 (
 	txt, 		# source text
@@ -51,7 +51,7 @@ find.tokens <- function
 }	
 
 
-
+#' @export 
 extract.token <- function
 (
 	txt, 		# source text
@@ -74,7 +74,7 @@ extract.token <- function
 	return(substr(txt,pos1,pos2))	
 }
 
-
+#' @export 
 remove.tags <- function
 (
 	temp 		# source text
@@ -315,6 +315,7 @@ processTBill.test <- function()
 #
 # This url is not working anymore, for updated example please see
 #   bt.extend.DBC.update.test in bt.test.r 
+#' @export 
 ###############################################################################
 get.CRB <- function(...)
 {
@@ -789,7 +790,7 @@ extend.data <- function
 	close.index = find.names('Close', hist)
 	if(is.na(close.index)) close.index = 1	
 	adjusted.index = find.names('Adjusted', hist)
-	if(is.na(adjusted.index)) adjusted.index = close.index	
+	if(len(adjusted.index)==0) adjusted.index = close.index	
 
 	if(scale) {
 		# find first common observation in current and hist series

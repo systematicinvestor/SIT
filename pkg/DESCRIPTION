@@ -3,8 +3,8 @@ Type: Package
 Title: Systematic Investor Toolbox
 Description: Systematic Investor Toolbox is a collection of tools that
     I use in my investment research.
-Version: 2015.01.26
-Date: 2015-01-26
+Version: 2015.01.28
+Date: 2015-01-28
 License: GPL-3
 LazyLoad: yes
 Author: Michael Kapler <TheSystematicInvestor@gmail.com>
