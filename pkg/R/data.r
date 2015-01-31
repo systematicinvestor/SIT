@@ -788,13 +788,18 @@ extend.data <- function
 
 	# find Close in hist
 	close.index = find.names('Close', hist)
-	if(is.na(close.index)) close.index = 1	
+	if(len(close.index)==0) close.index = 1	
 	adjusted.index = find.names('Adjusted', hist)
 	if(len(adjusted.index)==0) adjusted.index = close.index	
 
 	if(scale) {
+		cur.close.index = find.names('Close', current)
+		if(len(cur.close.index)==0) cur.close.index = 1	
+		cur.adjusted.index = find.names('Adjusted', current)
+		if(len(cur.adjusted.index)==0) cur.adjusted.index = cur.close.index	
+	
 		# find first common observation in current and hist series
-		common = merge(Cl(current), hist[,close.index], join='inner')
+		common = merge(current[,cur.close.index], hist[,close.index], join='inner')
 		
 		scale = as.numeric(common[1,1]) / as.numeric(common[1,2])
 			
@@ -803,7 +808,7 @@ extend.data <- function
 		else {
 			hist[,-adjusted.index] = hist[,-adjusted.index] * scale
 			
-			common = merge(Ad(current), hist[,adjusted.index], join='inner')
+			common = merge(current[,cur.adjusted.index], hist[,adjusted.index], join='inner')
 			scale = as.numeric(common[1,1]) / as.numeric(common[1,2])
 			hist[,adjusted.index] = hist[,adjusted.index] * scale
 		}
