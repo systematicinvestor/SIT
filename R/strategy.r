@@ -2804,10 +2804,12 @@ asset.allocation.strategy.test <- function()
 target.vol.strategy <- function(model, weight, 
 	target = 10/100, 
 	lookback.len = 21,
-	max.portfolio.leverage = 100/100) 
+	max.portfolio.leverage = 100/100,
+	annual.periods = 252
+) 
 {	
 	ret.log.model = ROC(model$equity, type='continuous')
-	hist.vol.model = sqrt(252) * runSD(ret.log.model, n = lookback.len)	
+	hist.vol.model = sqrt(annual.periods) * runSD(ret.log.model, n = lookback.len)	
 		hist.vol.model = as.vector(hist.vol.model)
 		
 	weight.target = weight * (target / hist.vol.model)

@@ -2,7 +2,7 @@
 \alias{rep.col}
 \title{Repeat Columns}
 \usage{
-  rep.col(m, nc)
+  rep.col(m, nc, basic = F)
 }
 \arguments{
   \item{m}{vector (column)}

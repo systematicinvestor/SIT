@@ -1088,9 +1088,12 @@ dev.off()
 # CAGR - geometric return
 #' @export 
 ###############################################################################
-compute.cagr <- function(equity) 
-{ 
-	as.double( last(equity,1)^(1/compute.nyears(equity)) - 1 )
+compute.cagr <- function(equity, nyears = NA) 
+{
+	if(is.numeric(nyears))
+		as.double( last(equity,1)^(1/nyears) - 1 )
+	else 
+		as.double( last(equity,1)^(1/compute.nyears(equity)) - 1 )
 }
 
 #' @export 

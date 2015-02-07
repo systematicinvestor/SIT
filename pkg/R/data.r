@@ -817,9 +817,9 @@ extend.data <- function
 	# subset history before current
 	hist = hist[format(index(current[1])-1,'::%Y:%m:%d'),,drop=F]
 	
-	
+	#hist = make.xts( rep.col(hist[,adjusted.index], ncol(current)), index(hist))	
 	if( ncol(hist) != ncol(current) )	
-		hist = make.xts( rep.col(hist[,adjusted.index], ncol(current)), index(hist))
+		hist = rep.col(hist[,adjusted.index], ncol(current))
 	else
 		hist = hist[, colnames(current)]
 	

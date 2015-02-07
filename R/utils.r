@@ -933,10 +933,15 @@ repmat <- function
 rep.row <- function
 (
 	m, # vector (row)
-	nr # number of copies along rows
+	nr,# number of copies along rows
+	basic = F
 )
 {
-	matrix(m, nr=nr, nc=len(m), byrow=T)
+	if(basic) return(matrix(m, nr=nr, nc=len(m), byrow=T))
+ if(is.null(dim(m))) dim(m) = c(1,len(m))
+	if(nr == 1) m
+ else
+  do.call(rbind, lapply(1:nr,function(i) m))
 }
 
 ###############################################################################
@@ -957,10 +962,15 @@ rep.row <- function
 rep.col <- function
 (
 	m,	# vector (column)
-	nc	# number of copies along columns
+	nc,# number of copies along columns
+ basic = F
 )
 {
-	matrix(m, nr=len(m), nc=nc, byrow=F)
+	if(basic) return(matrix(m, nr=len(m), nc=nc, byrow=F))
+ if(is.null(dim(m))) dim(m) = c(len(m),1)
+	if(nc == 1) m
+	else
+  do.call(cbind, lapply(1:nc,function(i) m))
 }
 
 
@@ -1057,7 +1067,7 @@ beta.degree <- function(beta)
 to.nice = function(out,nround=2,sprefix='',eprefix='') {
 	if( !is.null(dim(out)) ) {		
 		temp = matrix('', nrow(out),ncol(out))
-			rownames(temp) = rownames(out)
+		rownames(temp) = iif(is.xts(out), paste(index(out)),rownames(out))
 			colnames(temp) = colnames(out)
 			temp.n = apply(out,2,as.double)
 			index = is.na(temp.n)

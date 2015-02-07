@@ -2,7 +2,7 @@
 \alias{rep.row}
 \title{Repeat Rows}
 \usage{
-  rep.row(m, nr)
+  rep.row(m, nr, basic = F)
 }
 \arguments{
   \item{m}{vector (row)}

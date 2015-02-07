@@ -507,4 +507,11 @@ roofing.stochastic.indicator  <- function(x, lookback = 20) {
     super.smoother.filter(Stoc)
 }
 
-
+# Quantile over moving window
+#' @export 
+runQuantile = function(x, k, probs) {
+	load.packages('caTools')
+	temp = rep.col(x * NA, len(probs))
+	temp[k:len(x),] = runquantile(as.vector(coredata(x)), k, probs, endrule='trim')    
+	temp
+}

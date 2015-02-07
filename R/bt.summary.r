@@ -138,17 +138,25 @@ plotbt.custom.report.part2 <- function
 	name=ifnull(names(models),'')[1]
 		
 	# create layout	
+	if( len(models) > 1 )
 	ilayout = 
-		'1,1,3,4		
+		'1,1,3,4
 		2,2,5,5
 		2,2,6,6'
+	else
+	ilayout = 
+		'1,1,1,3
+		2,2,4,4
+		2,2,5,5'
+	
 	plota.layout(ilayout)
 	
 			
 	# Additional Info
 	plotbt.transition.map(model$weight, x.highlight = x.highlight, name=name)
 	temp = plotbt.monthly.table(model$equity, smain=name)	
-	plotbt.holdings.time(model$weight, smain=name)
+	if( len(models) > 1 ) 
+		plotbt.holdings.time(model$weight, smain=name)
 	
 	plot.table(to.percent(t(last(models[[1]]$weight))), smain=name)
 		
@@ -158,7 +166,11 @@ plotbt.custom.report.part2 <- function
 		plot.table( list2matrix(bt.detail.summary(model)), keep_all.same.cex = TRUE, smain=name)	
 	}
 			
-	if( len(models) > 1 ) plotbt.strategy.sidebyside(models)
+	if( len(models) > 1 ) 
+		plotbt.strategy.sidebyside(models)
+	else
+		plotbt.holdings.time(model$weight, smain=name)
+	
 }	
 
 #' @export 
