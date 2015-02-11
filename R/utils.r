@@ -1073,7 +1073,7 @@ to.nice = function(out,nround=2,sprefix='',eprefix='') {
 			index = is.na(temp.n)
 		
 		temp[] = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
-			temp[index] = out[index]
+			temp[index] = coredata(out)[index]
 		temp
 	} else {
 		temp.n = as.double(out)

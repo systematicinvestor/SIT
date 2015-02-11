@@ -131,7 +131,7 @@ bt.prep <- function
 				#for(j in colnames(b[[ symbolnames[i] ]])) {
 				for(field in spl('Open,High,Low,Adjusted')) {
 				j = map.col[[field]]
-				if(!is.na(j)) {
+				if(!is.null(j)) {
 					index1 = is.na(b[[ symbolnames[i] ]][,j]) & index
 					b[[ symbolnames[i] ]][index1, j] = close[index1]
 				}}						
@@ -850,7 +850,7 @@ bt.trade.summary <- function
 			
 			if( len(tstarti) > 0 ) {
 				if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
-				#if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
+				if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
 				
 				trades = rbind(trades, 
 								cbind(i, weight[(tstarti+1), i], 

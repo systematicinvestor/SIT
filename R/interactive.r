@@ -72,3 +72,51 @@ iline = function(type=c('v','h','cross'), col='red', remove.col='white',stop.key
 		onMouseDown = mouseup,onKeybd = keydown)
 }
 
+###############################################################################
+#' Visualize System Parameter Optimization
+#' based on [Visualizing Data](http://sanzprophet.blogspot.tw/2013/01/visualizing-data.html)
+#' The article was using [XDat](http://www.xdat.org/index.php?ref=download) app
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' result = cbind(rnorm(20,0,1),rnorm(20,10,1),rnorm(20,0,100),rnorm(20,20,21))
+#'  colnames(result) = spl('CAGR,A,B,C')
+#' visualize.system.parameter.optimization(result)
+#' }
+#' @export 
+############################################################################### 
+visualize.system.parameter.optimization = function(result) { 
+  load.packages('rpanel,tkrplot,MASS')
+
+  draw = function(panel) {
+    par(bg='white')
+    col = cols
+    index = colSums(result.t >= panel$min & result.t <= panel$max) == n
+    col[ index ] = 2
+    parcoord(result, var.label =T, col=col, lwd=col)
+    panel
+  }
+
+  redraw = function(panel) {
+    rp.tkrreplot(panel, tkrp)
+    panel
+  }
+
+  max.val = apply(result,2,max) 
+  min.val = apply(result,2,min)
+  max.val = max.val + 0.1 * abs(max.val) 
+  min.val = min.val - 0.1 * abs(min.val)
+
+  n = ncol(result)
+  cols = rep(1, nrow(result))
+  result.t = t(result)  
+  colnames(result) = paste0(colnames(result), '\n(', 1:n,')')
+
+  panel  = rp.control(title = 'Parallel Coordinates', max=max.val, min=min.val)
+  rp.slider(panel, max, max.val, min.val, horizontal=F, showvalue = T, action = redraw,initval=max.val)
+  rp.slider(panel, min, max.val, min.val, horizontal=F, showvalue = T, action = redraw,initval=min.val)   
+  rp.tkrplot(panel, tkrp, draw)
+}
+
