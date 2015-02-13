@@ -2808,14 +2808,14 @@ target.vol.strategy <- function(model, weight,
 	annual.periods = 252
 ) 
 {	
-	ret.log.model = ROC(model$equity, type='continuous')
-	hist.vol.model = sqrt(annual.periods) * runSD(ret.log.model, n = lookback.len)	
+	ret = diff(log(model$equity))
+	hist.vol.model = sqrt(annual.periods) * runSD(ret, n = lookback.len)	
 		hist.vol.model = as.vector(hist.vol.model)
 		
 	weight.target = weight * (target / hist.vol.model)
 	
 	# limit total leverage		
-	rs = rowSums(abs(weight.target))
+	rs = rowSums(abs(weight.target), na.rm=T)
 	weight.target = weight.target / iif(rs > max.portfolio.leverage, rs/max.portfolio.leverage, 1)		
 		
 	return(weight.target)	
@@ -2922,8 +2922,15 @@ target.vol.strategy <- function(model, weight,
 	      	data = round(100*model$period.weight,0)
 	      	ntrades = min(n, nrow(data))		
 	      	trades = last(data, ntrades)
-	      	colnames(trades)[1] = 'Date'
-	      	if(!is.null(smain) || !is.null(name)) colnames(trades)[1] = iif(is.null(smain),name,smain)
+	      	
+	      	if(!is.null(smain) || !is.null(name)) 
+	      		smain = iif(is.null(smain),name,smain)
+	      	else
+	      		smain = 'Date'
+	      		
+	      	#colnames(trades)[1] = 'Date'
+	      	#if(!is.null(smain) || !is.null(name)) colnames(trades)[1] = iif(is.null(smain),name,smain)
+	      	
 	      	if(make.plot) {
 	        	layout(1)
 	        	plot.table(as.matrix(trades))

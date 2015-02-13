@@ -933,15 +933,11 @@ repmat <- function
 rep.row <- function
 (
 	m, # vector (row)
-	nr,# number of copies along rows
-	basic = F
+	nr # number of copies along rows
 )
 {
-	if(basic) return(matrix(m, nr=nr, nc=len(m), byrow=T))
- if(is.null(dim(m))) dim(m) = c(1,len(m))
 	if(nr == 1) m
- else
-  do.call(rbind, lapply(1:nr,function(i) m))
+	else return(matrix(m, nr=nr, nc=len(m), byrow=T))
 }
 
 ###############################################################################
