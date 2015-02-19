@@ -68,7 +68,7 @@ proxy.test <- function(data.all, names = ls(data.all), price.fn=Ad)
 		data$symbolnames = names
 	for(n in data$symbolnames)
 		data[[n]] = make.stock.xts( price.fn( data.all[[n]] ) )	
-	bt.prep(data, align='remove.na')
+	bt.prep(data, align='remove.na', fill.gaps=T)
 
 	#*****************************************************************
 	# Prepare data
@@ -134,7 +134,7 @@ plot12month.rolling.spread <- function(data.all, names = ls(data.all), price.fn=
 		data$symbolnames = names[1:2]
 	for(n in data$symbolnames)
 		data[[n]] = make.stock.xts( price.fn( data.all[[n]] ) )	
-	bt.prep(data, align='remove.na')
+	bt.prep(data, align='remove.na', fill.gaps=T)
 
 	#*****************************************************************
 	# Prepare data
@@ -180,7 +180,7 @@ proxy.overlay.plot <- function(data.all, names = ls(data.all), price.fn=Ad)
 	for(n in data$symbolnames) 
 		data[[n]] = make.stock.xts( price.fn( data.all[[n]] ) )	
 		
-	bt.prep(data, align='keep.all')
+	bt.prep(data, align='keep.all', fill.gaps=T)
 
 	#*****************************************************************
 	# Prepare data
@@ -249,7 +249,7 @@ proxy.map <- function(raw.data, tickers)
   
   getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, raw.data = raw.data, set.symbolnames = T, auto.assign = T)
     for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-  bt.prep(data, align='keep.all')    
+  bt.prep(data, align='keep.all', fill.gaps=T)
       
   layout(1)
   plota.matplot(data$prices)

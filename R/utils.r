@@ -1761,7 +1761,7 @@ getSymbols.extra <- function
 		if(nchar(trim(s)) == 0) next
 		if(substring(trim(s)[1],1,1) == '#') next
 	
-		temp = spl(s, '=')
+		temp = spl(spl(s,"#")[1], "=")
 		if ( len(temp) > 1 ) { 
 			name = temp[1]
 			values = trim(spl(temp[2], '\\+'))

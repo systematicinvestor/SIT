@@ -247,7 +247,8 @@ ulcer.index <- function
 	n=14	# window length
 )
 {
-	sqrt(runSum((100*( x - runMax(x,n) ) / runMax(x,n))^2, n) / n)
+	#sqrt(runSum((100*( x - runMax(x,n) ) / runMax(x,n))^2, n) / n)
+	sqrt(runSum(( x / runMax(x,n) -1 )^2, n) / n)	
 }
 
 
@@ -450,8 +451,29 @@ ntop.keep <- function
 br.rank <- function(x)
 {	
 	t(apply(coredata(-x), 1, rank, na.last='keep'))
-}	
+}
 
+#' @export 
+bt.rank <- function(x, dirMaxMin = TRUE, do.sort = F )
+{	
+	if(!do.sort) {
+		if(dirMaxMin)
+			t(apply(coredata(-x), 1, rank, na.last='keep'))
+		else
+			t(apply(coredata(x), 1, rank, na.last='keep'))
+	} else {
+		index = 1:ncol(x)
+		x = coredata(x)
+		out = t(apply(x, 1, function(y) { 
+			temp = sort.list(y, na.last = TRUE, decreasing = dirMaxMin)
+			temp[temp] = index
+			temp
+			}
+		)) 
+		out[is.na(x)] = NA
+		out
+	}
+}	
 
 ############################################################################### 
 # SuperSmoother filter 2013 John F. Ehlers

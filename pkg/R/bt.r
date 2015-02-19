@@ -262,6 +262,7 @@ bt.prep.remove.symbols.min.history <- function
 	bt.prep.remove.symbols(b, which( count(b$prices, side=2) < min.history ))
 }
 
+
 #' @export 
 bt.prep.remove.symbols <- function
 (
@@ -281,22 +282,33 @@ bt.prep.remove.symbols <- function
 	}
 }
 
+
+#' @examples
+#' \dontrun{ 
+#' bt.prep.trim(data, endpoints(data$prices, 'months'))
+#' bt.prep.trim(data, '2006::')
+#' }
 #' @export 
 bt.prep.trim <- function
 (
-	b, 					# enviroment with symbols time series
+	b, 				# enviroment with symbols time series
 	dates = NULL	# subset of dates
 ) 
 {	
 	if(is.null(dates)) return(b)
 	
+	# convert dates to dates.index
+	dates.index = dates2index(b$prices, dates)	
+	
 	data.copy <- new.env()
-	for(s in b$symbolnames) data.copy[[s]] = b[[s]][dates,,drop=F]
+	for(s in b$symbolnames) data.copy[[s]] = b[[s]][dates.index,,drop=F]
 		 
 	data.copy$symbolnames = b$symbolnames
-	data.copy$prices = b$prices[dates,,drop=F]
-	data.copy$weight = b$weight[dates,,drop=F]
-	data.copy$execution.price = b$execution.price[dates,,drop=F]
+	data.copy$dates = b$dates[dates.index]
+	
+	data.copy$prices = b$prices[dates.index,,drop=F]
+	data.copy$weight = b$weight[dates.index,,drop=F]
+	data.copy$execution.price = b$execution.price[dates.index,,drop=F]
 	return(data.copy)
 }
  
@@ -851,6 +863,8 @@ bt.trade.summary <- function
 			tstarti = which(tstart[,i])
 			tendi = which(tend[,i])
 			
+#cat(colnames(data$prices)[i], len(tstarti), len(tendi), '\n')			
+			
 			if( len(tstarti) > 0 ) {
 				#if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
 				if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
@@ -893,6 +907,44 @@ bt.trade.summary <- function
 	return(out)
 }
 
+
+bt.trade.summary.test <- function() {
+test = list(
+	weight1 = matrix(c(0,0,0,1),nc=1),
+	weight2 = matrix(c(0,1,0,0),nc=1),
+	weight3 = matrix(c(1,1,1,1),nc=1),
+	weight4 = matrix(c(1,0,0,0),nc=1),
+	weight5 = matrix(c(1,2,0,1,2),nc=1)
+)
+
+	for(i in 1:len(test)) {
+	
+	weight = test[[i]]
+
+	# find trades
+	weight1 = mlag(weight, -1)
+	tstart = weight != weight1 & weight1 != 0
+	tend = weight != 0 & weight != weight1
+		#tstart[1, weight[1,] != 0] = T
+		n = nrow(weight)
+		tend[n, weight[n,] != 0] = T
+		tend[1, ] = NA
+		
+	trade = ifna(tstart | tend, FALSE)
+
+	tstarti = which(tstart)
+	tendi = which(tend)
+			
+	if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
+			
+	cat(len(tstarti), len(tendi), '\n')
+	
+	#data.frame(weight, weight1, tstart, tend)
+	}
+	
+}
+
+
 # helper function
 #' @export 
 bt.trade.summary.helper <- function(trades) 
@@ -932,47 +984,78 @@ bt.apply <- function
 (
 	b,			# enviroment with symbols time series
 	xfun=Cl,	# user specified function
-	...			# other parameters
+	...,		# other parameters
+	
+	periodicity = NULL,
+	period.ends = NULL
 )
 {
+	if(!is.null(periodicity) && is.null(period.ends))
+		period.ends = endpoints(b$weight, periodicity)
+
 	out = b$weight
 	out[] = NA
 	
 	symbolnames = b$symbolnames
 	nsymbols = length(symbolnames) 
 	
-	for( i in 1:nsymbols ) {	
-		msg = try( match.fun(xfun)( coredata(b[[ symbolnames[i] ]]),... ) , silent=TRUE)
-		if (class(msg)[1] != 'try-error') {
-			out[,i] = msg
-		} else {
-			warning(i, msg, '\n')
+	if(is.null(period.ends)) 
+		for( i in 1:nsymbols ) {	
+			msg = try( match.fun(xfun)( coredata(b[[ symbolnames[i] ]]),... ) , silent=TRUE)
+			if (class(msg)[1] != 'try-error')
+				out[,i] = msg
+			else
+				warning(i, msg, '\n')		
 		}
-	}
-	return(out)
+	else
+		for( i in 1:nsymbols ) {	
+			msg = try( match.fun(xfun)( coredata(b[[ symbolnames[i] ]][period.ends,]),... ) , silent=TRUE)
+			if (class(msg)[1] != 'try-error')
+				out[period.ends,i] = msg
+			else
+				warning(i, msg, '\n')		
+		}
+		
+	out
 }
+
 
 #' @export 
 bt.apply.matrix <- function
 (
 	b,			# matrix
 	xfun=Cl,	# user specified function
-	...			# other parameters
+	...,		# other parameters
+	
+	periodicity = NULL,
+	period.ends = NULL
 )
 {
+	if(!is.null(periodicity) && is.null(period.ends))
+		period.ends = endpoints(b, periodicity)
+
 	out = b
 	out[] = NA
 	nsymbols = ncol(b)
 	
-	for( i in 1:nsymbols ) {	
-		msg = try( match.fun(xfun)( coredata(b[,i]),... ) , silent=TRUE);
-		if (class(msg)[1] != 'try-error') {
-			out[,i] = msg
-		} else {
-			warning(i, msg, '\n')
+	if(is.null(period.ends)) 
+		for( i in 1:nsymbols ) {	
+			msg = try( match.fun(xfun)( coredata(b[,i]),... ) , silent=TRUE);
+			if (class(msg)[1] != 'try-error')
+				out[,i] = msg
+			else
+				warning(i, msg, '\n')		
 		}
-	}
-	return(out)
+	else
+		for( i in 1:nsymbols ) {	
+			msg = try( match.fun(xfun)( coredata(b[period.ends,i]),... ) , silent=TRUE);
+			if (class(msg)[1] != 'try-error')
+				out[period.ends,i] = msg
+			else
+				warning(i, msg, '\n')		
+		}
+	
+	out	
 }
 
 ###############################################################################
