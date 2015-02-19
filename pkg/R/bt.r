@@ -283,6 +283,16 @@ bt.prep.remove.symbols <- function
 }
 
 
+###############################################################################
+#' Trim data enviroment
+#'
+#' This function will remove weights that are smaller than given threshold
+#'
+#' @param b original enviroment with symbols time series
+#' @param dates dates to keep from original enviroment
+#'
+#' @return updated enviroment with symbols time series
+#'
 #' @examples
 #' \dontrun{ 
 #' bt.prep.trim(data, endpoints(data$prices, 'months'))
