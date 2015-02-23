@@ -287,6 +287,43 @@ bt.detail.summary <- function
 	
 	return(out.all)
 }
+
+###############################################################################
+# Rotational Trading: how to reduce trades and improve returns by Frank Hassler
+# http://engineering-returns.com/2011/07/06/rotational-trading-how-to-reducing-trades-and-improve-returns/
+# Custom Summary function to replicate tables from Engineering Returns
+#' @export 
+###############################################################################
+engineering.returns.kpi <- function
+(
+	bt,		# backtest object
+	trade.summary = NULL
+) 
+{	
+	if( !is.null(bt$trade.summary) ) trade.summary = bt$trade.summary
+	
+	out = list()
+	out$Period = join( format( range(index(bt$equity)), '%b%Y'), ' - ')
+		
+	out$Cagr = compute.cagr(bt$equity)
+	out$DVR = compute.DVR(bt) / 100
+	out$Sharpe = compute.sharpe(bt$ret) / 100	
+	out$R2 = compute.R2(bt$equity)
+		
+	if( !is.null(trade.summary) ) {
+		out$Win.Percent = trade.summary$stats['win.prob', 'All']
+		out$Avg.Trade = trade.summary$stats['avg.pnl', 'All']
+	}
+		
+	out$MaxDD = compute.max.drawdown(bt$equity)
+
+	# format
+	out = lapply(out, function(x) if(is.double(x)) round(100*x,1) else x)
+				
+	if( !is.null(trade.summary) ) out$Num.Trades = trade.summary$stats['ntrades', 'All']			
+			
+	return( list(System=out))
+}
 	
 ###############################################################################
 # Plot strategy perfromance side by side		

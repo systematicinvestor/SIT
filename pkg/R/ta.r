@@ -78,24 +78,24 @@ ifna.prevx.test <- function() {
 # Cross - gives a "1" or true on the day that ARRAY1 crosses above ARRAY2. Otherwise the result is "0".
 # To find out when ARRAY1 crosses below ARRAY2, use the formula cross(ARRAY2, ARRAY1)
 # http://www.amibroker.com/guide/afl/afl_view.php?id=34
-############################################################################### 
-###############################################################################
 #' @export 
 ###############################################################################
-cross <- function( array1, array2 ) {
-	array1 > array2 & iif(len(array1) > 1, mlag(array1), array1) < iif(len(array2) > 1, mlag(array2), array2)
+cross <- function( array1, array2, eq=F ) {
+	iif(eq, array1 >= array2, array1 > array2) & iif(len(array1) > 1, mlag(array1), array1) < iif(len(array2) > 1, mlag(array2), array2)
 }
 
-###############################################################################
 #' @export 
-###############################################################################
 cross.up <- function( array1, array2 ) { cross( array1, array2 ) }
 
-###############################################################################
+
 #' @export 
-###############################################################################
 cross.dn <- function( array1, array2 ) { cross( array2, array1 ) }
-    
+
+#' @export 
+cross.up.eq <- function( array1, array2 ) { cross( array1, array2, T ) }
+
+#' @export 
+cross.dn.eq <- function( array1, array2 ) { cross( array2, array1, T ) }
 
 
 ###############################################################################

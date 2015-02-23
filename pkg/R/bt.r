@@ -988,6 +988,11 @@ bt.trade.summary.helper <- function(trades)
 
 ###############################################################################
 # Apply given function to bt enviroment
+# for example, to compute 10 month moving average each quater 
+#bt.apply.matrix(prices, function(x) mean(last(x,10)), periodicity='months', apply.periodicity='quarters') 
+#
+# Make sure not to use a rolling window functions if apply.periodicity is given
+#
 #' @export 
 ###############################################################################
 bt.apply <- function
@@ -996,22 +1001,42 @@ bt.apply <- function
 	xfun=Cl,	# user specified function
 	...,		# other parameters
 	
+	# convert data to given periodicity before applying xfun
 	periodicity = NULL,
-	period.ends = NULL
+	period.ends = NULL,
+	
+	# apply xfun only on selected periodicity
+	apply.periodicity = NULL,
+	apply.period.ends = NULL
 )
 {
 	if(!is.null(periodicity) && is.null(period.ends))
 		period.ends = endpoints(b$weight, periodicity)
+	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
+		apply.period.ends = endpoints(b$weight, apply.periodicity)
+		
+	if(!is.null(apply.period.ends)) 
+		apply.period.ends = apply.period.ends[apply.period.ends > 0]
+	if(!is.null(period.ends)) 
+		period.ends = period.ends[period.ends > 0]
+	if(!is.null(apply.period.ends) && !is.null(period.ends)) {
+		map = array(NA, nrow(b$weight))
+			map[period.ends] = 1:len(period.ends)
+			map = ifna.prev(map)
+			map = ifna(map,1)
+	}
 
 	out = b$weight
 	out[] = NA
 	
 	symbolnames = b$symbolnames
 	nsymbols = length(symbolnames) 
-	
+	xfun = match.fun(xfun)
+
+if(is.null(apply.period.ends)) {		
 	if(is.null(period.ends)) 
 		for( i in 1:nsymbols ) {	
-			msg = try( match.fun(xfun)( coredata(b[[ symbolnames[i] ]]),... ) , silent=TRUE)
+			msg = try( xfun( coredata(b[[ symbolnames[i] ]]),... ) , silent=TRUE)
 			if (class(msg)[1] != 'try-error')
 				out[,i] = msg
 			else
@@ -1019,12 +1044,36 @@ bt.apply <- function
 		}
 	else
 		for( i in 1:nsymbols ) {	
-			msg = try( match.fun(xfun)( coredata(b[[ symbolnames[i] ]][period.ends,]),... ) , silent=TRUE)
+			msg = try( xfun( coredata(b[[ symbolnames[i] ]][period.ends,]),... ) , silent=TRUE)
 			if (class(msg)[1] != 'try-error')
 				out[period.ends,i] = msg
 			else
 				warning(i, msg, '\n')		
 		}
+} else {
+	if(is.null(period.ends)) 
+		for( i in 1:nsymbols ) {
+			x = coredata(b[[ symbolnames[i] ]])
+			for( j in apply.period.ends ) { 
+				msg = try( xfun( x[1:j,,drop=F],... ) , silent=TRUE)	
+				if (class(msg)[1] != 'try-error')
+					out[j,i] = msg
+				else
+					warning(i, msg, '\n')
+			}
+		}
+	else # i.e. run quaterly on the monthly data
+		for( i in 1:nsymbols ) {	
+			x = coredata(b[[ symbolnames[i] ]][period.ends,])
+			for( j in apply.period.ends ) {
+				msg = try( xfun( x[1:map[j]],... ) , silent=TRUE)				
+				if (class(msg)[1] != 'try-error')
+					out[j,i] = msg
+				else
+					warning(i, msg, '\n')		
+			}
+		}
+}		
 		
 	out
 }
@@ -1037,20 +1086,40 @@ bt.apply.matrix <- function
 	xfun=Cl,	# user specified function
 	...,		# other parameters
 	
+	# convert data to given periodicity before applying xfun
 	periodicity = NULL,
-	period.ends = NULL
+	period.ends = NULL,
+	
+	# apply xfun only on selected periodicity
+	apply.periodicity = NULL,
+	apply.period.ends = NULL
 )
 {
 	if(!is.null(periodicity) && is.null(period.ends))
 		period.ends = endpoints(b, periodicity)
-
+	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
+		apply.period.ends = endpoints(b, apply.periodicity)
+		
+	if(!is.null(apply.period.ends)) 
+		apply.period.ends = apply.period.ends[apply.period.ends > 0]
+	if(!is.null(period.ends)) 
+		period.ends = period.ends[period.ends > 0]
+	if(!is.null(apply.period.ends) && !is.null(period.ends)) {
+		map = array(NA, nrow(b))
+			map[period.ends] = 1:len(period.ends)
+			map = ifna.prev(map)
+			map = ifna(map,1)
+	}
+				
 	out = b
 	out[] = NA
 	nsymbols = ncol(b)
+	xfun = match.fun(xfun)
 	
+if(is.null(apply.period.ends)) {
 	if(is.null(period.ends)) 
 		for( i in 1:nsymbols ) {	
-			msg = try( match.fun(xfun)( coredata(b[,i]),... ) , silent=TRUE);
+			msg = try( xfun( coredata(b[,i]),... ) , silent=TRUE)
 			if (class(msg)[1] != 'try-error')
 				out[,i] = msg
 			else
@@ -1058,12 +1127,36 @@ bt.apply.matrix <- function
 		}
 	else
 		for( i in 1:nsymbols ) {	
-			msg = try( match.fun(xfun)( coredata(b[period.ends,i]),... ) , silent=TRUE);
+			msg = try( xfun( coredata(b[period.ends,i]),... ) , silent=TRUE)
 			if (class(msg)[1] != 'try-error')
 				out[period.ends,i] = msg
 			else
 				warning(i, msg, '\n')		
 		}
+} else {
+	if(is.null(period.ends)) 
+		for( i in 1:nsymbols ) {
+			x = coredata(b[,i])
+			for( j in apply.period.ends ) { 
+				msg = try( xfun( x[1:j],... ) , silent=TRUE)	
+				if (class(msg)[1] != 'try-error')
+					out[j,i] = msg
+				else
+					warning(i, msg, '\n')
+			}
+		}
+	else # i.e. run quaterly on the monthly data
+		for( i in 1:nsymbols ) {	
+			x = coredata(b[period.ends,i])			
+			for( j in apply.period.ends ) {
+				msg = try( xfun( x[1:map[j]],... ) , silent=TRUE)				
+				if (class(msg)[1] != 'try-error')
+					out[j,i] = msg
+				else
+					warning(i, msg, '\n')		
+			}
+		}
+}
 	
 	out	
 }
@@ -1504,6 +1597,25 @@ bt.start.dates <- function
 ) 
 {
 	temp = lapply(b, function(x) index(x[1]) )
+		temp$dates = NULL
+		temp$prices = NULL
+		temp$weight = NULL
+		temp$execution.price = NULL
+		temp$symbolnames = NULL
+	temp = temp[order( sapply(temp, function(x) x) )]
+	
+	out = t(t( sapply(temp, function(x) as.character(x)) ))
+    colnames(out) = 'Start'
+  out
+}
+
+#' @export 
+bt.end.dates <- function
+(
+	b 					# enviroment with symbols time series
+) 
+{
+	temp = lapply(b, function(x) index(last(x)) )
 		temp$dates = NULL
 		temp$prices = NULL
 		temp$weight = NULL
