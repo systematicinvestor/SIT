@@ -3,7 +3,8 @@
 \title{Create Staccked plot}
 \usage{
   plota.stacked(x, y, xlab = "",
-    col = plota.colors(ncol(y)), type = c("l", "s"), ...)
+    col = plota.colors(ncol(y)), type = c("l", "s"),
+    flip.legend = F, ...)
 }
 \arguments{
   \item{x}{dates object}

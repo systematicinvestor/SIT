@@ -347,6 +347,25 @@ plota.lines <- function(
 	}
 }
 
+###############################################################################
+#' Add text to time series plot
+#'
+#' @param y \code{\link{xts}} object
+#' @param ... additional parameters to the \code{\text{lines}}
+#'
+#' @return nothing
+#'
+#' @export 
+###############################################################################
+plota.text <- function(
+	y,					# xts object to plot
+	...					# other parameters to text
+)
+{
+	if(has.Cl(y)) y1 = Cl(y) else y1 = y[,1]	
+	
+	text(index4xts(y1), y1, ...)
+}
 
 ###############################################################################
 #' Format numbers using 1000 separator
@@ -952,6 +971,7 @@ plota.stacked <- function
 	xlab='',		# x axis label	
 	col = plota.colors(ncol(y)), 	# colors
 	type=c('l','s'),# plot type  : lines, step stairs
+	flip.legend = F,# reverse legend order
 	...				# other parameters for plot
 )
 {
@@ -1015,7 +1035,10 @@ plota.stacked <- function
 	} 
 
     # legend
-    plota.legend(colnames(y), col, cex = par('cex'))    
+    if(flip.legend)
+    	plota.legend(rev(colnames(y)), rev(col), cex = par('cex'))    
+    else
+    	plota.legend(colnames(y), col, cex = par('cex'))    
 }
 
 

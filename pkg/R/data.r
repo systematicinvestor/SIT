@@ -95,6 +95,35 @@ remove.tags <- function
 	return(temp)
 }
 
+#' @export 
+replace.token <- function
+(
+	txt, 		# source text
+	smarker,	# start key-phrase(s) to find
+	emarker,	# end key-phrase(s) to find
+	replacement,# replacement token
+	pos = 1		# position to start searching at
+)
+{
+	token = extract.token(txt, smarker, emarker, pos, keep.marker = T)
+	if(nchar(token) == 0) 
+		txt
+	else
+		replace.token(gsub(pattern = token, replacement = replacement, txt), smarker, emarker, replacement)
+}
+
+
+#' @export 
+clean.table <- function
+(
+	temp 		# extracted table
+)
+{
+	temp = trim(temp)
+	temp[nchar(temp)==0] = NA 
+	temp = temp[ncol(temp) > rowSums(is.na(temp)),,drop=F]
+	temp[,nrow(temp) > colSums(is.na(temp)),drop=F]
+}
 
 ###############################################################################
 # extract.table.from.webpage
@@ -103,22 +132,28 @@ remove.tags <- function
 extract.table.from.webpage <- function
 (
 	txt, 		# source text of webpage
-	marker,		# key-phrase(s) located in the table to extract
-	hasHeader=T	# flag if table has a header
+	marker=NA,	# key-phrase(s) located in the table to extract
+	has.header=T,# flag if table has a header
+	end.marker=NA # additional end of token marker(s)
 )
 {
 	tryCatch({		
-		# find location of data
-		marker = spl(marker)
+		# find location of data		
 		pos1=1
 		
-		for(i in 1:len(marker)) {
-			pos1 = regexpr(marker[i], substr(txt, pos1, nchar(txt))) + pos1
+		if(!is.na(marker)) {
+		marker = spl(marker)
+		if(len(marker) > 0 && nchar(marker[1]) > 0)
+			for(i in 1:len(marker))
+				pos1 = regexpr(marker[i], substr(txt, pos1, nchar(txt))) + pos1
 		}
+		
 		
 		# find start/end of table
 		pos0 = tail(gregexpr('<table', substr(txt, 1, pos1))[[1]], 1)
+		if(pos0 == -1) pos0 = pos1
 		pos2 = head(gregexpr('</table', substr(txt, pos1, nchar(txt)))[[1]], 1)
+		if(pos2 == -1) pos2 = nchar(txt)+1
 		temp =  substr(txt, pos0, pos1 + pos2 - 2)
 	
 		# remove all formating	
@@ -127,6 +162,12 @@ extract.table.from.webpage <- function
 		temp = gsub(pattern = '</tr>', replacement = ';row;', temp, perl = TRUE) 
 		temp = gsub(pattern = '</td>', replacement = ';col;', temp, perl = TRUE) 
 		temp = gsub(pattern = '</th>', replacement = ';col;', temp, perl = TRUE) 
+		if(!is.na(end.marker)) {
+			marker = spl(end.marker)
+			if(len(marker) > 0 && nchar(marker[1]) > 0)
+				for(i in 1:len(marker))
+					temp = gsub(pattern = marker[i], replacement = ';row;', temp, perl = TRUE) 
+		}
 						
 		temp = gsub(pattern = '<.*?>', replacement = '', temp, perl = TRUE) 
 		
@@ -142,9 +183,9 @@ extract.table.from.webpage <- function
 		n = max( sapply(temp[[1]], function(x) len(x)) )
 		temp = t( sapply(temp[[1]], function(x) x[1:n]) )
 		
-		if(hasHeader) {
-			colnames(temp) = temp[(hasHeader + 0), ]
-			temp = temp[-c(1:(hasHeader + 0)), ,drop=F]
+		if(has.header) {
+			colnames(temp) = trim(temp[(has.header + 0), ])
+			temp = temp[-c(1:(has.header + 0)), ,drop=F]
 		}
 
 	}, error = function(ex) {
@@ -1606,6 +1647,42 @@ get.FOMC.dates <- function
 }	
 
 
+###############################################################################
+# Get EDGAR info
+# www.sec.gov/cgi-bin/browse-edgar?CIK=AAPL&Find=Search&owner=exclude&action=getcompany
+# mktstk.wordpress.com/2015/03/03/sic-lookup-by-stock-symbol/
+#' @export 
+###############################################################################
+edgar.info <- function(ticker)
+{
+	# please note readLines only works with http, for more detail please read
+	# http://stackoverflow.com/questions/26540485/readlines-does-not-read-from-https-url-when-called-from-systemrscript
+	url = paste0('http://www.sec.gov/cgi-bin/browse-edgar?CIK=', ticker, '&Find=Search&owner=exclude&action=getcompany')
+	txt = join(readLines(url))
+	out = list()
+
+	# extract table from this page
+	temp = extract.table.from.webpage(txt, 'seriesDiv,Filings', has.header = T)
+  	out$fillings= clean.table(temp)
+  
+	temp = extract.token(txt, 'contentDiv,mailer,Mailing Address','</div>')
+	out$mailing = t(clean.table(extract.table.from.webpage(temp, has.header=F, end.marker='</span>')))
+		colnames(out$mailing) = 'Mailing Address'
+
+	temp = extract.token(txt, 'contentDiv,mailer,Business Address','</div>')
+	out$business = t(clean.table(extract.table.from.webpage(temp, has.header=F, end.marker='</span>')))
+		colnames(out$business) = 'Business Address'
+
+	temp = extract.token(txt, 'contentDiv,companyInfo,>','</div>')
+	temp = gsub('\\|', '</span>', replace.token(temp, '<br','>','</span>'))
+	temp = clean.table(extract.table.from.webpage(temp, has.header=F, end.marker='</span>'))
+	out$company = t(temp)
+		colnames(out$company) = 'Company Info'
+	
+	out$sic = trim(spl(spl(temp[grep('SIC', temp)],':')[2],'-'))
+
+	return(out)
+}
 
 
 ###############################################################################

@@ -937,10 +937,11 @@ rep.row <- function
 )
 {
 	if(nr == 1) m
-	else return(matrix(m, nr=nr, nc=len(m), byrow=T))
+	else matrix(m, nr=nr, nc=len(m), byrow=T)
 }
 
 ###############################################################################
+#do.call(cbind, lapply(1:nc,function(i) m))
 #' Repeat Columns
 #'
 #' @param m vector (column)
@@ -958,15 +959,16 @@ rep.row <- function
 rep.col <- function
 (
 	m,	# vector (column)
-	nc,# number of copies along columns
- basic = F
+	nc	# number of copies along columns
 )
 {
-	if(basic) return(matrix(m, nr=len(m), nc=nc, byrow=F))
- if(is.null(dim(m))) dim(m) = c(len(m),1)
 	if(nc == 1) m
-	else
-  do.call(cbind, lapply(1:nc,function(i) m))
+	else {
+		if(is.xts(m))
+			make.xts(matrix(coredata(m), nr=len(m), nc=nc, byrow=F), index(m))
+		else
+			matrix(m, nr=len(m), nc=nc, byrow=F)
+	}  
 }
 
 

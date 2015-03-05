@@ -264,18 +264,13 @@ optimize.portfolio.nlp <- function
 	# fnscale(1) - set -1 for maximization instead of minimization.
 	if( direction == 'min' ) fnscale = 1 else fnscale = -1
 	
-	# control structure	
-	if( as.numeric( sessionInfo()$R.version$minor ) < 9 ) {
-		cntl <- donlp2.control(silent = T, fnscale = fnscale, iterma =10000, nstep = 100, epsx = 1e-10)	
-	} else {
-		cntl <- donlp2Control()
-			cntl$silent = T
-			cntl$fnscale = fnscale
-			cntl$iterma =10000
-			cntl$nstep = 100
-			cntl$epsx = 1e-10
-	}		
-	
+	# control structure: as.numeric( sessionInfo()$R.version$minor ) < 9 
+	cntl = donlp2Control()
+	cntl$silent = T
+	cntl$fnscale = fnscale
+	cntl$iterma =10000
+	cntl$nstep = 100
+	cntl$epsx = 1e-10	
 	
 	# lower/upper bounds
 	par.l = constraints$lb

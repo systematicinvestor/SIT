@@ -502,9 +502,21 @@ bt.summary <- function
 	# cents / share commission
    	#   trade cost = abs(share - mlag(share)) * commission$cps
 	# fixed commission per trade to more effectively to penalize for turnover
-   	#   trade cost = abs(share - mlag(share)) * commission$cps +  sign(abs(share - mlag(share))) * commission$fixed
+   	#   trade cost = sign(abs(share - mlag(share))) * commission$fixed
 	# percentage commission
 	#   trade cost = price * abs(share - mlag(share)) * commission$percentage
+	
+	# Todo
+	# - ability to set different commissions at start/end of the trade
+	# - add percentage.fixed, same logic as fixed, but applied to capital
+	#   trade cost = sign(abs(share - mlag(share))) * 
+	#		price * abs(pmax(share, mlag(share))) * commission$percentage.fixed
+	# - ability to set commissions for each asset; hence modeling different tax
+	#   rates for stock and equities; these special commissions/taxes should
+	#   only be applied at the year end and depend on asset and holding period
+	#   only for trades that were completed in the given year => probably a separate function
+		
+	
 	if( !is.list(commission) ) {
 		if( type == 'weight') 
 			commission = list(cps = 0.0, fixed = 0.0, percentage = commission)	
@@ -956,6 +968,7 @@ test = list(
 
 
 # helper function
+# [Why Every Trader Should Know and Understand This Formula](http://www.priceactionlab.com/Blog/2015/02/why-every-trader-should-know-and-understand-this-formula/)
 #' @export 
 bt.trade.summary.helper <- function(trades) 
 {		
@@ -1007,24 +1020,15 @@ bt.apply <- function
 	
 	# apply xfun only on selected periodicity
 	apply.periodicity = NULL,
-	apply.period.ends = NULL
+	apply.period.ends = NULL,
+	
+	fill.gaps = F	# fill gaps introduced by having different periodicity
 )
 {
-	if(!is.null(periodicity) && is.null(period.ends))
-		period.ends = endpoints(b$weight, periodicity)
-	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
-		apply.period.ends = endpoints(b$weight, apply.periodicity)
-		
-	if(!is.null(apply.period.ends)) 
-		apply.period.ends = apply.period.ends[apply.period.ends > 0]
-	if(!is.null(period.ends)) 
-		period.ends = period.ends[period.ends > 0]
-	if(!is.null(apply.period.ends) && !is.null(period.ends)) {
-		map = array(NA, nrow(b$weight))
-			map[period.ends] = 1:len(period.ends)
-			map = ifna.prev(map)
-			map = ifna(map,1)
-	}
+	temp = bt.apply.setup(b$weight, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	period.ends = temp$period.ends
+	apply.period.ends = temp$apply.period.ends
+	map = temp$map
 
 	out = b$weight
 	out[] = NA
@@ -1032,6 +1036,8 @@ bt.apply <- function
 	symbolnames = b$symbolnames
 	nsymbols = length(symbolnames) 
 	xfun = match.fun(xfun)
+	
+	# check how many results xfun returns
 
 if(is.null(apply.period.ends)) {		
 	if(is.null(period.ends)) 
@@ -1074,8 +1080,10 @@ if(is.null(apply.period.ends)) {
 			}
 		}
 }		
-		
-	out
+	if(fill.gaps)
+		bt.apply.matrix(out, ifna.prev)
+	else
+		out
 }
 
 
@@ -1092,24 +1100,15 @@ bt.apply.matrix <- function
 	
 	# apply xfun only on selected periodicity
 	apply.periodicity = NULL,
-	apply.period.ends = NULL
+	apply.period.ends = NULL,
+	
+	fill.gaps = F	# fill gaps introduced by having different periodicity
 )
 {
-	if(!is.null(periodicity) && is.null(period.ends))
-		period.ends = endpoints(b, periodicity)
-	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
-		apply.period.ends = endpoints(b, apply.periodicity)
-		
-	if(!is.null(apply.period.ends)) 
-		apply.period.ends = apply.period.ends[apply.period.ends > 0]
-	if(!is.null(period.ends)) 
-		period.ends = period.ends[period.ends > 0]
-	if(!is.null(apply.period.ends) && !is.null(period.ends)) {
-		map = array(NA, nrow(b))
-			map[period.ends] = 1:len(period.ends)
-			map = ifna.prev(map)
-			map = ifna(map,1)
-	}
+	temp = bt.apply.setup(b, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	period.ends = temp$period.ends
+	apply.period.ends = temp$apply.period.ends
+	map = temp$map
 				
 	out = b
 	out[] = NA
@@ -1157,8 +1156,33 @@ if(is.null(apply.period.ends)) {
 			}
 		}
 }
+	if(fill.gaps)
+		bt.apply.matrix(out, ifna.prev)
+	else
+		out
+}
+
+
+bt.apply.setup <- function(m, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends) {
+	if(!is.null(periodicity) && is.null(period.ends))
+		period.ends = endpoints(m, periodicity)
+	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
+		apply.period.ends = endpoints(m, apply.periodicity)
+		
+	if(!is.null(apply.period.ends)) 
+		apply.period.ends = apply.period.ends[apply.period.ends > 0]
+	if(!is.null(period.ends)) 
+		period.ends = period.ends[period.ends > 0]
+
+	map = NULL		
+	if(!is.null(apply.period.ends) && !is.null(period.ends)) {
+		map = array(NA, nrow(m))
+			map[period.ends] = 1:len(period.ends)
+			map = ifna.prev(map)
+			map = ifna(map,1)
+	}
 	
-	out	
+	list(period.ends = period.ends, apply.period.ends = apply.period.ends, map = map)
 }
 
 ###############################################################################

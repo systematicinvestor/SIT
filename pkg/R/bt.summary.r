@@ -306,19 +306,23 @@ engineering.returns.kpi <- function
 	out$Period = join( format( range(index(bt$equity)), '%b%Y'), ' - ')
 		
 	out$Cagr = compute.cagr(bt$equity)
-	out$DVR = compute.DVR(bt) / 100
 	out$Sharpe = compute.sharpe(bt$ret) / 100	
-	out$R2 = compute.R2(bt$equity)
-		
+	out$DVR = compute.DVR(bt) / 100	
+	out$R2 = compute.R2(bt$equity) / 100	
+
+	out$Volatility = compute.risk(bt$ret)
+	out$MaxDD = compute.max.drawdown(bt$equity)
+	out$Exposure = compute.exposure(bt$weight)						
+			
 	if( !is.null(trade.summary) ) {
 		out$Win.Percent = trade.summary$stats['win.prob', 'All']
-		out$Avg.Trade = trade.summary$stats['avg.pnl', 'All']
+		out$Avg.Trade = trade.summary$stats['avg.pnl', 'All']		
+		out$Profit.Factor = trade.summary$stats['profitfactor', 'All'] / 100
 	}
 		
-	out$MaxDD = compute.max.drawdown(bt$equity)
 
 	# format
-	out = lapply(out, function(x) if(is.double(x)) round(100*x,1) else x)
+	out = lapply(out, function(x) if(is.double(x)) round(100*x,2) else x)
 				
 	if( !is.null(trade.summary) ) out$Num.Trades = trade.summary$stats['ntrades', 'All']			
 			
@@ -433,8 +437,12 @@ plotbt.transition.map <- function
 	par(mar=c(2, 4, 1, 1), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
 	
 	
-	weight[is.na(weight)] = 0	
-	plota.stacked(index.xts(weight), weight, col = col, type='s', main = iif(nchar(name) > 0, paste('Transition Map for', name), ''), x.highlight = x.highlight)	
+	weight[is.na(weight)] = 0
+	
+	#arrange so that most consient holdings are the bottom 
+	weight = weight[, sort.list(colSums(weight!=0), decreasing=T)]
+	
+	plota.stacked(index.xts(weight), weight, col = col, type='s', flip.legend=T, main = iif(nchar(name) > 0, paste('Transition Map for', name), ''), x.highlight = x.highlight)	
 }
 	
 ###############################################################################

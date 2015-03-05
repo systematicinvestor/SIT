@@ -456,6 +456,8 @@ br.rank <- function(x)
 #' @export 
 bt.rank <- function(x, dirMaxMin = TRUE, do.sort = F )
 {	
+res = NA * x
+res[] = {
 	if(!do.sort) {
 		if(dirMaxMin)
 			t(apply(coredata(-x), 1, rank, na.last='keep'))
@@ -473,6 +475,8 @@ bt.rank <- function(x, dirMaxMin = TRUE, do.sort = F )
 		out[is.na(x)] = NA
 		out
 	}
+}
+res	
 }	
 
 ############################################################################### 
