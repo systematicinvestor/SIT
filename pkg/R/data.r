@@ -449,15 +449,14 @@ dow.jones.components <- function()
 ###############################################################################
 nasdaq.100.components <- function()
 {
-	url = 'http://www.nasdaq.com/markets/indices/nasdaq-100.aspx'
-	txt = join(readLines(url))
-
-	# extract table from this page
-	temp = extract.table.from.webpage(txt, 'Symbol', hasHeader = 2)
+	url = 'http://www.nasdaq.com/quotes/nasdaq-100-stocks.aspx?render=download'
+	temp = read.csv(url, header=TRUE, stringsAsFactors=F)		
+		colnames(temp) = trim(colnames(temp))
+	
 	tickers = temp[, 'Symbol']
-
 	return(tickers)
 }
+
 	
 
 ###############################################################################
