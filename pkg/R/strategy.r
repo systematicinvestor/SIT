@@ -2859,7 +2859,7 @@ target.vol.strategy <- function(model, weight,
 	#names(models)	
 	# advanced ... - signals
 	#' @export 
-	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1) {
+	calendar.strategy <- function(data, ..., universe = data$prices > 0, do.lag.universe = 1, commission = 0) {
 		signals = list( ... )		
 		if( is.list(signals[[1]]) ) signals = signals[[1]]
 		else {
@@ -2883,7 +2883,7 @@ target.vol.strategy <- function(model, weight,
 				else
 					data$weight[] = ifna(temp / rowSums(temp),0)
 					#data$weight[] = ntop(iif(temp,1,NA), nassets)
-			models[[n]] = bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T, silent=T)  	
+			models[[n]] = bt.run.share(data, do.lag = 0, trade.summary=T, clean.signal=T, commission = commission, silent=T)  	
 		}
 		models
 	}	

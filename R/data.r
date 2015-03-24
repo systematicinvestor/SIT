@@ -65,10 +65,11 @@ extract.token <- function
 	if (nchar(smarker) > 0)
 		pos1 = find.tokens(txt, smarker, pos, pos.start = keep.marker)
 	if( pos1 < 0 ) return("")
+	pos1.marker = iif(keep.marker, pos1 + nchar(last(spl(smarker))), pos1)
 	
 	pos2 = nchar(txt)
 	if (nchar(emarker) > 0)
-		pos2 = find.tokens(txt, emarker, pos1, pos.start = !keep.marker) - 1
+		pos2 = find.tokens(txt, emarker, pos1.marker, pos.start = !keep.marker) - 1
 	if( pos2 < 0 ) return("")
 	
 	return(substr(txt,pos1,pos2))	
@@ -882,6 +883,49 @@ extend.data.proxy <- function(data, data.proxy = NULL, proxy.filename = 'data.pr
     			data[[n]] = extend.data(data[[n]], data.proxy[[n]], scale=T)
 }  
 	
+###############################################################################
+# Leveraged series
+###############################################################################  
+# Create Leveraged series with data from the unlevereged.
+# @example create.leveraged(tlt, 2)
+# @example extend.data(data$UBT, create.leveraged(data$TLT, leverage=2), scale=T)
+# @example extend.data(data$TMF, create.leveraged(data$TLT, leverage=3), scale=T)
+#' @export 
+create.leveraged = function(hist, leverage=2) {
+	rets = 1 + leverage * (hist / mlag(hist) - 1)
+	rets[1,] = 1	
+	bt.apply.matrix(rets, cumprod)
+}	
+
+
+create.leveraged.test = function() {
+    tickers = spl('TMF,UBT,TLT')
+    data = new.env()
+    
+    getSymbols(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)   
+
+    
+    test2 = extend.data(data$UBT, create.leveraged(data$TLT, leverage=2), scale=T)
+    test3 = extend.data(data$TMF, create.leveraged(data$TLT, leverage=3), scale=T)    
+    proxy.test(list(TLT=data$TLT, UBT=test2, TMF=test3),price.fn=Ad)
+	
+    test0 = create.leveraged(data$TLT, leverage=2)    
+    proxy.test(list(UBT=data$UBT, EXTEND=test0),price.fn=Ad)
+    
+    test0 = create.leveraged(data$TLT, leverage=3)    
+    proxy.test(list(TMF=data$TMF, EXTEND=test0),price.fn=Ad)
+
+    # please note the difference in the above extension is due to difference in the
+    # underlying benchmarks. I.e.
+    #    
+    # http://www.proshares.com/funds/ubt.html
+    # ProShares Ultra 20+ Year Treasury (UBT) seeks daily investment results
+    # that correspond to two times (2x) the daily performance of the Barclays U.S. 20+ Year Treasury Bond Index.
+    #
+    # http://www.direxioninvestments.com/products/direxion-daily-20-year-treasury-bull-3x-etf
+    # Direxion Daily 20+ Yr Trsy Bull 3X ETF (TMF) seeks daily investment results
+    # that correspond to three times (3x) the daily performance of the NYSE 20 Year Plus Treasury Bond Index (AXTWEN).
+}
 
 ###############################################################################
 # Bundes Bank - long history of gold prices
@@ -1342,6 +1386,18 @@ get.fama.french.data <- function(
 		if(n.index == 2) {
 			name = trim(out[start.index])
 			colnames = scan(text = out[end.index], what='', quiet=T)
+			
+			colnames1 = scan(text = out[end.index+1], what='', quiet=T)
+			if(len(colnames) > len(colnames1)) {
+				cindex = which(diff(gregexpr(' ',out[end.index+1])[[1]]) > 1)
+				cindex = c(1, gregexpr(' ',out[end.index+1])[[1]][(cindex+1)], nchar(out[end.index])+1)
+				colnames = rep('', len(cindex)-1)
+				for(j in 2:len(cindex))
+					colnames[j-1] = substr(out[end.index], cindex[j-1], cindex[j]-1)
+				colnames = trim(colnames)
+				colnames = colnames[nchar(colnames) > 0]				
+			}
+			
 		} else if(n.index > 2) {
 			name = trim(out[start.index])
 			colnames0 = scan(text = out[(end.index-1)], what='', quiet=T)

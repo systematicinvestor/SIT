@@ -228,48 +228,6 @@ ifnull <- function
 }
 
 ###############################################################################
-#' Faster version of rep fucntion
-#'
-#' This function is a faster version of rep fucntion
-#'
-#' @param x data to be repeated
-#' @param times number of times to repeat the data
-#'
-#' @return new data
-#'
-#' @examples
-#' \dontrun{ 
-#' fast.rep(c(1,NA,2,Inf,3), 4)
-#' }
-#' @export 
-###############################################################################
-fast.rep <- function(x, times) { 
-	length(x) = times
-	x[] = x[1]		
-	x
-}
-
-fast.rep.test.speed <- function() {
-	#install.packages('rbenchmark_0.3.tar.gz', repos = NULL, type="source")
-
-	test1 <- function() {
-		rep(101,10000)
-	}
-	test2 <- function() {
-		fast.rep(101,10000)
-	}
-		
-	require(rbenchmark)
-	benchmark(
-		test1(), 
-	    test2(),
-	    columns = c("test", "replications", "elapsed", "relative"),
-	    order = "relative",
-	    replications = 10000
-	)
-}	
-
-###############################################################################
 #' Count number of non NA elements
 #'
 #' This function will count number of non NA elements in the given matrix
@@ -578,7 +536,7 @@ if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n
 	
 	index = match.fun(fn.ends)(all, F)
 	
-	temp.cum = cumsum(fast.rep(1,n.all))
+	temp.cum = cumsum(rep(1,n.all))
 		temp = temp.cum * NA
 		temp[index] = temp.cum[index]
 	days.since = temp.cum - ifna.prev(temp)

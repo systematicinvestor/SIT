@@ -208,7 +208,7 @@ bt.ts.price.stop <- function(x, price, pstop)
 	price = coredata(price)
 	pstop = coredata(pstop)
 
-	if(length(pstop) == 1) pstop = fast.rep(pstop, len(x))
+	if(length(pstop) == 1) pstop = rep(pstop, len(x))
 
 	# faster which
 	dummy = 1:length(x)
@@ -265,7 +265,7 @@ bt.ts.time.price.stop <- function(x, nlen, price, pstop)
 	price = coredata(price)
 	pstop = coredata(pstop)
 
-	if(length(pstop) == 1) pstop = fast.rep(pstop, len(x))
+	if(length(pstop) == 1) pstop = rep(pstop, len(x))
 
 	# faster which
 	dummy = 1:length(x)
