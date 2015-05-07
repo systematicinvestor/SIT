@@ -40,11 +40,11 @@
 ###############################################################################
 spl <- function 
 (
-	s,			# input string
-	delim = ','	# delimiter
+  s,      # input string
+  delim = ',' # delimiter
 )
 { 
-	return(unlist(strsplit(s,delim))); 
+  return(unlist(strsplit(s,delim))); 
 }
 
 ###############################################################################
@@ -65,11 +65,11 @@ spl <- function
 ###############################################################################
 join <- function
 (
-	v, 			# vector of strings
-	delim = ''	# delimiter
+  v,      # vector of strings
+  delim = ''  # delimiter
 )
 { 
-	return(paste(v,collapse=delim)); 
+  return(paste(v,collapse=delim)); 
 }
 
 ###############################################################################
@@ -89,7 +89,7 @@ join <- function
 ###############################################################################
 trim <- function
 (
-	s	# string
+  s # string
 )
 {
   s = sub(pattern = '^\\s+', replacement = '', x = s)
@@ -114,11 +114,99 @@ trim <- function
 ###############################################################################
 len <- function
 (
-	x	# vector
+  x # vector
 )
 {
-	return(length(x)) 
+  return(length(x)) 
 }
+
+###############################################################################
+#' Shortcut for new.env function
+#'
+#' This function is a convenience shortcut for new.env function
+#' adding ability to work with environment the same way you work with list
+#'
+#' @param ... members of new environment
+#'
+#' @return new environment
+#'
+#' @examples
+#' \dontrun{ 
+#' whitespace = ' '
+#' env(a=10,b=3,whitespace)
+#' env(a=10,b=3,10)
+#' }
+#' @export
+#' @rdname EnvironmentFunctions
+###############################################################################
+env <- function
+(
+	...,
+	hash = TRUE, 
+	parent = parent.frame(), 
+	size = 29L
+) 
+{
+	temp = new.env(hash = hash, parent = parent, size = size)
+	values = list(...)
+	if(len(values) == 0) return(temp)
+	
+	values.names = names(values)
+	names = as.character(substitute(c(...))[-1])
+		
+	names = iif(nchar(values.names) > 0, values.names, names)
+	for(i in 1:len(values))
+		temp[[ names[i] ]] = values[[i]]
+	temp
+}
+
+###############################################################################
+#' Shortcut for rm function to delete items from given environment
+#'
+#' @export
+#' @rdname EnvironmentFunctions
+env.del <- function(names, env) {
+	rm(list=names, envir=env)
+}
+
+
+###############################################################################
+#' Shortcut for all.equal function
+#'
+#' This function is a convenience shortcut for all.equal function
+#' adding ability to work with multiple variables
+#'
+#' @param ... variables to compare
+#'
+#' @return matrix with results of comparison
+#'
+#' all.equal(r.cor, c.cor)
+#' all(abs(r.cor - c.cor) < 1e-10, na.rm=T)
+#'
+#' @export
+###############################################################################
+test.equality = function(..., eps = 1e-10, na.rm=T, type=c('first', 'all')) {
+	values = list(...)
+	n = len(values) 
+	if(n == 0) return
+	
+	values.names = names(values)
+	names = as.character(substitute(c(...))[-1])		
+	names = iif(nchar(values.names) > 0, values.names, names)
+
+	out = c()
+	if(type[1] == 'all')
+		for(i in 1:(n-1))
+			for(j in (i+1):n)
+				out = rbind(out, c(names[i], names[j], all(abs(values[[i]] - values[[j]]) < 1e-10, na.rm=na.rm)))
+	else
+		for(i in 2:n)
+			out = rbind(out, c(names[1], names[i], all(abs(values[[1]] - values[[i]]) < 1e-10, na.rm=na.rm)))
+
+	colnames(out) = spl('item1, item2,equal')
+	out
+}
+
 
 ###############################################################################
 #' Faster version of ifelse function
@@ -139,33 +227,33 @@ len <- function
 ###############################################################################
 iif <- function
 (
-	cond,		# condition
-	truepart,	# true part
-	falsepart	# false part
+  cond,   # condition
+  truepart, # true part
+  falsepart # false part
 )
 {
-	if(len(cond) == 1) { if(cond) truepart else falsepart }
-	else {  
-		if(length(falsepart) == 1) {
-			temp = falsepart
-			falsepart = cond
-			falsepart[] = temp
-		}
-		
-		if(length(truepart) == 1) 
-			falsepart[cond] = truepart 
-		else {
-			cond = ifna(cond,F)
-			if(is.xts(truepart))
-				falsepart[cond] = coredata(truepart)[cond]
-			else
-				falsepart[cond] = truepart[cond]
-		}
-			
-		#falsepart[!is.na(cond)] = temp
+  if(len(cond) == 1) { if(cond) truepart else falsepart }
+  else {  
+    if(length(falsepart) == 1) {
+      temp = falsepart
+      falsepart = cond
+      falsepart[] = temp
+    }
+    
+    if(length(truepart) == 1) 
+      falsepart[cond] = truepart 
+    else {
+      cond = ifna(cond,F)
+      if(is.xts(truepart))
+        falsepart[cond] = coredata(truepart)[cond]
+      else
+        falsepart[cond] = truepart[cond]
+    }
+      
+    #falsepart[!is.na(cond)] = temp
 
-		return(falsepart);
-	}
+    return(falsepart);
+  }
 } 
 
 ###############################################################################
@@ -186,20 +274,20 @@ iif <- function
 ###############################################################################
 ifna <- function
 (
-	x,	# check x for NA, NaN, Inf
-	y	# if found replace with y
+  x,  # check x for NA, NaN, Inf
+  y # if found replace with y
 ) 
-{ 	
-	return(iif(is.na(x) | is.nan(x) | is.infinite(x), y, x))
+{   
+  return(iif(is.na(x) | is.nan(x) | is.infinite(x), y, x))
 }
 
 #' @export 
 fast.na.omit <- function
 (
-	x
+  x
 ) 
 {
-	x[!is.na(x)]
+  x[!is.na(x)]
 }
 
 ###############################################################################
@@ -221,10 +309,10 @@ fast.na.omit <- function
 ############################################################################### 
 ifnull <- function
 (
-	x,	# check x for NULL
-	y	# if found replace with y
-) { 	
-	return(iif(is.null(x), y, x))
+  x,  # check x for NULL
+  y # if found replace with y
+) {   
+  return(iif(is.null(x), y, x))
 }
 
 ###############################################################################
@@ -244,15 +332,15 @@ ifnull <- function
 #' @export 
 ###############################################################################
 count <- function(
-	x,			# matrix with data
-	side = 2	# margin along which to count
+  x,      # matrix with data
+  side = 2  # margin along which to count
 )
 {
-	if( is.null(dim(x)) ) { 
-		sum( !is.na(x) ) 
-	} else { 
-		apply(!is.na(x), side, sum) 
-	}
+  if( is.null(dim(x)) ) { 
+    sum( !is.na(x) ) 
+  } else { 
+    apply(!is.na(x), side, sum) 
+  }
 }  
 
 ###############################################################################
@@ -273,14 +361,14 @@ count <- function(
 ###############################################################################
 run.count <- function
 (
-	x, 			# vector with data
-	window.len	# window length
+  x,      # vector with data
+  window.len  # window length
 )
 { 
-	n    = length(x) 
-	xcount = cumsum( !is.na(x) )
-	ycount = xcount[-c(1 : (k-1))] - c(0, xcount[-c((n-k+1) : n)])
-	return( c( xcount[1:(k-1)], ycount))
+  n    = length(x) 
+  xcount = cumsum( !is.na(x) )
+  ycount = xcount[-c(1 : (k-1))] - c(0, xcount[-c((n-k+1) : n)])
+  return( c( xcount[1:(k-1)], ycount))
 }
 
 ###############################################################################
@@ -298,45 +386,45 @@ run.count <- function
 #' @rdname DateFunctions
 ###############################################################################
 date.dayofweek <- function(dates) 
-{	
-	return(as.double(format(dates, '%w')))
+{ 
+  return(as.double(format(dates, '%w')))
 }
 
 #' @export 
 #' @rdname DateFunctions
 date.day <- function(dates) 
-{	
-	return(as.double(format(dates, '%d')))
+{ 
+  return(as.double(format(dates, '%d')))
 }
 
 #' @export 
 #' @rdname DateFunctions
 date.week <- function(dates) 
-{	
-	return(as.double(format(dates, '%U')))
+{ 
+  return(as.double(format(dates, '%U')))
 }
  
 #' @export 
 #' @rdname DateFunctions
 date.month <- function(dates) 
-{	
-	return(as.double(format(dates, '%m')))
+{ 
+  return(as.double(format(dates, '%m')))
 }
 
-# (((1:12)-1) %/% 3)+1	
+# (((1:12)-1) %/% 3)+1  
 # date.quarter(Sys.Date())
 #' @export 
 #' @rdname DateFunctions
 date.quarter <- function(dates) 
-{	
-	(((date.month(dates))-1) %/% 3)+1	
+{ 
+  (((date.month(dates))-1) %/% 3)+1 
 }
 
 #' @export 
 #' @rdname DateFunctions
 date.year <- function(dates) 
-{	
-	return(as.double(format(dates, '%Y')))
+{ 
+  return(as.double(format(dates, '%Y')))
 }
 
 
@@ -355,75 +443,75 @@ date.year <- function(dates)
 #' @rdname DateFunctionsIndex
 ###############################################################################
 date.week.ends <- function(dates, last.date=T) 
-{	
-	ends = which(diff( 100*date.year(dates) + date.week(dates) ) != 0)
-	ends.add.last.date(ends, len(dates), last.date)
+{ 
+  ends = which(diff( 100*date.year(dates) + date.week(dates) ) != 0)
+  ends.add.last.date(ends, len(dates), last.date)
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
 date.month.ends <- function(dates, last.date=T) 
-{	
-	ends = which(diff( 100*date.year(dates) + date.month(dates) ) != 0)
-	ends.add.last.date(ends, len(dates), last.date)
+{ 
+  ends = which(diff( 100*date.year(dates) + date.month(dates) ) != 0)
+  ends.add.last.date(ends, len(dates), last.date)
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
 date.quarter.ends <- function(dates, last.date=T) 
-{	
-	ends = which(diff( 10*date.year(dates) + date.quarter(dates) ) != 0)
-	ends.add.last.date(ends, len(dates), last.date)
+{ 
+  ends = which(diff( 10*date.year(dates) + date.quarter(dates) ) != 0)
+  ends.add.last.date(ends, len(dates), last.date)
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
 date.year.ends <- function(dates, last.date=T) 
-{	
-	ends = which(diff( date.year(dates) ) != 0)
-	ends.add.last.date(ends, len(dates), last.date)
+{ 
+  ends = which(diff( date.year(dates) ) != 0)
+  ends.add.last.date(ends, len(dates), last.date)
 }
 
 # helper function to add last date
 ends.add.last.date <- function(ends, last.date, action=T) 
 {
-	if(action)
-		unique(c(ends, last.date))
-	else
-		ends
+  if(action)
+    unique(c(ends, last.date))
+  else
+    ends
 }
 
 #' @export 
 #' @rdname DateFunctionsIndex
 date.ends.fn <- function(periodicity) {
-	switch(periodicity,
-		'weeks' = date.week.ends,
-		'months' = date.month.ends,
-		'quarters' = date.quarter.ends,
-		'years' = date.year.ends,
-		date.month.ends)	
+  switch(periodicity,
+    'weeks' = date.week.ends,
+    'months' = date.month.ends,
+    'quarters' = date.quarter.ends,
+    'years' = date.year.ends,
+    date.month.ends)  
 }
 
 #' out is result of the business.days.location.end
 #' @export 
 #' @rdname DateFunctionsIndex
 date.ends.index <- function(out, timing) {
-	if(timing <= 0)
-		which(out$days.till == (-timing))
-	else
-		which(out$days.since == (timing))
+  if(timing <= 0)
+    which(out$days.till == (-timing))
+  else
+    which(out$days.since == (timing))
 }
-	
+  
 #' last calendar day of period
 #' date.end('2014-01-13')
 #' @export 
-#' @rdname DateFunctionsIndex	
+#' @rdname DateFunctionsIndex 
 date.end <- function(date = Sys.Date(), periodicity = 'months', date.format = '%Y-%m-%d') {
-	date = as.Date(paste(date), date.format)
-	temp = seq(date, date + 40, 1)
-	temp[date.ends.fn(periodicity)(temp)[1]]
+  date = as.Date(paste(date), date.format)
+  temp = seq(date, date + 40, 1)
+  temp[date.ends.fn(periodicity)(temp)[1]]
 }
-	
+  
 
 # to ger proper month-end and a day before month-end
 # !!!note holidayTSX() is missing CALabourDay
@@ -431,12 +519,12 @@ date.end <- function(date = Sys.Date(), periodicity = 'months', date.format = '%
 # load.packages('RQuantLib')    
 # from = as.Date('10Jun2013','%d%b%Y')
 # to = as.Date('10Jan2014','%d%b%Y')
-# holidays = getHolidayList("UnitedStates/NYSE", from, to) 	
+# holidays = getHolidayList("UnitedStates/NYSE", from, to)  
 #' @export 
 business.days <- function(from, to = as.Date(from) + 31, holidays = NULL) {
-	from = as.Date(from)
-	to = as.Date(to)
-	
+  from = as.Date(from)
+  to = as.Date(to)
+  
     dates = seq(from, to, by='day')
     rm.index = date.dayofweek(dates) == 6 | date.dayofweek(dates) == 0
     if(!is.null(holidays)) {
@@ -453,15 +541,15 @@ business.days <- function(from, to = as.Date(from) + 31, holidays = NULL) {
 # business.days.till.end(from, holidays)
 #' @export 
 business.days.till.end <- function(from, holidays = NULL, fn.ends = date.month.ends) {
-	from = as.Date(from)
-	
-	# make sure from is a business date
-	dates = business.days(from - 10, from, holidays)
-	from = dates[len(dates)]
-	
-	dates = business.days(from, from + 40, holidays)
-	index = match.fun(fn.ends)(dates, F)
-	index[1] - 1
+  from = as.Date(from)
+  
+  # make sure from is a business date
+  dates = business.days(from - 10, from, holidays)
+  from = dates[len(dates)]
+  
+  dates = business.days(from, from + 40, holidays)
+  index = match.fun(fn.ends)(dates, F)
+  index[1] - 1
 }
 
 # from = as.Date('3Dec2013','%d%b%Y')
@@ -470,39 +558,39 @@ business.days.till.end <- function(from, holidays = NULL, fn.ends = date.month.e
 # business.days.since.end(from, holidays)
 #' @export  
 business.days.since.end <- function(from, holidays = NULL, fn.ends = date.month.ends) {
-	from = as.Date(from)
-	
-	# make sure from is a business date
-	dates = business.days(from - 10, from, holidays)
-	from = dates[len(dates)]
-		
-	dates = business.days(from - 40, from + 10, holidays)
-	index = match.fun(fn.ends)(dates, F)
-			
-	last.index = index[len(index)]
-	if( dates[last.index] == from) return(0)
-	
-	from.index = sum(dates <= from)
-	if( dates[last.index] < from) return(from.index - last.index)
-	
-	last.index = index[(len(index) - 1)]
-	return(from.index - last.index)
+  from = as.Date(from)
+  
+  # make sure from is a business date
+  dates = business.days(from - 10, from, holidays)
+  from = dates[len(dates)]
+    
+  dates = business.days(from - 40, from + 10, holidays)
+  index = match.fun(fn.ends)(dates, F)
+      
+  last.index = index[len(index)]
+  if( dates[last.index] == from) return(0)
+  
+  from.index = sum(dates <= from)
+  if( dates[last.index] < from) return(from.index - last.index)
+  
+  last.index = index[(len(index) - 1)]
+  return(from.index - last.index)
 }
 
 next.business.day <- function(from, holidays = NULL, offset = 0) {
-	from = as.Date(from)
-	
-	# make sure from is a business date
-	dates = business.days(from + offset, from + 10, holidays)
-	dates[1]
+  from = as.Date(from)
+  
+  # make sure from is a business date
+  dates = business.days(from + offset, from + 10, holidays)
+  dates[1]
 }
 
 last.business.day <- function(from, holidays = NULL, offset = 0) {
-	from = as.Date(from)
-	
-	# make sure from is a business date
-	dates = business.days(from - 10, from - offset, holidays)
-	dates[1]
+  from = as.Date(from)
+  
+  # make sure from is a business date
+  dates = business.days(from - 10, from - offset, holidays)
+  dates[1]
 }
 
 # load.packages('quantmod')
@@ -511,40 +599,40 @@ last.business.day <- function(from, holidays = NULL, offset = 0) {
 # out = business.days.location.end(dates, holidayNYSE)
 # cbind(format(dates,'%d%b%y'), out$days.since, out$days.till)
 #' @export 
-business.days.location.end <- function(dates, calendar = null, fn.ends = date.month.ends) {	
-	dates = as.Date(dates)
-	n = len(dates)
-	
-	# getHolidayList
-	load.packages('RQuantLib')
-	
-holidays = NULL		
-if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1) 	
-	
-	before = business.days(dates[1] - 60, dates[1] - 1, holidays)
-		n.before = len(before) 
+business.days.location.end <- function(dates, calendar = null, fn.ends = date.month.ends) { 
+  dates = as.Date(dates)
+  n = len(dates)
+  
+  # getHolidayList
+  load.packages('RQuantLib')
+  
+holidays = NULL   
+if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)   
+  
+  before = business.days(dates[1] - 60, dates[1] - 1, holidays)
+    n.before = len(before) 
 
-holidays = NULL		
-if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n] + 60) 	
-				
-	after = business.days(dates[n] + 1, dates[n] + 60, holidays)
-	
-	
-	all = c(before, dates, after)
-		n.all = len(all)
-	all.index = (n.before + 1) : (n.before + n)
-	
-	index = match.fun(fn.ends)(all, F)
-	
-	temp.cum = cumsum(rep(1,n.all))
-		temp = temp.cum * NA
-		temp[index] = temp.cum[index]
-	days.since = temp.cum - ifna.prev(temp)
-	days.till = temp[ifna.prevx.rev(temp)] - temp.cum
-	
-	#cbind(format(all,'%d%b%y'), days.since, days.till)[all.index, ]
-	
-	list(days.since = days.since[all.index], days.till = days.till[all.index])
+holidays = NULL   
+if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n] + 60)   
+        
+  after = business.days(dates[n] + 1, dates[n] + 60, holidays)
+  
+  
+  all = c(before, dates, after)
+    n.all = len(all)
+  all.index = (n.before + 1) : (n.before + n)
+  
+  index = match.fun(fn.ends)(all, F)
+  
+  temp.cum = cumsum(rep(1,n.all))
+    temp = temp.cum * NA
+    temp[index] = temp.cum[index]
+  days.since = temp.cum - ifna.prev(temp)
+  days.till = temp[ifna.prevx.rev(temp)] - temp.cum
+  
+  #cbind(format(all,'%d%b%y'), days.since, days.till)[all.index, ]
+  
+  list(days.since = days.since[all.index], days.till = days.till[all.index])
 }
  
 
@@ -566,23 +654,23 @@ if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n
 ###############################################################################
 map2monthly <- function(equity) 
 {
-	#a = coredata(Cl(to.monthly(equal.weight$equity)))
+  #a = coredata(Cl(to.monthly(equal.weight$equity)))
 
-	if(compute.annual.factor(equity) >= 12) return(equity)
-	
-	dates = index(equity)
-	equity = coredata(equity)
+  if(compute.annual.factor(equity) >= 12) return(equity)
+  
+  dates = index(equity)
+  equity = coredata(equity)
 
-	temp = as.Date(c('', 10000*date.year(dates) + 100*date.month(dates) + 1), '%Y%m%d')[-1]
-	new.dates = seq(temp[1], last(temp), by = 'month')		
-	
-	map = match( 100*date.year(dates) + date.month(dates), 100*date.year(new.dates) + date.month(new.dates) ) 
-	temp = rep(NA, len(new.dates))
-	temp[map] = equity
-	
-	#range(a - temp)
-	
-	return( make.xts( ifna.prev(temp), new.dates) )
+  temp = as.Date(c('', 10000*date.year(dates) + 100*date.month(dates) + 1), '%Y%m%d')[-1]
+  new.dates = seq(temp[1], last(temp), by = 'month')    
+  
+  map = match( 100*date.year(dates) + date.month(dates), 100*date.year(new.dates) + date.month(new.dates) ) 
+  temp = rep(NA, len(new.dates))
+  temp[map] = equity
+  
+  #range(a - temp)
+  
+  return( make.xts( ifna.prev(temp), new.dates) )
 }
 
 ###############################################################################
@@ -602,23 +690,23 @@ map2monthly <- function(equity)
 ###############################################################################
 create.monthly.table <- function(monthly.data) 
 {
-	nperiods = nrow(monthly.data)
-	
-	years = date.year(index(monthly.data[c(1,nperiods)]))
-		years = years[1] : years[2]
+  nperiods = nrow(monthly.data)
+  
+  years = date.year(index(monthly.data[c(1,nperiods)]))
+    years = years[1] : years[2]
 
-	# create monthly matrix
-	temp = matrix( double(), len(years), 12)
-		rownames(temp) = years
-		colnames(temp) = spl('Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
-	
-	# align months
-	index = date.month(index(monthly.data[c(1,nperiods)]))
-	temp[] = matrix( c( rep(NA, index[1]-1), monthly.data, rep(NA, 12-index[2]) ), ncol=12, byrow = T)
-		
-	return(temp)
+  # create monthly matrix
+  temp = matrix( double(), len(years), 12)
+    rownames(temp) = years
+    colnames(temp) = spl('Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
+  
+  # align months
+  index = date.month(index(monthly.data[c(1,nperiods)]))
+  temp[] = matrix( c( rep(NA, index[1]-1), monthly.data, rep(NA, 12-index[2]) ), ncol=12, byrow = T)
+    
+  return(temp)
 }
-		
+    
 ###############################################################################
 #' Compute the expiration date of stock options (3rd Friday of the month)
 #'
@@ -644,56 +732,56 @@ create.monthly.table <- function(monthly.data)
 #' @export 
 ###############################################################################
 third.friday.month <- function(years, months)
-{	
+{ 
 helper <- function(year, month) {
-	day = date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )
-	day = c(20,19,18,17,16,15,21)[1 + day]
-	as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1]
+  day = date.dayofweek( as.Date(c('', 10000*year + 100*month + 1), '%Y%m%d')[-1] )
+  day = c(20,19,18,17,16,15,21)[1 + day]
+  as.Date(c('', 10000*year + 100*month + day), '%Y%m%d')[-1]
 }
-	if(len(years) > 1 && len(months) > 1) {
-		out = c()
-		for(month in months)
-			out = c(out, helper(years,month))
-		as.Date(out)
-	} else
-		helper(years,months) 
-}	
+  if(len(years) > 1 && len(months) > 1) {
+    out = c()
+    for(month in months)
+      out = c(out, helper(years,month))
+    as.Date(out)
+  } else
+    helper(years,months) 
+} 
 
 # Special days
 # http://www.cboe.com/AboutCBOE/xcal2014.pdf
-# third.friday.month(2010:2013, 4)	
-# key.date = map.spx.expiration(data$prices) 	
+# third.friday.month(2010:2013, 4)  
+# key.date = map.spx.expiration(data$prices)  
 # VIX settles 30 days prior to SPY
-# key.date = map.spx.expiration(data$prices, offset=30) 	
+# key.date = map.spx.expiration(data$prices, offset=30)   
 # na.omit(key.date['2014'])
 #' @export
 map.spx.expiration <- function(data, backfill = T, offset = 0) {
-	dates = as.Date(index(data))
-	
-	# 3rd Friday of the month is last trading day for equity options
-	years = date.year(range(dates))
-	friday = third.friday.month(years[1]:(years[2]+1), 1:12)
-		friday.future = friday[friday > last(dates)]
-		friday = friday[friday <= last(dates)]
-	
-	key.date.index = match(friday, dates)
-	na.index = which(is.na(key.date.index))
-	
-	# backfill NA's
-	if(backfill && len(na.index)>0)
-		key.date.index[na.index] = match(friday[na.index]-1, dates)
+  dates = as.Date(index(data))
+  
+  # 3rd Friday of the month is last trading day for equity options
+  years = date.year(range(dates))
+  friday = third.friday.month(years[1]:(years[2]+1), 1:12)
+    friday.future = friday[friday > last(dates)]
+    friday = friday[friday <= last(dates)]
+  
+  key.date.index = match(friday, dates)
+  na.index = which(is.na(key.date.index))
+  
+  # backfill NA's
+  if(backfill && len(na.index)>0)
+    key.date.index[na.index] = match(friday[na.index]-1, dates)
 
-	if(offset != 0) {
-		friday = c(dates[key.date.index], friday.future)
-		offset.date = friday - offset
-		key.date.index = match(offset.date, dates)
-	}
-	
-	key.date.index = na.omit(key.date.index)
-	
-	key.date = NA * data[,1]
-		key.date[key.date.index,] = T
-	key.date
+  if(offset != 0) {
+    friday = c(dates[key.date.index], friday.future)
+    offset.date = friday - offset
+    key.date.index = match(offset.date, dates)
+  }
+  
+  key.date.index = na.omit(key.date.index)
+  
+  key.date = NA * data[,1]
+    key.date[key.date.index,] = T
+  key.date
 }
 
 
@@ -718,22 +806,22 @@ map.spx.expiration <- function(data, backfill = T, offset = 0) {
 ############################################################################### 
 load.packages <- function
 (
-	packages, 							# names of the packages separated by comma
-	repos = "http://cran.r-project.org",# default repository
-	dependencies = c("Depends", "Imports"),	# install dependencies
-	...									# other parameters to install.packages
+  packages,               # names of the packages separated by comma
+  repos = "http://cran.r-project.org",# default repository
+  dependencies = c("Depends", "Imports"), # install dependencies
+  ...                 # other parameters to install.packages
 )
 {
-	packages = spl(packages)
-	for( ipackage in packages ) {
-		if(!require(ipackage, quietly=TRUE, character.only = TRUE)) {
-			install.packages(ipackage, repos=repos, dependencies=dependencies, ...) 
-			
-			if(!require(ipackage, quietly=TRUE, character.only = TRUE)) {
-				stop("package", sQuote(ipackage), 'is needed.  Stopping')
-			}
-		}
-	}
+  packages = spl(packages)
+  for( ipackage in packages ) {
+    if(!require(ipackage, quietly=TRUE, character.only = TRUE)) {
+      install.packages(ipackage, repos=repos, dependencies=dependencies, ...) 
+      
+      if(!require(ipackage, quietly=TRUE, character.only = TRUE)) {
+        stop("package", sQuote(ipackage), 'is needed.  Stopping')
+      }
+    }
+  }
 }
 
 ###############################################################################
@@ -752,10 +840,10 @@ load.packages <- function
 ############################################################################### 
 tic <- function
 (
-	identifier	# integer value
+  identifier  # integer value
 )
 {
-	assign(paste('saved.time', identifier, sep=''), proc.time()[3], envir = .GlobalEnv)
+  assign(paste('saved.time', identifier, sep=''), proc.time()[3], envir = .GlobalEnv)
 }
 
 ###############################################################################
@@ -774,26 +862,26 @@ tic <- function
 ############################################################################### 
 toc <- function
 (
-	identifier	# integer value
+  identifier  # integer value
 )
 {
-	if( exists(paste('saved.time', identifier, sep=''), envir = .GlobalEnv) ) {
-	    prevTime = get(paste('saved.time', identifier, sep=''), envir = .GlobalEnv)
-    	diffTimeSecs = proc.time()[3] - prevTime
-    	print(paste('Elapsed time is', round(diffTimeSecs, 2), 'seconds\n'))
+  if( exists(paste('saved.time', identifier, sep=''), envir = .GlobalEnv) ) {
+      prevTime = get(paste('saved.time', identifier, sep=''), envir = .GlobalEnv)
+      diffTimeSecs = proc.time()[3] - prevTime
+      print(paste('Elapsed time is', round(diffTimeSecs, 2), 'seconds\n'))
     } else {
-    	print('Toc error\n')
+      print('Toc error\n')
     }
 }
 
 
 test.tic.toc <- function()
 {
-	tic(10)
-	for( i in 1 : 100 ) {
-		temp = runif(100)
-	}
-	toc(10)
+  tic(10)
+  for( i in 1 : 100 ) {
+    temp = runif(100)
+  }
+  toc(10)
 }
 
 ###############################################################################
@@ -816,34 +904,58 @@ test.tic.toc <- function()
 ###############################################################################
 mlag <- function
 (
-	m,			# matrix or vector
-	nlag = 1	# number of lags
+  m,      # matrix or vector
+  nlag = 1  # number of lags
 )
 { 
-	# vector
-	if( is.null(dim(m)) ) { 
-		n = len(m)
-		if(nlag > 0) {
-			m[(nlag+1):n] = m[1:(n-nlag)]
-			m[1:nlag] = NA
-		} else if(nlag < 0) {
-			m[1:(n+nlag)] = m[(1-nlag):n]
-			m[(n+nlag+1):n] = NA
-		} 	
-		
-	# matrix	
-	} else {
-		n = nrow(m)
-		if(nlag > 0) {
-			m[(nlag+1):n,] = m[1:(n-nlag),]
-			m[1:nlag,] = NA
-		} else if(nlag < 0) {
-			m[1:(n+nlag),] = m[(1-nlag):n,]
-			m[(n+nlag+1):n,] = NA
-		} 
-	}
-	return(m);
+  # vector
+  if( is.null(dim(m)) ) { 
+    n = len(m)
+    if(nlag > 0) {
+      m[(nlag+1):n] = m[1:(n-nlag)]
+      m[1:nlag] = NA
+    } else if(nlag < 0) {
+      m[1:(n+nlag)] = m[(1-nlag):n]
+      m[(n+nlag+1):n] = NA
+    }   
+    
+  # matrix  
+  } else {
+    n = nrow(m)
+    if(nlag > 0) {
+      m[(nlag+1):n,] = m[1:(n-nlag),]
+      m[1:nlag,] = NA
+    } else if(nlag < 0) {
+      m[1:(n+nlag),] = m[(1-nlag):n,]
+      m[(n+nlag+1):n,] = NA
+    } 
+  }
+  return(m);
 }
+
+
+###############################################################################
+#' Last elements of matrix or vector
+#'
+#' @param m vector / matrix
+#' @param n number of elements from the end, \strong{defaults to 1}
+#'
+#' @return last n elements
+#'
+#' @examples
+#' \dontrun{ 
+#' mlast(1:10)
+#' }
+#' @export 
+###############################################################################
+mlast = function(m, nlast=1) {
+	n = iif(is.null(dim(m)), len(m), nrow(m))
+    if(nlast >= n)
+		m
+    else
+		iif(is.null(dim(m)), m[(n-nlast+1):n], m[(n-nlast+1):n,,drop=F])
+}
+
 
 ###############################################################################
 #' Replicate and tile a given vector
@@ -865,12 +977,12 @@ mlag <- function
 ###############################################################################
 repmat <- function
 (
-	v,	# vector
-	n,	# number of copies along rows
-	m	# number of copies along columns
+  v,  # vector
+  n,  # number of copies along rows
+  m # number of copies along columns
 )
 {
-	kronecker( matrix(1, n, m), v )
+  kronecker( matrix(1, n, m), v )
 }
 
 ###############################################################################
@@ -890,12 +1002,12 @@ repmat <- function
 ###############################################################################
 rep.row <- function
 (
-	m, # vector (row)
-	nr # number of copies along rows
+  m, # vector (row)
+  nr # number of copies along rows
 )
 {
-	if(nr == 1) m
-	else matrix(m, nr=nr, nc=len(m), byrow=T)
+  if(nr == 1) m
+  else matrix(m, nr=nr, nc=len(m), byrow=T)
 }
 
 ###############################################################################
@@ -916,45 +1028,45 @@ rep.row <- function
 ###############################################################################
 rep.col <- function
 (
-	m,	# vector (column)
-	nc	# number of copies along columns
+  m,  # vector (column)
+  nc  # number of copies along columns
 )
 {
-	if(nc == 1) m
-	else {
-		if(is.xts(m))
-			make.xts(matrix(coredata(m), nr=len(m), nc=nc, byrow=F), index(m))
-		else
-			matrix(m, nr=len(m), nc=nc, byrow=F)
-	}  
+  if(nc == 1) m
+  else {
+    if(is.xts(m))
+      make.xts(matrix(coredata(m), nr=len(m), nc=nc, byrow=F), index(m))
+    else
+      matrix(m, nr=len(m), nc=nc, byrow=F)
+  }  
 }
 
 
 # move column name to first row
 #' @export 
 col.name2row = function(x, move.name=T) {
-	if(move.name && !is.null(colnames(x))) {
-		x = rbind(colnames(x), x)
-		colnames(x) = NULL
-		x
-	} else {
-		colnames(x) = x[1,]
-		x[-1,]
-	}
+  if(move.name && !is.null(colnames(x))) {
+    x = rbind(colnames(x), x)
+    colnames(x) = NULL
+    x
+  } else {
+    colnames(x) = x[1,]
+    x[-1,]
+  }
 }
 
 
 # move row name to first column
 #' @export 
 row.name2col = function(x, move.name=T) {
-	if(move.name && !is.null(rownames(x))) {
-		x = cbind(rownames(x), x)
-		rownames(x) = NULL
-		x
-	} else {
-		rownames(x) = x[,1]
-		x[,-1]
-	}
+  if(move.name && !is.null(rownames(x))) {
+    x = cbind(rownames(x), x)
+    rownames(x) = NULL
+    x
+  } else {
+    rownames(x) = x[,1]
+    x[,-1]
+  }
 }
 
 
@@ -976,22 +1088,22 @@ row.name2col = function(x, move.name=T) {
 #' lookup.index(data, which(data > 4))
 #' }
 #' @export 
-# play with following example: update 1 %% 4	
+# play with following example: update 1 %% 4  
 ###############################################################################
 lookup.index <- function
 (
-	data, 	# matrix
-	i, 		# index of observations
-	details = F	# flag to return additional details
+  data,   # matrix
+  i,    # index of observations
+  details = F # flag to return additional details
 ) 
 {
-	n = nrow(data)
-	irow = ((i - 1) %% n) + 1	
-	icol = ((i - 1) %/% n) +1 
-	if(details)
-		list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[max(0,irow-5):min(nrow(data),irow+5),icol])
-	else
-		list(irow=irow,icol=icol)
+  n = nrow(data)
+  irow = ((i - 1) %% n) + 1 
+  icol = ((i - 1) %/% n) +1 
+  if(details)
+    list(irow=irow,icol=icol,obs=data[irow,icol],obsr=data[max(0,irow-5):min(nrow(data),irow+5),icol])
+  else
+    list(irow=irow,icol=icol)
 }
 
 ###############################################################################
@@ -1002,7 +1114,7 @@ lookup.index <- function
 #' @return angle
 #' 
 #' @references 
-#' \url{http://r.789695.n4.nabble.com/slope-calculation-td858652.html	}
+#' \url{http://r.789695.n4.nabble.com/slope-calculation-td858652.html }
 #'
 #' @examples
 #' \dontrun{ 
@@ -1012,7 +1124,7 @@ lookup.index <- function
 ###############################################################################
 beta.degree <- function(beta) 
 { 
-	atan(beta)*360/(2*pi) 
+  atan(beta)*360/(2*pi) 
 }
 
 
@@ -1021,24 +1133,24 @@ beta.degree <- function(beta)
 ###############################################################################
 #' @export 
 to.nice = function(out,nround=2,sprefix='',eprefix='') {
-	if( !is.null(dim(out)) ) {		
-		temp = matrix('', nrow(out),ncol(out))
-		rownames(temp) = iif(is.xts(out), paste(index(out)),rownames(out))
-			colnames(temp) = colnames(out)
-			temp.n = apply(out,2,as.double)
-			index = is.na(temp.n)
-		
-		temp[] = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
-			temp[index] = coredata(out)[index]
-		temp
-	} else {
-		temp.n = as.double(out)
-		index = is.na(temp.n)
-	
-		temp = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
-			temp[index] = out[index]
-		temp		
-	}
+  if( !is.null(dim(out)) ) {    
+    temp = matrix('', nrow(out),ncol(out))
+    rownames(temp) = iif(is.xts(out), paste(index(out)),rownames(out))
+      colnames(temp) = colnames(out)
+      temp.n = apply(out,2,as.double)
+      index = is.na(temp.n)
+    
+    temp[] = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
+      temp[index] = coredata(out)[index]
+    temp
+  } else {
+    temp.n = as.double(out)
+    index = is.na(temp.n)
+  
+    temp = paste(sprefix,format(round( temp.n ,nround),big.mark=",", scientific=FALSE),eprefix ,sep='')
+      temp[index] = out[index]
+    temp    
+  }
 }
 
 #' @export 
@@ -1069,8 +1181,8 @@ Sys.setenv(TZ = 'GMT')
 #' # We want to set the timezone, so that following code produces expected results
 #' Sys.getenv('TZ')
 #' test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
-#'	as.numeric(test)
-#'	as.numeric(as.POSIXct(as.Date(test)))
+#'  as.numeric(test)
+#'  as.numeric(as.POSIXct(as.Date(test)))
 #' as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
 #' test == as.POSIXct(as.Date(test))
 #'
@@ -1078,8 +1190,8 @@ Sys.setenv(TZ = 'GMT')
 #' Sys.setenv(TZ = 'GMT')
 #' Sys.getenv('TZ')
 #' test = as.POSIXct('2012-10-31', format='%Y-%m-%d')
-#'	as.numeric(test)
-#'	as.numeric(as.POSIXct(as.Date(test)))
+#'  as.numeric(test)
+#'  as.numeric(as.POSIXct(as.Date(test)))
 #' as.numeric(as.POSIXct(as.Date(test))) - as.numeric(test)
 #' test == as.POSIXct(as.Date(test))
 #'
@@ -1105,29 +1217,29 @@ XTSFunctions <- function() {}
 ###############################################################################
 make.xts <- function
 (
-	x,			# data
-	order.by	# date
+  x,      # data
+  order.by  # date
 )
 {
-	#Sys.setenv(TZ = 'GMT')
-	tzone = Sys.getenv('TZ')
-	
+  #Sys.setenv(TZ = 'GMT')
+  tzone = Sys.getenv('TZ')
+  
     orderBy = class(order.by)
     index = as.numeric(as.POSIXct(order.by, tz = tzone))
     
     # need to handle case for one row; i.e. len(orderBy) == 1
     if( is.null(dim(x)) ) {
-    	if( len(order.by) == 1 )
-    		x = t(as.matrix(x))
-    	else
-	    	dim(x) = c(len(x), 1)
+      if( len(order.by) == 1 )
+        x = t(as.matrix(x))
+      else
+        dim(x) = c(len(x), 1)
     }
     x = as.matrix(x)
 
     x = structure(.Data = x, 
-    	index = structure(index, tzone = tzone, tclass = orderBy), 
-    	class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
-	return( x )
+      index = structure(index, tzone = tzone, tclass = orderBy), 
+      class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
+  return( x )
 }
 
 
@@ -1148,24 +1260,24 @@ as.xts.list <- function(data) { for(n in names(data)) colnames(data[[n]])=n; do.
 #' 
 #' @export 
 ###############################################################################
-xts2ts = function(x) {	
-	annual.factor = compute.annual.factor(x)
+xts2ts = function(x) {  
+  annual.factor = compute.annual.factor(x)
 
-	map = c(date.day, date.week, date.month, date.quarter)
-		names(map) = trim(spl('252, 52, 12, 4'))
-	date.fn = map[[paste(annual.factor)]]
+  map = c(date.day, date.week, date.month, date.quarter)
+    names(map) = trim(spl('252, 52, 12, 4'))
+  date.fn = map[[paste(annual.factor)]]
 
-	first.date = index(first(x))
-	last.date = index(last(x))
-	
-	start = date.year(first.date)
-	end = date.year(last.date)
-	if(	!is.null(date.fn) ) {
-		start = c(start, date.fn(first.date)) 
-		end = c(end, date.fn(last.date)) 
-	} 
-		
-	ts(coredata(x[,1]), start = start, end = end, deltat = 1 / annual.factor) 	
+  first.date = index(first(x))
+  last.date = index(last(x))
+  
+  start = date.year(first.date)
+  end = date.year(last.date)
+  if( !is.null(date.fn) ) {
+    start = c(start, date.fn(first.date)) 
+    end = c(end, date.fn(last.date)) 
+  } 
+    
+  ts(coredata(x[,1]), start = start, end = end, deltat = 1 / annual.factor)   
 }
 
 
@@ -1180,11 +1292,11 @@ xts2ts = function(x) {
 ###############################################################################
 flip.xts <- function(x)
 {
-	dates = index(x)
-	dates.index = nrow(x):1
-	out = make.xts(coredata(x)[dates.index,], dates[dates.index])
-		indexClass(out) = indexClass(x)
-	return( out )
+  dates = index(x)
+  dates.index = nrow(x):1
+  out = make.xts(coredata(x)[dates.index,], dates[dates.index])
+    indexClass(out) = indexClass(x)
+  return( out )
 }
 
 
@@ -1206,17 +1318,17 @@ flip.xts <- function(x)
 ###############################################################################
 write.xts <- function
 (
-	x,			# XTS object
-	filename,	# file name
-	append = FALSE,	
-	...
+  x,      # XTS object
+  filename, # file name
+  append = FALSE, 
+  ...
 )
 {
-	cat('Date', file = filename, append = append)
+  cat('Date', file = filename, append = append)
 
-	write.table(x, sep=',',  row.names = format(index(x), ...), 
-		col.names = NA, file = filename, append = T, quote = F)
-	#write.csv(x, row.names = format(index(x)), filename)	
+  write.table(x, sep=',',  row.names = format(index(x), ...), 
+    col.names = NA, file = filename, append = T, quote = F)
+  #write.csv(x, row.names = format(index(x)), filename) 
 }
 
 ###############################################################################
@@ -1238,151 +1350,151 @@ write.xts <- function
 ###############################################################################
 read.xts <- function
 (
-	x,	# file name or data matrix
-	date.fn = paste,
-	index.class = 'Date',
-	decreasing = FALSE,
-	sep = ',',
-	date.column = 1,
-	skip = -1L,
-	...
+  x,  # file name or data matrix
+  date.fn = paste,
+  index.class = 'Date',
+  decreasing = FALSE,
+  sep = ',',
+  date.column = 1,
+  skip = -1L,
+  ...
 )
 {
 if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
-	data = x
-	dates = as.matrix(data[,date.column,drop=F])
-	data  = data[,-date.column,drop=F]
+  data = x
+  dates = as.matrix(data[,date.column,drop=F])
+  data  = data[,-date.column,drop=F]
 } else {
-	filename = x
-	load.packages('data.table')
+  filename = x
+  load.packages('data.table')
 if(!is.data.table(x)) {
-	# set autostart
-	out = fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
-		setnames(out,gsub(' ', '_', trim(colnames(out)))) 
-} else out = x	
+  # set autostart
+  out = fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
+    setnames(out,gsub(' ', '_', trim(colnames(out)))) 
+} else out = x  
 
-	
-#		first.column.expr = parse(text = colnames(out)[date.column])
-		#rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-(1:date.column)],collapse=','),')'))
-	# remove non-numeric columns
-    rest.columns.expr = parse(text = paste('list(', paste(names(which(sapply(out,class)[-(1:date.column)] != 'character')),collapse=','),')'))		
-#	dates = out[,eval(first.column.expr)]
-#	data = out[, eval(rest.columns.expr)]
+  
+#   first.column.expr = parse(text = colnames(out)[date.column])
+    #rest.columns.expr = parse(text = paste('list(', paste(colnames(out)[-(1:date.column)],collapse=','),')'))
+  # remove non-numeric columns
+    rest.columns.expr = parse(text = paste('list(', paste(names(which(sapply(out,class)[-(1:date.column)] != 'character')),collapse=','),')'))    
+# dates = out[,eval(first.column.expr)]
+# data = out[, eval(rest.columns.expr)]
 
-	dates = as.matrix(out[,date.column,with=FALSE])		
-	index = which(sapply(out,class) != 'character')
-		index = index[ index > date.column ]	
-	data =  as.matrix(out[,index,with=FALSE]+0)	
-}		
-	dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
-		dates.index = iif(is.null(decreasing), 1:nrow(data), order(dates, decreasing = decreasing) )
-	out = make.xts(data[dates.index,,drop=F], dates[dates.index])
-		indexClass(out) = index.class
-	return( out )
+  dates = as.matrix(out[,date.column,with=FALSE])   
+  index = which(sapply(out,class) != 'character')
+    index = index[ index > date.column ]  
+  data =  as.matrix(out[,index,with=FALSE]+0) 
+}   
+  dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
+    dates.index = iif(is.null(decreasing), 1:nrow(data), order(dates, decreasing = decreasing) )
+  out = make.xts(data[dates.index,,drop=F], dates[dates.index])
+    indexClass(out) = index.class
+  return( out )
 }  
 
 
 # A few other variations to read data
 read.xts.old <- function
 (
-	filename,	# file name
-	date.fn = paste,
-	index.class = 'Date',
-	decreasing = FALSE,
-	...
+  filename, # file name
+  date.fn = paste,
+  index.class = 'Date',
+  decreasing = FALSE,
+  ...
 )
 {
-	out = read.csv(filename, stringsAsFactors=F)
-	#return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
-	
-	dates = as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...)
-		dates.index = order(dates, decreasing = decreasing)
-	out = make.xts(out[dates.index,-1,drop=F], dates[dates.index])
-		indexClass(out) = index.class
-	return( out )
+  out = read.csv(filename, stringsAsFactors=F)
+  #return( make.xts(out[,-1,drop=F], as.Date(out[,1], ...)) )
+  
+  dates = as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...)
+    dates.index = order(dates, decreasing = decreasing)
+  out = make.xts(out[dates.index,-1,drop=F], dates[dates.index])
+    indexClass(out) = index.class
+  return( out )
 
-# Example code from	getSymbols.yahoo (quantmod): as.POSIXct is used to avoid Dates conversion problems
+# Example code from getSymbols.yahoo (quantmod): as.POSIXct is used to avoid Dates conversion problems
 # fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())
-# indexClass(fr) = "Date"	
+# indexClass(fr) = "Date" 
 }
 
 read.xts.yahoo.old <- function
 (
-	filename,	# file name
-	date.fn = paste,
-	index.class = 'Date',
-	decreasing = FALSE,
-	...
+  filename, # file name
+  date.fn = paste,
+  index.class = 'Date',
+  decreasing = FALSE,
+  ...
 )
 {
-	temp = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)	
-	
-	dates = as.POSIXct(match.fun(date.fn)(temp[[1]]), tz = Sys.getenv('TZ'), ...)	
-		dates.index = order(dates, decreasing = decreasing)
-		
-	out = matrix(double(1),len(dates), 6)
-   		colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
-	out[,1] = temp[[2]] 
-   	out[,2] = temp[[3]]
-   	out[,3] = temp[[4]]
-   	out[,4] = temp[[5]] 
-   	out[,5] = temp[[6]]
-   	out[,6] = temp[[7]]
-		
-   	out = make.xts(out[dates.index,],  dates[dates.index])
-		indexClass(out) = index.class
-	return( out )
+  temp = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)  
+  
+  dates = as.POSIXct(match.fun(date.fn)(temp[[1]]), tz = Sys.getenv('TZ'), ...) 
+    dates.index = order(dates, decreasing = decreasing)
+    
+  out = matrix(double(1),len(dates), 6)
+      colnames(out) = spl('Open,High,Low,Close,Volume,Adjusted')
+  out[,1] = temp[[2]] 
+    out[,2] = temp[[3]]
+    out[,3] = temp[[4]]
+    out[,4] = temp[[5]] 
+    out[,5] = temp[[6]]
+    out[,6] = temp[[7]]
+    
+    out = make.xts(out[dates.index,],  dates[dates.index])
+    indexClass(out) = index.class
+  return( out )
 }
 
 read.xts.test <- function() {
-	load.packages('rbenchmark')
+  load.packages('rbenchmark')
 
-	filename = 'c:/stocks/SPY.csv'
+  filename = 'c:/stocks/SPY.csv'
 
-	test1 <- function() {
-		out = read.csv(filename, stringsAsFactors=F)
-	}
-	test2 <- function() {
-		out1 = fread(filename, stringsAsFactors=F)
-	}
-	test3 <- function() {
-		out2 = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)
-	}
-   		
-	library(rbenchmark)
-	 benchmark(
-	     test1(), 
-	     test2(),
-	     test3(),
-	     columns = c("test", "replications", "elapsed", "relative"),
-	     order = "relative",
-	     replications = 20
-	 )
+  test1 <- function() {
+    out = read.csv(filename, stringsAsFactors=F)
+  }
+  test2 <- function() {
+    out1 = fread(filename, stringsAsFactors=F)
+  }
+  test3 <- function() {
+    out2 = scan(filename, what=list('',double(0), double(0),double(0),double(0),double(0),double(0)), skip=1, sep=',', quiet =T)
+  }
+      
+  library(rbenchmark)
+   benchmark(
+       test1(), 
+       test2(),
+       test3(),
+       columns = c("test", "replications", "elapsed", "relative"),
+       order = "relative",
+       replications = 20
+   )
 
 
-	test1 <- function() {
-		out = read.xts(filename, format = '%Y-%m-%d')
-	}
-	test2 <- function() {
-		out1 = read.xts.old(filename, format = '%Y-%m-%d')
-	}
-	test3 <- function() {
-		out2 = read.xts.yahoo.old(filename, format = '%Y-%m-%d')
-	}
-		
-	library(rbenchmark)
-	 benchmark(
-	     test1(), 
-	     test2(),
-	     test3(),
-	     columns = c("test", "replications", "elapsed", "relative"),
-	     order = "relative",
-	     replications = 20
-	 )
-	 
+  test1 <- function() {
+    out = read.xts(filename, format = '%Y-%m-%d')
+  }
+  test2 <- function() {
+    out1 = read.xts.old(filename, format = '%Y-%m-%d')
+  }
+  test3 <- function() {
+    out2 = read.xts.yahoo.old(filename, format = '%Y-%m-%d')
+  }
+    
+  library(rbenchmark)
+   benchmark(
+       test1(), 
+       test2(),
+       test3(),
+       columns = c("test", "replications", "elapsed", "relative"),
+       order = "relative",
+       replications = 20
+   )
+   
 }
    
-	
+  
 ###############################################################################
 #' Fast alternative to index() function for \code{\link{xts}} object
 #'
@@ -1401,39 +1513,39 @@ read.xts.test <- function() {
 # maybe rename to bt.index.xts
 index.xts <- function
 (
-	x			# XTS object
+  x     # XTS object
 )
 {
-	temp = attr(x, 'index')
-	class(temp) = c('POSIXct', 'POSIXt')
-	
+  temp = attr(x, 'index')
+  class(temp) = c('POSIXct', 'POSIXt')
+  
     type = attr(x, '.indexCLASS')[1]
     if( type == 'Date' || type == 'yearmon' || type == 'yearqtr')
-		temp = as.Date(temp)
-	return(temp)
+    temp = as.Date(temp)
+  return(temp)
 }
 
 # other variants that are not currently used
 # this function is used in plota for X axis
 index4xts <- function
 (
-	x			# XTS object
+  x     # XTS object
 )
 {
-	temp = attr(x, 'index')
-	class(temp)='POSIXct' 
-	
-	return(temp)
+  temp = attr(x, 'index')
+  class(temp)='POSIXct' 
+  
+  return(temp)
 }
 
 index2date.time <- function(temp) {
-	class(temp)='POSIXct' 
-	
-	if( attr(x, '.indexCLASS')[1] == 'Date') {	
-		as.Date(temp)
-	} else {
-		as.POSIXct(temp, tz = Sys.getenv('TZ'))
-	}
+  class(temp)='POSIXct' 
+  
+  if( attr(x, '.indexCLASS')[1] == 'Date') {  
+    as.Date(temp)
+  } else {
+    as.POSIXct(temp, tz = Sys.getenv('TZ'))
+  }
 }
 
 ###############################################################################
@@ -1464,13 +1576,13 @@ index2date.time <- function(temp) {
 #' @export 
 ###############################################################################
 dates2index <- function( x, dates = 1:nrow(x) ) {
-	dates.index = dates
-	if(!is.numeric(dates)) {
-		temp = x[,1]
-		temp[] = 1:nrow(temp)
-		dates.index = as.numeric(temp[dates])
-	}
-	return(dates.index)
+  dates.index = dates
+  if(!is.numeric(dates)) {
+    temp = x[,1]
+    temp[] = 1:nrow(temp)
+    dates.index = as.numeric(temp[dates])
+  }
+  return(dates.index)
 } 
 
 
@@ -1487,21 +1599,21 @@ dates2index <- function( x, dates = 1:nrow(x) ) {
 ###############################################################################
 find.names <- function(names, data, return.index = T) 
 { 
-	names = spl(names)
-	all.names = colnames(data)
-	out = list()
-	for(n in names) {
-		loc = grep(n, all.names, ignore.case = TRUE)
-	
-		# special logic for Close and Adjusted	
-		if(len(loc) == 0 && ncol(data) == 1 && 
-			(grepl(n,'close',ignore.case = TRUE) || grepl(n,'adjusted',ignore.case = TRUE))
-			) loc = 1
-		
-		if(len(loc) > 0) out[[n]] = iif(return.index, loc, all.names[loc])
-	}
-		
-	iif(len(names) == 1 && len(out) == 1, out[[1]][1], out)
+  names = spl(names)
+  all.names = colnames(data)
+  out = list()
+  for(n in names) {
+    loc = grep(n, all.names, ignore.case = TRUE)
+  
+    # special logic for Close and Adjusted  
+    if(len(loc) == 0 && ncol(data) == 1 && 
+      (grepl(n,'close',ignore.case = TRUE) || grepl(n,'adjusted',ignore.case = TRUE))
+      ) loc = 1
+    
+    if(len(loc) > 0) out[[n]] = iif(return.index, loc, all.names[loc])
+  }
+    
+  iif(len(names) == 1 && len(out) == 1, out[[1]][1], out)
 }
 
 
@@ -1516,28 +1628,28 @@ find.names <- function(names, data, return.index = T)
 #' @export 
 ############################################################################### 
 make.stock.xts <- function(out, column=1) {
-	# try to be smart about mapping columns in out
-	names = spl('Open,High,Low,Close,Volume,Adjusted')
-	names.index = find.names(names, out)
-	
-	temp= list()
-	for(n in names)
-		if( !is.null(names.index[[n]]) )
-			temp[[n]] = out[,names.index[[n]][1]]
-	
-	if(is.null(temp$Close) && is.null(temp$Adjusted))
-		temp$Close = temp$Adjusted = out[,column]
-	if(is.null(temp$Adjusted)) temp$Adjusted = temp$Close
-	if(is.null(temp$Close)) temp$Close = temp$Adjusted
-	
-	if(is.null(temp$Open)) temp$Open = temp$Close
-	if(is.null(temp$High)) temp$High = temp$Close
-	if(is.null(temp$Low)) temp$Low = temp$Close
-	if(is.null(temp$Volume)) temp$Volume = 0
-	
-	out = cbind(temp$Open,temp$High,temp$Low,temp$Close,temp$Volume,temp$Adjusted)
-		colnames(out) = names
-	out
+  # try to be smart about mapping columns in out
+  names = spl('Open,High,Low,Close,Volume,Adjusted')
+  names.index = find.names(names, out)
+  
+  temp= list()
+  for(n in names)
+    if( !is.null(names.index[[n]]) )
+      temp[[n]] = out[,names.index[[n]][1]]
+  
+  if(is.null(temp$Close) && is.null(temp$Adjusted))
+    temp$Close = temp$Adjusted = out[,column]
+  if(is.null(temp$Adjusted)) temp$Adjusted = temp$Close
+  if(is.null(temp$Close)) temp$Close = temp$Adjusted
+  
+  if(is.null(temp$Open)) temp$Open = temp$Close
+  if(is.null(temp$High)) temp$High = temp$Close
+  if(is.null(temp$Low)) temp$Low = temp$Close
+  if(is.null(temp$Volume)) temp$Volume = 0
+  
+  out = cbind(temp$Open,temp$High,temp$Low,temp$Close,temp$Volume,temp$Adjusted)
+    colnames(out) = names
+  out
 }
 
 
@@ -1554,24 +1666,24 @@ make.stock.xts <- function(out, column=1) {
 #' }
 #' @export 
 ############################################################################### 
-# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))	
+# scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))  
 scale.one <- function
 (
-	x, 
-	overlay = F, 
-	main.index = which(!is.na(x[1,]))[1] 
+  x, 
+  overlay = F, 
+  main.index = which(!is.na(x[1,]))[1] 
 ) 
 {
-	index = 1:nrow(x)
-	if( overlay )
-		x / rep.row(apply(x, 2, 
-				function(v) {
-					i = index[!is.na(v)][1]
-					v[i] / as.double(x[i,main.index])
-				}
-		), nrow(x))
-	else
-		x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
+  index = 1:nrow(x)
+  if( overlay )
+    x / rep.row(apply(x, 2, 
+        function(v) {
+          i = index[!is.na(v)][1]
+          v[i] / as.double(x[i,main.index])
+        }
+    ), nrow(x))
+  else
+    x / rep.row(apply(x, 2, function(v) v[index[!is.na(v)][1]]), nrow(x))
 }
 
 ###############################################################################
@@ -1590,22 +1702,22 @@ scale.one <- function
 ###############################################################################
 get.extension <- function(x) 
 { 
-	trim( tail(spl(x,'\\.'),1) ) 
-}	
+  trim( tail(spl(x,'\\.'),1) ) 
+} 
 
 #' @export 
 #' @rdname FilenameFunctions
 get.full.filename <- function(x) 
 { 
-	trim( tail(spl(gsub('\\\\','/',x),'/'),1) ) 
+  trim( tail(spl(gsub('\\\\','/',x),'/'),1) ) 
 }
 
 #' @export 
 #' @rdname FilenameFunctions
 get.filename <- function(x) 
 { 
-	temp = spl(get.full.filename(x),'\\.')
-	join(temp[-len(temp)])
+  temp = spl(get.full.filename(x),'\\.')
+  join(temp[-len(temp)])
 }
 
 
@@ -1634,34 +1746,34 @@ get.filename <- function(x)
 ######################################################################x#########
 getSymbols.sit <- function
 (
-	Symbols, 
-	env = .GlobalEnv, 
-	auto.assign = TRUE, 
-	stock.folder = 'c:/temp/Seasonality/stocks',
-	stock.date.format = '%Y-%m-%d',
-	...
+  Symbols, 
+  env = .GlobalEnv, 
+  auto.assign = TRUE, 
+  stock.folder = 'c:/temp/Seasonality/stocks',
+  stock.date.format = '%Y-%m-%d',
+  ...
 ) 
 {
-	require(quantmod)	
-	
-	# http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod
-	for(i in 1:len(Symbols)) {
-		s = Symbols[i]
-		
-		temp = list()
-		temp[[ s ]] = list(src='csv', format=stock.date.format, dir=stock.folder)
-		setSymbolLookup(temp)
-		
-		temp = quantmod::getSymbols(s, env = env, auto.assign = auto.assign)		
-		if (!auto.assign) {
-			cat(s, format(range(index(temp)), '%d-%b-%Y'), '\n', sep='\t')	
-			return(temp)
-		}
-		if(!is.null(env[[ s ]]))
-			cat(i, 'out of', len(Symbols), 'Reading', s, format(range(index(env[[ s ]])), '%d-%b-%Y'), '\n', sep='\t')	
-		else
-			cat(i, 'out of', len(Symbols), 'Missing', s, '\n', sep='\t')	
-	}
+  require(quantmod) 
+  
+  # http://stackoverflow.com/questions/8970823/how-to-load-csv-data-file-into-r-for-use-with-quantmod
+  for(i in 1:len(Symbols)) {
+    s = Symbols[i]
+    
+    temp = list()
+    temp[[ s ]] = list(src='csv', format=stock.date.format, dir=stock.folder)
+    setSymbolLookup(temp)
+    
+    temp = quantmod::getSymbols(s, env = env, auto.assign = auto.assign)    
+    if (!auto.assign) {
+      cat(s, format(range(index(temp)), '%d-%b-%Y'), '\n', sep='\t')  
+      return(temp)
+    }
+    if(!is.null(env[[ s ]]))
+      cat(i, 'out of', len(Symbols), 'Reading', s, format(range(index(env[[ s ]])), '%d-%b-%Y'), '\n', sep='\t')  
+    else
+      cat(i, 'out of', len(Symbols), 'Missing', s, '\n', sep='\t')  
+  }
 }
 
 
@@ -1701,114 +1813,114 @@ getSymbols.sit <- function
 ################################################################################
 getSymbols.extra <- function 
 (
-	Symbols = NULL, 
-	env = parent.frame(), 
-	getSymbols.fn = getSymbols,
-	raw.data = new.env(),		# extra pre-loaded raw data
-	set.symbolnames = F,
-	auto.assign = T,  
-	...
+  Symbols = NULL, 
+  env = parent.frame(), 
+  getSymbols.fn = getSymbols,
+  raw.data = new.env(),   # extra pre-loaded raw data
+  set.symbolnames = F,
+  auto.assign = T,  
+  ...
 ) 
 {
-	if(is.character(Symbols)) Symbols = spl(Symbols)
-	if(len(Symbols) < 1) return(Symbols)
-	
-	Symbols = spl(toupper(gsub('\n',',',join(Symbols, ','))))
-		
-	# split
-	map = list()
-	for(s in Symbols) {
-		if(nchar(trim(s)) == 0) next
-		if(substring(trim(s)[1],1,1) == '#') next
-	
-		temp = spl(spl(s,"#")[1], "=")
-		if ( len(temp) > 1 ) { 
-			name = temp[1]
-			values = trim(spl(temp[2], '\\+'))
-			
-			value1 = values[1]
-				value1.name = grepl('\\[', value1)			
-			value1 = gsub('\\]','',gsub('\\[','',value1))
-			value1 = trim(spl(value1,';'))
-			
-			values = values[-1]
-			
-			for(n in trim(spl(name,';')))
-				map[[ n  ]] = c(value1[1], values)
-				
-			if( len(value1) > 1 || value1.name)
-				for(n in value1)
-					map[[ n  ]] = c(n, values)			
-		} else {
-			temp = spl(s, '\\+')
-			name = temp[1]
-			values = trim(temp[-1])
-			for(n in trim(spl(name,';')))
-				map[[ n  ]] = c(n, values)
-		}
-		
-		#name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
-		#values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
-		#map[[trim(name)]] = trim(values)		
-	}
-	Symbols = unique(unlist(map))
-	
-	# find overlap with raw.data
-	Symbols = setdiff(Symbols, ls(raw.data))
+  if(is.character(Symbols)) Symbols = spl(Symbols)
+  if(len(Symbols) < 1) return(Symbols)
+  
+  Symbols = spl(toupper(gsub('\n',',',join(Symbols, ','))))
+    
+  # split
+  map = list()
+  for(s in Symbols) {
+    if(nchar(trim(s)) == 0) next
+    if(substring(trim(s)[1],1,1) == '#') next
+  
+    temp = spl(spl(s,"#")[1], "=")
+    if ( len(temp) > 1 ) { 
+      name = temp[1]
+      values = trim(spl(temp[2], '\\+'))
+      
+      value1 = values[1]
+        value1.name = grepl('\\[', value1)      
+      value1 = gsub('\\]','',gsub('\\[','',value1))
+      value1 = trim(spl(value1,';'))
+      
+      values = values[-1]
+      
+      for(n in trim(spl(name,';')))
+        map[[ n  ]] = c(value1[1], values)
+        
+      if( len(value1) > 1 || value1.name)
+        for(n in value1)
+          map[[ n  ]] = c(n, values)      
+    } else {
+      temp = spl(temp, '\\+')
+      name = temp[1]
+      values = trim(temp[-1])
+      for(n in trim(spl(name,';')))
+        map[[ n  ]] = c(n, values)
+    }
+    
+    #name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
+    #values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
+    #map[[trim(name)]] = trim(values)   
+  }
+  Symbols = unique(unlist(map))
+  
+  # find overlap with raw.data
+  Symbols = setdiff(Symbols, ls(raw.data))
 
-	# download
-	data <- new.env()
-	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
-	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
-	
-	# reconstruct, please note getSymbols replaces ^ symbols
-	if (set.symbolnames) env$symbolnames = names(map)
-	for(s in names(map)) {
-		env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
-		if( len(map[[ s ]]) > 1)
-			for(i in 2:len(map[[ s ]]))
-				if(is.null(data[[ gsub('\\^', '', map[[ s ]][i]) ]]))
-					cat('Not Downloaded, main =', s, 'missing' , gsub('\\^', '', map[[ s ]][i]), '\n', sep='\t')		
-				else
-					env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T)
-		if (!auto.assign)
-       		return(env[[ s ]])			
-	}	
+  # download
+  data <- new.env()
+  if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
+  for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
+  
+  # reconstruct, please note getSymbols replaces ^ symbols
+  if (set.symbolnames) env$symbolnames = names(map)
+  for(s in names(map)) {
+    env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
+    if( len(map[[ s ]]) > 1)
+      for(i in 2:len(map[[ s ]]))
+        if(is.null(data[[ gsub('\\^', '', map[[ s ]][i]) ]]))
+          cat('Not Downloaded, main =', s, 'missing' , gsub('\\^', '', map[[ s ]][i]), '\n', sep='\t')    
+        else
+          env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T)
+    if (!auto.assign)
+          return(env[[ s ]])      
+  } 
 }
 
 
 
 getSymbols.extra.test <- function() 
 {
-	# Syntax to specify tickers:
-	# * Basic : RWX
-	# * Rename: REIT=RWX
-	# * Extend: RWX+VNQ
-	# * Mix above: REIT.LONG=RWX+VNQ+VGSIX	
-	tickers = spl('REIT=RWX, RWX+VNQ, REIT.LONG=RWX+VNQ+VGSIX')
-	data <- new.env()
-		getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
-	bt.start.dates(data)
-	
-	data$symbolnames = spl('REIT.LONG,RWX,REIT')
-		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-	bt.prep(data, align='keep.all', fill.gaps = T) 	
+  # Syntax to specify tickers:
+  # * Basic : RWX
+  # * Rename: REIT=RWX
+  # * Extend: RWX+VNQ
+  # * Mix above: REIT.LONG=RWX+VNQ+VGSIX  
+  tickers = spl('REIT=RWX, RWX+VNQ, REIT.LONG=RWX+VNQ+VGSIX')
+  data <- new.env()
+    getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+  bt.start.dates(data)
+  
+  data$symbolnames = spl('REIT.LONG,RWX,REIT')
+    for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+  bt.prep(data, align='keep.all', fill.gaps = T)  
    
-	plota.matplot(data$prices)
-	
-	# Use extrenal data
-	raw.data <- new.env()
-		raw.data$GOLD = bundes.bank.data.gold()
-	
-	tickers = spl('GLD, GLD.LONG=GLD+GOLD')
-	data <- new.env()
-		getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, raw.data = raw.data, auto.assign = T)
-	bt.start.dates(data)
-	data$symbolnames = spl('GLD.LONG,GLD')
-   		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
-	bt.prep(data, align='keep.all', fill.gaps = T) 	
+  plota.matplot(data$prices)
+  
+  # Use extrenal data
+  raw.data <- new.env()
+    raw.data$GOLD = bundes.bank.data.gold()
+  
+  tickers = spl('GLD, GLD.LONG=GLD+GOLD')
+  data <- new.env()
+    getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, raw.data = raw.data, auto.assign = T)
+  bt.start.dates(data)
+  data$symbolnames = spl('GLD.LONG,GLD')
+      for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+  bt.prep(data, align='keep.all', fill.gaps = T)  
    
-   plota.matplot(data$prices)	
+   plota.matplot(data$prices) 
 } 
 
 
@@ -1818,18 +1930,18 @@ getSymbols.extra.test <- function()
 ################################################################################
 getSymbols.intraday <- function 
 (
-	Symbols = NULL, 
-	env = parent.frame(), 
-	getSymbols.fn = getSymbols,
-	auto.assign = T,  
-	...
+  Symbols = NULL, 
+  env = parent.frame(), 
+  getSymbols.fn = getSymbols,
+  auto.assign = T,  
+  ...
 ) 
 {
-	if(len(Symbols) > 0) {
-		match.fun(getSymbols.fn)(Symbols, env = env, auto.assign = auto.assign, ...)
-		data.today = getQuote.yahoo.today(ls(env))
-		bt.append.today(env, data.today)
-	}
+  if(len(Symbols) > 0) {
+    match.fun(getSymbols.fn)(Symbols, env = env, auto.assign = auto.assign, ...)
+    data.today = getQuote.yahoo.today(ls(env))
+    bt.append.today(env, data.today)
+  }
 }
 
 ###############################################################################
@@ -1840,18 +1952,18 @@ getSymbols.intraday <- function
 #' @export 
 ###############################################################################
 log.fn <- function(p.start=0, p.end=1) {
-	p.start = p.start
-  	p.end = p.end
-	function(..., percent=NULL) { 
-		cat(..., iif(is.null(percent),'',paste(', percent = ', round(100 * (p.start + percent * (p.end - p.start)), 1), '%', sep='')), '\n') 
-	}
+  p.start = p.start
+    p.end = p.end
+  function(..., percent=NULL) { 
+    cat(..., iif(is.null(percent),'',paste(', percent = ', round(100 * (p.start + percent * (p.end - p.start)), 1), '%', sep='')), '\n') 
+  }
 }
 
 ###############################################################################
 #' @export 
 ###############################################################################
 log.fn.msg <- function(msg, log = log.fn()) {
-	log = log
+  log = log
     msg = msg
     function(..., percent=NULL) { log(paste(msg, ...), percent=percent) }
 }  
@@ -1903,5 +2015,5 @@ ls.v <- function(env=sys.frame(-1))unlist(lapply(ls(env=env),function(x)if(!is.f
 # http://r.789695.n4.nabble.com/Numeric-Characters-in-String-td3817873.html
 #' @export 
 parse.number <- function(x) {
-	as.numeric(gsub('[^0-9\\+-\\.]', '', x) )	
+  as.numeric(gsub('[^0-9\\+-\\.]', '', x) ) 
 }

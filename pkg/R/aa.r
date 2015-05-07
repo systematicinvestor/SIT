@@ -184,6 +184,10 @@ optimize.portfolio <- function
 	full.solution = F
 )
 {
+	# load / check required packages
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
+	
+	
 	n = nrow(constraints$A)	
 	nt = nrow(ia$hist.returns)
 	
@@ -583,6 +587,14 @@ portfolio.var <- function
 #  [ SUM <over i> [ SUM <over j> r.ij ] * x.i ] < u.j, for each j = 1,...,T 
 #  u.j-1 < u.j, for each j = 1,...,T - portfolio high water mark
 #  w.j >= 0, for each j = 1,...,T 
+#
+# Please note that MaxDD and AvgDD are special cases of CDaR i.e.
+# MaxDD is CDaR with alpha = 1
+# AvgDD is CDaR with alpha = 0
+# DRAWDOWN MEASURE IN PORTFOLIO OPTIMIZATION, ALEXEI CHEKHLOV, STANISLAV URYASEV, MICHAEL ZABARANKIN 
+# Proposition 3.4, page 25(13)
+# http://www.math.columbia.edu/~chekhlov/IJTheoreticalAppliedFinance.8.1.2005.pdf
+#
 #' @export 
 ###############################################################################
 add.constraint.cdar <- function

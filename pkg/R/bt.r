@@ -1000,15 +1000,110 @@ bt.trade.summary.helper <- function(trades)
 }		
 
 ###############################################################################
-# Apply given function to bt enviroment
-# for example, to compute 10 month moving average each quater 
-#bt.apply.matrix(prices, function(x) mean(last(x,10)), periodicity='months', apply.periodicity='quarters') 
+# Change data periodicity in the given bt enviroment
 #
-# Make sure not to use a rolling window functions if apply.periodicity is given
+# example of mapping to first day of the month
+# date.map.fn = function(x) as.Date(format(x, '%Y-%m-1'),'%Y-%m-%d')
 #
 #' @export 
 ###############################################################################
+bt.change.periodicity <- function
+(
+	b,			# enviroment with symbols time series
+	
+	# convert data to given periodicity
+	periodicity = 'months',
+	period.ends = NULL,
+	date.map.fn = NULL 
+)
+{
+	require(xts)
+	b1 = env()
+	for(n in ls(b))
+		if( is.xts( b[[n]] ) ) {
+			if(!is.null(periodicity))
+				period.ends = endpoints(b[[n]], periodicity)
+				
+			temp = b[[n]][period.ends,]				
+				
+			if(!is.null(date.map.fn))
+				index(temp) = date.map.fn(index(temp))
+				
+			colnames(temp) = colnames(b[[n]])
+			b1[[n]] = temp
+		} else			
+			b1[[n]] = b[[n]]		
+		
+		if(!is.null(b$dates))
+			b1$dates = index(b1$prices)		
+	b1
+}
+
+###############################################################################
+# Apply given function to bt enviroment
+# for example, to compute 10 month moving average each quater 
+# bt.apply.matrix(prices, function(x) mean(last(x,10)), periodicity='months', apply.periodicity='quarters') 
+#
+# Make sure not to use a rolling window functions if apply.periodicity is given
+#
+###############################################################################
+#' @export 
 bt.apply <- function
+(
+	b,			# enviroment with symbols time series
+	xfun=Cl,	# user specified function
+	...			# other parameters
+)
+{
+	out = b$weight
+	out[] = NA
+	
+	symbolnames = b$symbolnames
+	nsymbols = length(symbolnames) 
+	xfun = match.fun(xfun)
+	
+	for( i in 1:nsymbols ) {	
+		msg = try( xfun( coredata(b[[ symbolnames[i] ]]),... ) , silent=TRUE)
+		if (class(msg)[1] == 'try-error')
+			warning(i, msg, '\n')					
+		else
+			out[,i] = msg
+	}
+	return(out)
+}
+
+#' @export 
+bt.apply.matrix <- function
+(
+	b,			# matrix
+	xfun=Cl,	# user specified function
+	...			# other parameters
+)
+{
+	out = b
+	out[] = NA
+	nsymbols = ncol(b)
+	xfun = match.fun(xfun)
+	
+	for( i in 1:nsymbols ) {	
+		msg = try( xfun( coredata(b[,i]),... ) , silent=TRUE)
+		if (class(msg)[1] == 'try-error')
+			warning(i, msg, '\n')					
+		else
+			out[,i] = msg
+			
+	}
+	return(out)
+}
+
+
+
+
+
+# following function can handle different periodicity and apply.periodicity
+# make sure not to use a rolling window functions if apply.periodicity is given!!!
+#' @export 
+bt.apply.ex <- function
 (
 	b,			# enviroment with symbols time series
 	xfun=Cl,	# user specified function
@@ -1025,7 +1120,7 @@ bt.apply <- function
 	fill.gaps = F	# fill gaps introduced by having different periodicity
 )
 {
-	temp = bt.apply.setup(b$weight, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	temp = bt.apply.setup.helper(b$weight, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
 	period.ends = temp$period.ends
 	apply.period.ends = temp$apply.period.ends
 	map = temp$map
@@ -1080,15 +1175,12 @@ if(is.null(apply.period.ends)) {
 			}
 		}
 }		
-	if(fill.gaps)
-		bt.apply.matrix(out, ifna.prev)
-	else
-		out
+	if(fill.gaps) bt.apply.matrix(out, ifna.prev) else out
 }
 
-
+# make sure not to use a rolling window functions if apply.periodicity is given!!!
 #' @export 
-bt.apply.matrix <- function
+bt.apply.matrix.ex <- function
 (
 	b,			# matrix
 	xfun=Cl,	# user specified function
@@ -1105,7 +1197,7 @@ bt.apply.matrix <- function
 	fill.gaps = F	# fill gaps introduced by having different periodicity
 )
 {
-	temp = bt.apply.setup(b, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	temp = bt.apply.setup.helper(b, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
 	period.ends = temp$period.ends
 	apply.period.ends = temp$apply.period.ends
 	map = temp$map
@@ -1156,14 +1248,12 @@ if(is.null(apply.period.ends)) {
 			}
 		}
 }
-	if(fill.gaps)
-		bt.apply.matrix(out, ifna.prev)
-	else
-		out
+	if(fill.gaps) bt.apply.matrix(out, ifna.prev) else out
 }
 
 
-bt.apply.setup <- function(m, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends) {
+
+bt.apply.setup.helper <- function(m, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends) {
 	if(!is.null(periodicity) && is.null(period.ends))
 		period.ends = endpoints(m, periodicity)
 	if(!is.null(apply.periodicity) && is.null(apply.period.ends))
@@ -1184,6 +1274,247 @@ bt.apply.setup <- function(m, xfun, periodicity, period.ends, apply.periodicity,
 	
 	list(period.ends = period.ends, apply.period.ends = apply.period.ends, map = map)
 }
+
+
+
+
+# following function can handle multiple return arrays. i.e. ATR
+# make sure not to use a rolling window functions if apply.periodicity is given!!!
+#' @export 
+bt.apply.ex2 <- function
+(
+	b,			# enviroment with symbols time series
+	xfun=Cl,	# user specified function
+	...,		# other parameters
+	
+	# convert data to given periodicity before applying xfun
+	periodicity = NULL,
+	period.ends = NULL,
+	
+	# apply xfun only on selected periodicity
+	apply.periodicity = NULL,
+	apply.period.ends = NULL,
+	
+	fill.gaps = F	# fill gaps introduced by having different periodicity
+)
+{
+	temp = bt.apply.setup.helper(b$weight, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	period.ends = temp$period.ends
+	apply.period.ends = temp$apply.period.ends
+	map = temp$map
+
+	temp = b$weight
+	temp[] = NA
+	out = env(out = temp, n=1, name='out')
+	index = 1:nrow(temp)
+	
+	symbolnames = b$symbolnames
+	nsymbols = length(symbolnames) 
+	xfun = match.fun(xfun)
+	
+	if(is.null(apply.period.ends)) {	
+		for( i in 1:nsymbols )
+			if(is.null(period.ends)) 
+				set.result.helper(b[[ symbolnames[i] ]], index, xfun, out, i, ...)
+			else
+				set.result.helper(b[[ symbolnames[i] ]][period.ends,], period.ends, xfun, out, i, ...)
+	} else {	
+		for( i in 1:nsymbols ) {
+			x = coredata(iif(is.null(period.ends), b[[ symbolnames[i] ]], b[[ symbolnames[i] ]][period.ends,]))
+			for( j in apply.period.ends )
+				if(is.null(period.ends))
+					set.result.helper(x[1:j,,drop=F], j, xfun, out, i, ...)
+				else # i.e. run quaterly on the monthly data
+					set.result.helper(x[1:map[j],,drop=F], j, xfun, out, i, ...)
+		}
+	}
+
+	bt.apply.fill.gaps.helper(out, fill.gaps)
+}
+
+
+
+# out = bt.apply2(data, function(x) ATR(HLC(x)))
+# out$atr
+# make sure not to use a rolling window functions if apply.periodicity is given!!!
+#' @export 
+bt.apply.matrix.ex2 <- function
+(
+	b,			# matrix
+	xfun=Cl,	# user specified function
+	...,		# other parameters
+	
+	# convert data to given periodicity before applying xfun
+	periodicity = NULL,
+	period.ends = NULL,
+	
+	# apply xfun only on selected periodicity
+	apply.periodicity = NULL,
+	apply.period.ends = NULL,
+	
+	fill.gaps = F	# fill gaps introduced by having different periodicity
+)
+{
+	temp = bt.apply.setup.helper(b, xfun, periodicity, period.ends, apply.periodicity, apply.period.ends)
+	period.ends = temp$period.ends
+	apply.period.ends = temp$apply.period.ends
+	map = temp$map
+				
+	temp = b
+	temp[] = NA
+	out = env(out = temp, n=1, name='out')
+	index = 1:nrow(temp)
+	
+	nsymbols = ncol(b)
+	xfun = match.fun(xfun)
+	
+	if(is.null(apply.period.ends)) {	
+		for( i in 1:nsymbols )
+			if(is.null(period.ends)) 
+				set.result.helper(b[,i], index, xfun, out, i, ...)
+			else
+				set.result.helper(b[period.ends,i], period.ends, xfun, out, i, ...)
+	} else {	
+		for( i in 1:nsymbols ) {
+			x = coredata(iif(is.null(period.ends), b[,i], b[period.ends,i]))
+			for( j in apply.period.ends )
+				if(is.null(period.ends)) {
+					set.result.helper(x[1:j], j, xfun, out, i, ...)		
+				} else # i.e. run quaterly on the monthly data
+					set.result.helper(x[1:map[j]], j, xfun, out, i, ...)		
+		}
+	}
+	
+	bt.apply.fill.gaps.helper(out, fill.gaps)
+}
+
+set.result.helper = function(x, j, xfun, out, i, ...) {
+	msg = try( xfun( iif(is.xts(x), coredata(x), x), ... ) , silent=TRUE)
+	if (class(msg)[1] == 'try-error')
+		warning(i, msg, '\n')			
+	else {
+		nresult = iif(is.null(dim(msg)), 1, ncol(msg))
+		if(nresult != out$n) {				
+			temp = out[[ out$name[1] ]]
+			rm(list = out$name, envir = out)
+			out$name = iif(is.null(dim(msg)), names(msg), colnames(msg))
+			out$n = nresult	
+			for(result.name in out$name)
+				out[[result.name]] = temp							
+		}
+				
+		if(out$n == 1)
+			out$out[j,i] = msg
+		else
+			for(result.name in out$name)
+				out[[result.name]][j,i] = iif(len(j) == 1, msg[result.name], msg[,result.name])
+	}
+}
+
+bt.apply.fill.gaps.helper = function(out, fill.gaps) {
+	if(out$n == 1) {
+		if(fill.gaps)
+    		bt.apply.matrix(out$out, ifna.prev)
+		else
+			out$out
+	} else {
+		if(fill.gaps)
+			for(result.name in out$name)
+				out[[result.name]] = bt.apply.matrix(out[[result.name]], ifna.prev)
+		rm(list = c('n','name'), envir = out)
+		out
+	}		
+}
+
+
+# test for bt.apply functions
+bt.apply.test = function() {
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod,quadprog,corpcor,lpSolve')
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+
+	data = env()
+	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
+	bt.prep(data, align='remove.na', dates='1990::') 
+
+	t2 = bt.apply.ex2(data, function(x) ATR(HLC(x)))
+	#t2$atr
+	#ls(t2)
+
+
+
+	prices = data$prices
+	
+	t01 = bt.apply.matrix(prices, SMA, 100)	
+	t02 = bt.apply(data, function(x) SMA(Cl(x),100))
+	t11 = bt.apply.matrix.ex(prices, SMA, 100)	
+	t12 = bt.apply.ex(data, function(x) SMA(Cl(x),100))
+	t21 = bt.apply.matrix.ex2(prices, SMA, 100)	
+	t22 = bt.apply.ex2(data, function(x) SMA(Cl(x),100))
+	print(all.equal(t01, t02))
+	print(all.equal(t01, t11))
+	print(all.equal(t01, t12))
+	print(all.equal(t01, t21))
+	print(all.equal(t01, t22))
+
+	t11 = bt.apply.matrix.ex(prices, SMA, 10, periodicity='months')
+	t12 = bt.apply.ex(data, function(x) SMA(Cl(x),10), periodicity='months')
+	t21 = bt.apply.matrix.ex2(prices, SMA, 10, periodicity='months')
+	t22 = bt.apply.ex2(data, function(x) SMA(Cl(x),10), periodicity='months')
+	print(all.equal(t11, t12))
+	print(all.equal(t11, t21))
+	print(all.equal(t11, t22))
+
+
+	# Make sure not to use a rolling window functions if apply.periodicity is given
+	# bt.apply.matrix(prices, function(x) mean(mlast(x,10)), periodicity='months', apply.periodicity='quarters') 
+	t11 = bt.apply.matrix.ex(prices, function(x) mean(mlast(x,100)), apply.periodicity='quarters')
+	t12 = bt.apply.ex(data, function(x) mean(mlast(Cl(x),100)), apply.periodicity='quarters')
+	t21 = bt.apply.matrix.ex2(prices, function(x) mean(mlast(x,100)), apply.periodicity='quarters')
+	t22 = bt.apply.ex2(data, function(x) mean(mlast(Cl(x),100)), apply.periodicity='quarters')
+	print(all.equal(t11, t12))
+	print(all.equal(t11, t21))
+	print(all.equal(t11, t22))
+
+
+	t11 = bt.apply.matrix.ex(prices, function(x) mean(mlast(x,10)), periodicity='months', apply.periodicity='quarters') 
+	t12 = bt.apply.ex(data, function(x) mean(mlast(Cl(x),10)), periodicity='months', apply.periodicity='quarters') 
+	t21 = bt.apply.matrix.ex2(prices, function(x) mean(mlast(x,10)), periodicity='months', apply.periodicity='quarters') 
+	t22 = bt.apply.ex2(data, function(x) mean(mlast(Cl(x),10)), periodicity='months', apply.periodicity='quarters') 
+	print(all.equal(t11, t12))
+	print(all.equal(t11, t21))
+	print(all.equal(t11, t22))
+
+
+
+	load.packages('rbenchmark')
+
+	test01 = function() { t01 = bt.apply.matrix(prices, SMA, 100)	}
+	test02 = function() { t02 = bt.apply(data, function(x) SMA(Cl(x),100)) }
+	test11 = function() { t11 = bt.apply.matrix.ex(prices, SMA, 100)	}
+	test12 = function() { t12 = bt.apply.ex(data, function(x) SMA(Cl(x),100)) }
+	test21 = function() { t21 = bt.apply.matrix.ex2(prices, SMA, 100)	 }
+	test22 = function() { t22 = bt.apply.ex2(data, function(x) SMA(Cl(x),100)) }
+
+	
+  	library(rbenchmark)
+	benchmark(
+   		test01(),
+   		test02(),
+   		test11(),
+   		test12(),
+   		test21(),
+   		test22(),
+       columns = c("test", "replications", "elapsed", "relative"),
+       order = "relative",
+       replications = 50
+	)
+	
+}
+
 
 ###############################################################################
 # Remove excessive signal

@@ -351,7 +351,7 @@ plota.lines <- function(
 #' Add text to time series plot
 #'
 #' @param y \code{\link{xts}} object
-#' @param ... additional parameters to the \code{\text{lines}}
+#' @param ... additional parameters to the \code{\link{lines}}
 #'
 #' @return nothing
 #'

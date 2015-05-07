@@ -114,31 +114,32 @@ portfolio.omega <- function
 max.omega.portfolio <- function
 (
 	ia,				# input assumptions
-	constraints		# constraints
+	constraints,	# constraints
+	type = c('mixed', 'lp', 'nlp')
 )
 {
 	n = nrow(constraints$A)	
 	nt = nrow(ia$hist.returns)
+	type = type[1]
 	
-	sol = optimize.portfolio(ia, constraints, add.constraint.omega, portfolio.omega, 'max', T)
-				
-	if(!inherits(sol, 'try-error')) {
-		x0 = sol$solution[1:n]
-		u = sol$solution[(1+n):(n+nt)]
-		d = sol$solution[(n+nt+1):(n+2*nt)] 
-		t = sol$solution[(n+2*nt+1):(n+2*nt+1)] 
-		
-		x = x0/t
-	} else {
-		x = NA
-	}		
+	if(type == 'mixed'	|| type == 'lp') {
+		sol = optimize.portfolio(ia, constraints, add.constraint.omega, portfolio.omega, 'max', T)
+			
+		x = rep(NA, n)	
+		if(!inherits(sol, 'try-error') && sol$status ==0) {
+			x0 = sol$solution[1:n]
+			u = sol$solution[(1+n):(n+nt)]
+			d = sol$solution[(n+nt+1):(n+2*nt)] 
+			t = sol$solution[(n+2*nt+1):(n+2*nt+1)] 		
+			x = x0/t
+		}
+	}
 
 	#portfolio.omega(t(x),ia)
 	#sol$value
 
-	# Try solving problem using Rdonlp2
-	if( any( u*d != 0 ) || sol$status !=0 ) {
-	
+	if((type == 'mixed' && (sol$status !=0 || any( u*d != 0 ) )) || type == 'nlp') {
+		# Try solving problem using Rdonlp2
 		if(is.null(ia$parameters.omega)) omega = 0 else omega = ia$parameters.omega
 	
 		# omega
