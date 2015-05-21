@@ -78,7 +78,7 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 	
 
 		# extract table from this page
-		data = extract.table.from.webpage(txt, 'INDICATORS', hasHeader = T)
+		data = extract.table.from.webpage(txt, 'INDICATORS', has.header = T)
 			colnames(data) = data[1,]
 			rownames(data) = data[,1]
 			data = data[,-1,drop=F]
@@ -94,7 +94,7 @@ if( len(grep('INDICATORS', txt, ignore.case = T)) == 0 ) {
 		# extract option value to go to the next page
 		temp = gsub(pattern = '<option', replacement = '<tr>', txt, perl = TRUE)
 		temp = gsub(pattern = '</option>', replacement = '</tr>', temp, perl = TRUE)	
-		temp = extract.table.from.webpage(temp, 'All amounts', hasHeader = T)
+		temp = extract.table.from.webpage(temp, 'All amounts', has.header = T)
 		
     	temp = apply(temp,1,join)
         index.selected = grep('selected', temp)
