@@ -3,7 +3,7 @@
 \title{Add recession bars to the existing plot}
 \usage{
   plota.recession(col = col.add.alpha("gray", 50),
-    ylim = par("usr")[3:4], ...)
+    highlight = NULL)
 }
 \arguments{
   \item{col}{highlight color for recession periods,
