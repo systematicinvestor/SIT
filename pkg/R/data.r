@@ -1740,7 +1740,26 @@ edgar.info <- function(ticker)
 }
 
 
-
+###############################################################################
+# Get Zacks info
+# http://www.zacks.com/stock/research/IBM/earnings-announcements
+#' @export
+###############################################################################
+zacks.info <- function(ticker = 'IBM')
+{
+  url = paste0('http://www.zacks.com/stock/research/', ticker, '/earnings-announcements')
+  txt = join(readLines(url))
+ 
+  out = list()
+  require(jsonlite)
+  
+  for(i in spl('earnings,webcasts,revisions,splits,dividends,guidance')) {  
+  	data = extract.token(txt,paste0('<script>,window.app_data_', i, ',=,"data"'),'</script>')
+  	data = fromJSON(paste('{"data"', data))
+  	out[[i]] = data$data
+  }
+  out
+}
 
 
 ###############################################################################
