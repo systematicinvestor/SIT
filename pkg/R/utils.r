@@ -171,6 +171,37 @@ env.del <- function(names, env) {
 
 
 ###############################################################################
+# Variables to List and back
+#' @export 
+###############################################################################
+vars2list <- function(...) {
+	out = list( ... )		
+	names(out) = as.character(substitute(c(...))[-1])
+	out
+}
+
+#' @export 
+list2vars <- function(data, env = parent.frame()) {
+	for(n in names(data))
+		assign(n, data[[n]], env)
+}	 
+
+###############################################################################
+# Check default argumnets
+#' @export 
+###############################################################################
+check.args = function(default.args, args=NULL) {
+	if(is.null(args)) return(default.args)
+	
+	for(n in ls(default.args))
+		if(is.null(args[[n]]))
+			args[[n]] = default.args[[n]]
+			
+	args
+}
+
+
+###############################################################################
 #' Shortcut for all.equal function
 #'
 #' This function is a convenience shortcut for all.equal function
