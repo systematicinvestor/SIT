@@ -567,6 +567,39 @@ create.ia.period <- function
 	}	
 }
 
+
+# Create historical input assumptions
+#' @export 	
+create.historical.ia <- function
+(
+	hist.returns, 
+	annual.factor
+) {	
+	# setup input assumptions
+	ia = create.ia(hist.returns)
+	
+	ia$annual.factor = annual.factor
+
+	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)	
+	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
+	
+	# convert ia to annual		
+	#ia$arithmetic.return = ia$annual.factor * ia$arithmetic.return
+	ia$arithmetic.return = (1 + ia$arithmetic.return)^ia$annual.factor - 1		
+	ia$geometric.return = (1 + ia$geometric.return)^ia$annual.factor - 1
+	
+	ia$risk = sqrt(ia$annual.factor) * ia$risk
+
+	# compute covariance matrix
+	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
+	
+	ia$expected.return = ia$arithmetic.return
+	
+	ia
+}
+
+
 ###############################################################################
 # The Averaging techniques are used to avoid over-fitting any particular frequency
 # created by pierre.c.chretien

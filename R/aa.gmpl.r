@@ -95,14 +95,69 @@ Rglpk.create.constraints <- function( prob )
 	f.obj = prob$objective_coefficients
 	dir = ifelse(prob$maximize, 'max', 'min')
 
+   	prob$names = prob$objective_vars_names
+   	prob$tickers = prob$objective_vars_names
+	
     # find tickers wgt[AAPL]
+    if(len(grep('\\[',prob$objective_vars_names)) > 0) {
     temp = matrix(spl(gsub(']','', prob$objective_vars_names),'\\['), nr=2)
     	prob$names = temp[1,]
     	prob$tickers = temp[2,]
+    }
 	
 	return(list(constraints=constraints, f.obj=f.obj, dir=dir, prob=prob))
 }
  
+
+###############################################################################
+# Parse Views
+#' @export 
+############################################################################### 
+parse.views = function(symbolnames, views) {
+	load.packages('Rglpk')
+
+	if (is.character(views))
+		views = spl(views)
+	views = trim(spl(gsub('\n', ',', join(views, ','))))
+	views = views[nchar(views) > 0 & substring(views, 1, 1) != "#"]
+	views = sapply(views, function(x) spl(x,'#')[1])
+	
+model.file = 'temp.model.mod'
+	
+	# create GNU MathProg model
+	cat("	
+###############################################################################	
+# Define Variables
+", join(paste0('var ', symbolnames, '>=0;'),'\n'), "
+
+# Define Objective
+minimize objective : ", join(symbolnames, '+'), ";
+
+# Define Constraints
+", join(paste0('V', 1:len(views), ':', views,';'),'\n'), "
+ 
+###############################################################################
+	", file = model.file, append = FALSE)
+	
+	#--------------------------------------------------------------------------
+	# Read GNU MathProg model/Setup constraints/Solve QP problem
+	#--------------------------------------------------------------------------	
+	# read model
+	model = Rglpk.read.model(model.file,type = 'MathProg') 	
+
+	# convert GNU MathProg model to constraint used in solve.QP
+	temp = Rglpk.create.constraints(model)$constraints	
+	
+	A = t(as.matrix(temp$A))
+		colnames(A) = symbolnames
+	
+	list(
+		A = A,
+		b = temp$b
+	)
+}	
+	
+
 
 ###############################################################################
 # Helper function to find Minimum Variance Portfolio

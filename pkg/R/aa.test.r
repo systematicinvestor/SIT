@@ -2201,55 +2201,6 @@ aa.test.create.ia.custom <- function(symbols, symbol.names = symbols, dates = NU
 
 
 ###############################################################################
-# Create historical input assumptions
-###############################################################################
-create.historical.ia <- function
-(
-	hist.returns, 
-	annual.factor,
-	symbols = colnames(hist.returns), 
-	symbol.names = symbols)
-{	
-	# setup input assumptions
-	ia = list()
-	
-	ia$n = len(symbols)
-	ia$annual.factor = annual.factor
-	
-	ia$symbols = symbols
-	ia$symbol.names = symbol.names
-	
-	ia$hist.returns = hist.returns
-	
-	# compute historical returns, risk, and correlation
-	ia$arithmetic.return = apply(hist.returns, 2, mean, na.rm = T)
-	ia$geometric.return = apply(hist.returns, 2, function(x) prod(1+x)^(1/len(x))-1 )
-	
-	# use N instead of N-1 in computation of variance
-	# ia$risk = apply(hist.returns, 2, function(x) sqrt(sum((x-mean(x))^2)/len(x)) )	
-	ia$risk = apply(hist.returns, 2, sd, na.rm = T)
-	
-	ia$correlation = cor(hist.returns, use = 'complete.obs', method = 'pearson')			
-	#ia$correlation = cor(hist.returns, use = 'pairwise.complete.obs', method = 'pearson')			
-	
-	# convert ia to annual		
-		#ia$arithmetic.return = ia$annual.factor * ia$arithmetic.return
-		ia$arithmetic.return = (1 + ia$arithmetic.return)^ia$annual.factor - 1
-		
-		ia$geometric.return = (1 + ia$geometric.return)^ia$annual.factor - 1
-		ia$risk = sqrt(ia$annual.factor) * ia$risk
-
-	# compute covariance matrix
-	ia$risk = iif(ia$risk == 0, 0.000001, ia$risk)
-	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))		
-	
-	ia$expected.return = ia$arithmetic.return
-	
-	return(ia)
-}
-
-
-###############################################################################
 # Add short (negative copy) input assumptions to given ia
 ###############################################################################
 aa.test.ia.add.short <- function(ia)

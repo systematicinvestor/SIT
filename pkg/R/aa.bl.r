@@ -65,13 +65,26 @@ bl.compute.posterior <- function
 	cov, 		# Covariance matrix
 	pmat=NULL, 	# Views pick matrix
 	qmat=NULL, 	# View mean vector
-	tau=0.025 	# Measure of uncertainty of the prior estimate of the mean returns
+	tau=0.025, 	# Measure of uncertainty of the prior estimate of the mean returns
+	confidences=NULL  # Confidence of each view
 )
 {
 	out = list()	
 
 	if( !is.null(pmat) ) {
+		if( is.null(confidences) ) {
+		# The Black-Litterman Model In Detail by Jay Walters
+		# Assume that the variance of the views will be proportional to the variance of the asset
+		# returns, just as the variance of the prior distribution is. He and Litterman (1999)
+		# This specification of the variance, or uncertainty, of the views essentially equally weights the investor's
+		# views and the market equilibrium weights. By including tau in the expression, the final solution becomes
+		# independent of tau as well.
+				
+		# contactenate 1 and remove first row, col ([-1,-1]) to work properly with single view
 		omega = diag(c(1,diag(tau * pmat %*% cov %*% t(pmat))))[-1,-1]
+		} else {
+		omega = diag(c(1,confidences))[-1,-1]
+		}
 		
 		temp = solve(solve(tau * cov) + t(pmat) %*% solve(omega) %*% pmat)
 	
@@ -88,6 +101,7 @@ bl.compute.posterior <- function
 	}
 	return(out)
 }
+
 
 # He & Litterman: The intuition Behind Black- Litterman Model Portfolios
 # formulas (13)

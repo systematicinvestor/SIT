@@ -175,17 +175,22 @@ env.del <- function(names, env) {
 #' @export 
 ###############################################################################
 vars2list <- function(...) {
-	out = list( ... )		
-	names(out) = as.character(substitute(c(...))[-1])
-	out
+	values = list( ... )
+	if(len(values) == 0) return(values)
+
+	values.names = names(values)
+	names = as.character(substitute(c(...))[-1])
+		
+	names(values) = iif(nchar(values.names) > 0, values.names, names)
+	values
 }
 
+# assign(n, data[[n]], env)
 #' @export 
 list2vars <- function(data, env = parent.frame()) {
 	for(n in names(data))
-		assign(n, data[[n]], env)
-}	 
-
+		env[[n]] = data[[n]]
+}
 ###############################################################################
 # Check default argumnets
 #' @export 
