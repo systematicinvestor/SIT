@@ -1774,11 +1774,10 @@ plot.ia <- function
 )
 {
 	# create a table with summary statistics
-	if( is.null(layout) ) layout(1:2)	
+	if( is.null(layout) ) layout(matrix(1:2, nr=1))	
 	temp = cbind(ia$expected.return, ia$risk)
 		temp[] = plota.format(100 * temp[], 1, '', '%')
-		temp = cbind(ia$symbol.names, temp)
-		colnames(temp) = spl('Name,Return,Risk')
+		colnames(temp) = spl('Return,Risk')
 	plot.table(temp, 'Symbol')
 	
 	# visualize correlation  matrix

@@ -122,7 +122,11 @@ parse.views = function(symbolnames, views) {
 	views = views[nchar(views) > 0 & substring(views, 1, 1) != "#"]
 	views = sapply(views, function(x) spl(x,'#')[1])
 	
-model.file = 'temp.model.mod'
+ FILE <- tempfile("fun")
+  on.exit(unlink(FILE))	
+	
+model.file = tempfile('temp.model')
+on.exit(unlink(model.file))	
 	
 	# create GNU MathProg model
 	cat("	
