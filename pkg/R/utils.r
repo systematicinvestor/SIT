@@ -172,6 +172,23 @@ env.del <- function(names, env) {
 
 ###############################################################################
 # Variables to List and back
+#
+# can be useful for debugging:
+#
+# gall <<- vars2list(lookbacks, n.lag, hist.returns, index, hist.all, n.lookback)					
+# list2vars(gall)
+#
+# options(warn=2)
+# options(warn=1)
+#
+# test.env = environment()
+# save(test.env, file='test.env.Rdata')
+#
+# load('test.env.Rdata')
+# list2vars(test.env)
+# list2vars(test.env, environment()) 
+# similar to checkpoint package at CRAN
+#
 #' @export 
 ###############################################################################
 vars2list <- function(...) {
@@ -188,7 +205,7 @@ vars2list <- function(...) {
 # assign(n, data[[n]], env)
 #' @export 
 list2vars <- function(data, env = parent.frame()) {
-	for(n in names(data))
+	for(n in ls(data))
 		env[[n]] = data[[n]]
 }
 ###############################################################################
@@ -198,9 +215,8 @@ list2vars <- function(data, env = parent.frame()) {
 check.args = function(default.args, args=NULL) {
 	if(is.null(args)) return(default.args)
 	
-	for(n in ls(default.args))
-		if(is.null(args[[n]]))
-			args[[n]] = default.args[[n]]
+	for(n in setdiff(ls(default.args), ls(args)))
+		args[[n]] = default.args[[n]]
 			
 	args
 }
@@ -521,11 +537,93 @@ ends.add.last.date <- function(ends, last.date, action=T)
 #' @rdname DateFunctionsIndex
 date.ends.fn <- function(periodicity) {
   switch(periodicity,
-    'weeks' = date.week.ends,
-    'months' = date.month.ends,
-    'quarters' = date.quarter.ends,
-    'years' = date.year.ends,
-    date.month.ends)  
+    weeks = date.week.ends,
+    week = date.week.ends,
+    weekly = date.week.ends,
+    
+    months = date.month.ends,
+    month = date.month.ends,
+    monthly = date.month.ends,
+    
+    quarters = date.quarter.ends,
+    quarter = date.quarter.ends,
+    quarterly = date.quarter.ends,
+        
+    years = date.year.ends,
+    year = date.year.ends,
+    yearly = date.year.ends,
+    annual = date.year.ends,
+    annually = date.year.ends,
+    
+    # default
+    NULLL)  
+}
+
+# 'date.ends(data$prices,'year')
+#' @export 
+#' @rdname DateFunctionsIndex
+date.ends <- function(dates, periodicity, by=1, skip=0, last.date=T, calendar = NULL) {
+	if( is.xts(dates) ) dates = index(dates)
+	periodicity = trim(tolower(periodicity))
+	
+	# bi- means 'every two', as in every two [weeks/months/years, etc]
+	# biweekly = every two weeks / bimonthly = every two months
+	# semi- to mean 'twice every' (as semiannually - twice per year)
+	# semiweekly = twice a week / semimonthly = twice a month
+	bi.flag = substr(periodicity,1,2) == 'bi'
+	#semi.flag = substr(periodicity,1,4) == 'semi'	
+
+	if(bi.flag) periodicity = substr(periodicity,3,1000)
+		by = iif(bi.flag, 2, by)
+	#if(semi.flag) periodicity = substr(periodicity,5,1000)
+	periodicity = trim(gsub('-','',periodicity))
+	
+	
+	
+	# handle boundary cases. i.e. last day is month end
+	dates = as.Date(dates)
+		n = len(dates)
+  
+  	# getHolidayList
+  	load.packages('RQuantLib')
+  
+	holidays = NULL   
+	if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)     
+		before = business.days(dates[1] - 60, dates[1] - 1, holidays)
+    	n.before = len(before) 
+
+	holidays = NULL   
+	if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[n] + 1, dates[n] + 60)   
+		after = business.days(dates[n] + 1, dates[n] + 60, holidays)
+
+	dates = c(before, dates, after)
+	
+	
+	
+	# find ends
+	fn = date.ends.fn(periodicity)
+	if( is.null(fn) ) {
+		ends = endpoints(make.xts(1:len(dates), dates), periodicity)
+			ends = ends[ends > 0]
+	} else
+		ends = fn(dates, last.date=F)
+
+
+				
+		
+	# map back to original dates
+	ends = ends[ends > n.before & ends <= (n.before + n)]
+		ends = ends - n.before
+
+		
+		
+		
+	ends = ends.add.last.date(ends, n, last.date)		
+				
+	if( skip > 0) ends = ends[-c(1:skip)]
+	if( by > 1) ends = ends[seq(1, len(ends), by=by)]
+		
+	ends		
 }
 
 #' out is result of the business.days.location.end
@@ -1819,6 +1917,16 @@ getSymbols.sit <- function
 # get first element in every offset: sapply(offsets, '[', 1)
 
 
+#' @export 
+parse.expr = function(expr) {
+	if (is.character(expr))
+		expr = spl(expr)
+	expr = gsub('<newline>','\n', expr)
+	expr = trim(spl(gsub('\n', ',', join(expr, ','))))
+	
+	expr = expr[nchar(expr) > 0 & substring(expr, 1, 1) != "#"]
+	sapply(expr, function(x) spl(x,'#')[1])
+}
 
 ###############################################################################
 #' Helper function to extend functionality of getSymbols
@@ -1858,59 +1966,60 @@ getSymbols.extra <- function
   ...
 ) 
 {
-  if(is.character(Symbols)) Symbols = spl(Symbols)
-  if(len(Symbols) < 1) return(Symbols)
+	Symbols = parse.expr(Symbols)
+	if(len(Symbols) < 1) return(Symbols)
   
-  Symbols = spl(toupper(gsub('\n',',',join(Symbols, ','))))
+  	Symbols = toupper(Symbols)
     
-  # split
-  map = list()
-  for(s in Symbols) {
-    if(nchar(trim(s)) == 0) next
-    if(substring(trim(s)[1],1,1) == '#') next
-  
-    temp = spl(spl(s,"#")[1], "=")
-    if ( len(temp) > 1 ) { 
-      name = temp[1]
-      values = trim(spl(temp[2], '\\+'))
+	# split
+	map = list()
+	for(s in Symbols) {  
+		temp = spl(s, "=")
+		if ( len(temp) > 1 ) { 
+			name = temp[1]
+			values = trim(spl(temp[2], '\\+'))
       
-      value1 = values[1]
-        value1.name = grepl('\\[', value1)      
-      value1 = gsub('\\]','',gsub('\\[','',value1))
-      value1 = trim(spl(value1,';'))
+			# handle = [a] + b
+			value1 = values[1]
+				value1.name = grepl('\\[', value1)      
+			value1 = gsub('\\]','',gsub('\\[','',value1))
+			value1 = trim(spl(value1,';'))
       
-      values = values[-1]
+			values = values[-1]
       
-      for(n in trim(spl(name,';')))
-        map[[ n  ]] = c(value1[1], values)
+			for(n in trim(spl(name,';')))
+				map[[ n  ]] = c(value1[1], values)
         
-      if( len(value1) > 1 || value1.name)
-        for(n in value1)
-          map[[ n  ]] = c(n, values)      
-    } else {
-      temp = spl(temp, '\\+')
-      name = temp[1]
-      values = trim(temp[-1])
-      for(n in trim(spl(name,';')))
-        map[[ n  ]] = c(n, values)
-    }
+			# handle = [a] + b
+			if( len(value1) > 1 || value1.name)
+				for(n in value1)
+					map[[ n  ]] = c(n, values)      
+		} else {
+			temp = spl(temp, '\\+')
+			name = temp[1]
+			values = trim(temp[-1])
+			
+			for(n in trim(spl(name,';')))
+				map[[ n  ]] = c(n, values)
+		}
     
-    #name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
-    #values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
-    #map[[trim(name)]] = trim(values)   
-  }
-  Symbols = unique(unlist(map))
+		#name = iif(len(spl(s, '=')) > 1, spl(s, '=')[1], spl(s, '\\+')[1])
+		#values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
+		#map[[trim(name)]] = trim(values)   
+	}
+	Symbols = unique(unlist(map))
   
-  # find overlap with raw.data
-  Symbols = setdiff(Symbols, ls(raw.data))
+	# find overlap with raw.data
+	Symbols = setdiff(Symbols, ls(raw.data))
 
-  # download
-  data <- new.env()
-  if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
-  for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
+	# download
+	data = new.env()
+	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
+	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
   
-  # reconstruct, please note getSymbols replaces ^ symbols
-  if (set.symbolnames) env$symbolnames = names(map)
+	# reconstruct, please note getSymbols replaces ^ symbols
+	if (set.symbolnames) env$symbolnames = names(map)
+	
   for(s in names(map)) {
     env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
     if( len(map[[ s ]]) > 1)

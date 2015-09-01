@@ -9679,6 +9679,7 @@ dev.off()
 #
 # http://cssanalytics.wordpress.com/2014/07/29/vix-adjusted-momentum/
 # http://cssanalytics.wordpress.com/2014/07/30/error-adjusted-momentum/
+# http://www.quintuitive.com/2015/06/21/trading-moving-averages-with-less-whipsaws/
 ###############################################################################
 bt.adjusted.momentum.test <- function() 
 {
@@ -9705,12 +9706,22 @@ bt.adjusted.momentum.test <- function()
 		
 	models = list()
 
+	commission = list(cps = 0.01, fixed = 10.0, percentage = 0.0)
+	
+	
+	#*****************************************************************
+	# Buy and Hold
+	#****************************************************************** 
+	data$weight[] = NA
+		data$weight[] = 1
+	models$buy.hold = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
+	
 	#*****************************************************************
 	# 200 SMA
 	#****************************************************************** 
 	data$weight[] = NA
 		data$weight[] = iif(prices > SMA(prices, 200), 1, 0)
-	models$ma200 = bt.run.share(data, clean.signal=T)
+	models$ma200 = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
 	
 	#*****************************************************************
 	# 200 ROC
@@ -9719,29 +9730,78 @@ bt.adjusted.momentum.test <- function()
 	
 	data$weight[] = NA
 		data$weight[] = iif(SMA(roc, 200) > 0, 1, 0)
-	models$roc200 = bt.run.share(data, clean.signal=T)
+	models$roc200 = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
 	
 	#*****************************************************************
 	# 200 VIX MOM
 	#****************************************************************** 
 	data$weight[] = NA
 		data$weight[] = iif(SMA(roc/VIX, 200) > 0, 1, 0)
-	models$vix.mom = bt.run.share(data, clean.signal=T)
+	models$vix.mom = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
 
 	#*****************************************************************
-	# 200 ER MOM
+	# 200 ER MOM - the logic is that returns should be weighted more 
+	# when predictability is high, and conversely weighted less when 
+	# predictability is low. In this case, the error-adjusted moving average 
+	# will hopefully be more robust to market noise than a standard moving average.	
 	#****************************************************************** 
 	forecast = SMA(roc,10)
 	error = roc - mlag(forecast)
 	mae = SMA(abs(error), 10)
+	sma = SMA(roc/mae, 200)
 	
 	data$weight[] = NA
-		data$weight[] = iif(SMA(roc/mae, 200) > 0, 1, 0)
-	models$er.mom = bt.run.share(data, clean.signal=T)
+		data$weight[] = iif(sma > 0, 1, 0)
+	models$er.mom = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
 		
+	# cushioned
+	stddev = runSD(roc/mae,200)
+	upper.band = 0
+	lower.band = -0.05*stddev
+
+	data$weight[] = NA
+		data$weight[] = iif(cross.up(sma, upper.band), 1, iif(cross.dn(sma, lower.band), 0, NA))
+	models$er.mom.cushioned = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
+
+	
+if(F) {		
+	#*****************************************************************
+	# EA, for stdev calculatins assume 0 sample mean
+	# http://www.quintuitive.com/2015/06/21/trading-moving-averages-with-less-whipsaws/
+	#****************************************************************** 
+	adj.rets = roc / sqrt(runSum(roc^2,10)/9)
+	#adj.rets = roc / runSD(roc,10)
+		sma = SMA(adj.rets, 200) 
+		stddev = sqrt(runSum(adj.rets^2,200)/199)
+		#stddev = runSD(adj.rets,200)
+ 
+	data$weight[] = NA
+		data$weight[] = iif(sma > 0, 1, 0)
+		#upper.band = lower.band = 0
+		#data$weight[] = iif(cross.up(sma, upper.band), 1, iif(cross.dn(sma, lower.band), 0, NA))
+	models$ea = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
+
+	#*****************************************************************
+	# Cushioned EA 
+	#****************************************************************** 
+	upper.band = 0
+	lower.band = -0.05*stddev
+
+	data$weight[] = NA
+		data$weight[] = iif(cross.up(sma, upper.band), 1, iif(cross.dn(sma, lower.band), 0, NA))
+	models$ea.cushioned = bt.run.share(data, clean.signal=T, commission=commission, trade.summary=T)
+}	
 	#*****************************************************************
 	# Report
 	#****************************************************************** 
+	layout(1:2)
+	plotbt(models, plotX = T, log = 'y', LeftMargin = 3, main = NULL)
+		mtext('Cumulative Performance', side = 2, line = 1)
+	
+	plotbt.strategy.sidebyside(models, perfromance.fn=engineering.returns.kpi)
+	
+	
+	
 png(filename = 'plot1.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')    	
 	
 	strategy.performance.snapshoot(models, T)
@@ -9750,7 +9810,36 @@ dev.off()
 }	
 	
 
-
+ 
+#*****************************************************************
+# Example showing the signal and execution lags
+#*****************************************************************
+bt.signal.execution.lag.test <- function()
+{
+	do.lag = 2
+	calc.offset = -1
+	
+	# Load test data
+	data <- new.env()
+		date = as.Date('2015-Aug-26','%Y-%b-%d')
+		dates = seq(date-100, date, by=1)
+		data$TEST = make.stock.xts(make.xts(1:len(dates), dates))
+	bt.prep(data)
+	
+	# Setup
+	prices = data$prices   
+		nperiods = nrow(prices)
+			
+	period.ends = endpoints(prices, 'months') + calc.offset
+		period.ends = period.ends[(period.ends > 0) & (period.ends <= nperiods)]
+	
+	# Code Strategy
+	data$weight[] = NA
+		data$weight[period.ends,] = prices[period.ends,]
+	model = bt.run(data, do.lag = do.lag)
+	
+	last(as.xts(list(WEIGHT = model$weight, SIGNAL = prices)),20)
+}
 
 ###############################################################################
 # Execution price: buy low sell high

@@ -109,21 +109,22 @@ Rglpk.create.constraints <- function( prob )
 }
  
 
+
+
 ###############################################################################
-# Parse Views
+# Parse Views / Constraints using GNU Mathprog specifications
 #' @export 
 ############################################################################### 
 parse.views = function(symbolnames, views) {
 	load.packages('Rglpk')
 
-	if (is.character(views))
-		views = spl(views)
-	views = trim(spl(gsub('\n', ',', join(views, ','))))
-	views = views[nchar(views) > 0 & substring(views, 1, 1) != "#"]
-	views = sapply(views, function(x) spl(x,'#')[1])
-	
- FILE <- tempfile("fun")
-  on.exit(unlink(FILE))	
+	views = parse.expr(views)
+	if (len(views)==0)
+		return(list(
+			A = matrix(0, nr=0, nc=len(symbolnames)),
+			b = c(),
+			meq = 0
+		))	
 	
 model.file = tempfile('temp.model')
 on.exit(unlink(model.file))	
@@ -157,7 +158,8 @@ minimize objective : ", join(symbolnames, '+'), ";
 	
 	list(
 		A = A,
-		b = temp$b
+		b = temp$b,
+		meq = temp$meq
 	)
 }	
 	

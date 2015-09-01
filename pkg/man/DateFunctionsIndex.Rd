@@ -1,5 +1,6 @@
 \name{date.week.ends}
 \alias{date.end}
+\alias{date.ends}
 \alias{date.ends.fn}
 \alias{date.ends.index}
 \alias{date.month.ends}
@@ -17,6 +18,9 @@
   date.year.ends(dates, last.date = T)
 
   date.ends.fn(periodicity)
+
+  date.ends(dates, periodicity, by = 1, skip = 0,
+    last.date = T, calendar = NULL)
 
   date.ends.index(out, timing)
 

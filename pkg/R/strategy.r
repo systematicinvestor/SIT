@@ -644,29 +644,6 @@ create.ia.averaged <- function(lookbacks, n.lag)
 
 
 
-# Create basic constraints
-#' @export
-create.basic.constraints <- function(
-	n,
-	const.lb = 0, 
-	const.ub = 1,
-	const.sum = 1
-)
-{
-	if(len(const.lb) == 1) const.lb = rep(const.lb, n)
-	if(len(const.ub) == 1) const.ub = rep(const.ub, n)
-
-	# 0 <= x.i <= 1
-	constraints = new.constraints(n, lb = const.lb, ub = const.ub)
-		constraints = add.constraints(diag(n), type='>=', b=const.lb, constraints)
-		constraints = add.constraints(diag(n), type='<=', b=const.ub, constraints)
-	
-	# SUM x.i = 1
-	if(!is.na(const.sum))
-		constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
-	
-	return(constraints)
-}
 
 ###############################################################################
 # Portfolio Construction and Optimization routines
@@ -927,6 +904,7 @@ ef.portfolio <- function(percent = 0.5)
 # http://www.tbm.tudelft.nl/fileadmin/Faculteit/TBM/Over_de_Faculteit/Afdelingen/Afdeling_Infrastructure_Systems_and_Services/Sectie_Informatie_en_Communicatie_Technologie/medewerkers/jan_van_den_berg/courses/Security_en_Techniek/doc/ACFM-met-Roland.pdf
 #*****************************************************************
 # solve.QP: min(x'Dx - 2*dvec*x) 
+#' @export 
 min.te.portfolio.test <- function() 
 {
 	# minimum Tracking Error portfolios
@@ -989,6 +967,57 @@ min.te.portfolio.test <- function()
 	252 * portfolio.return(x, ia)
 }
 	
+
+
+
+#*****************************************************************	
+# generate given number of historical scenarios
+# and average portfolio allocation algo weights 
+# across all scenarios
+#' @export 
+#*****************************************************************
+random.hist <- function(
+	portfolio.fn = min.var.portfolio, # portfolio allocation algo
+    nsamples = 100,         # Number of Samples to draw
+    sample.len = 60         # Length of each sample	
+)
+{
+	fn = try( match.fun(portfolio.fn) , silent = TRUE)
+	if(class(fn)[1] == 'try-error') stop(paste('random.hist', fn))
+	
+	nsamples = nsamples
+	sample.len = sample.len
+	
+	function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+	    # load / check required packages
+    	load.packages('MASS')
+
+    	# first run base
+    	weight = fn(ia, constraints)
+    	
+	    #Start Monte Carlo simulation of asset returns
+    	ia.original = ia
+    		
+	    for(i in 1:nsamples) {
+	        ia$hist.returns = mvrnorm(sample.len, ia.original$expected.return, Sigma = ia.original$cov)
+	 
+	        ia$expected.return = apply(ia$hist.returns, 2, mean)
+	        ia$risk = apply(ia$hist.returns, 2, sd)
+	        ia$correlation = cor(ia$hist.returns, use = 'complete.obs', method = 'pearson')
+	        ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+	 
+	        weight = weight + fn(ia, constraints)
+	    }
+	 
+	    weight / (nsamples + 1)
+	}	
+}
+
 	
 	
 		

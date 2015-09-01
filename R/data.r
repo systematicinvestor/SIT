@@ -1799,44 +1799,76 @@ data.clean <- function
 (
   data, 
   min.ratio = 2.5, 
-  min.obs = 3*252
+  min.obs = 3*252,
+  iqr.mult = 20
 ) 
-{ 
+{
+  data$symbolnames = iif(is.null(data$symbolnames), ls(data), data$symbolnames)
+  
   # remove all series that has less than minimum number of observations
-  index = names(which(lapply(data,function(x) count(x$Close)) < min.obs))
+if(min.obs > 0) {  
+  index = names(which(sapply(data$symbolnames, function(x) as.numeric(count(Cl(data[[x]])))) < min.obs))
   if (len(index) > 0) {
     cat('Removing', index, 'have less than', min.obs, 'observations','\n')
     rm(list=index, envir=data)
+    
+    data$symbolnames = setdiff(data$symbolnames, index)
   }
+}
     
-  for(ticker in ls(data)) {
-    ticker.data = data[[ticker]]
-    ticker.data = ticker.data[ticker.data$Close > 0 & ticker.data$Adjusted > 0]
+  for(ticker in data$symbolnames)
+    data[[ticker]] = data.clean.helper(data[[ticker]], ticker, min.ratio, iqr.mult)
+}
+
+data.clean.helper <- function
+(
+  data, 
+  ticker,
+  min.ratio = 2.5, 
+  iqr.mult = 20
+) 
+{
+    data = data[Cl(data) > 0 & Ad(data) > 0]
     
-    nperiods = nrow(ticker.data)
-    price = ticker.data$Adjusted
+    nperiods = nrow(data)
+    price = Ad(data)
     
+    # forward ratio
     ratio = as.vector((price)/mlag(price))
     index = which(ratio > min.ratio)
         
     if(len(index) > 0)
       for(i in index) {
-        cat('Abnormal price found for', ticker, format(index(ticker.data)[i],'%d-%b-%Y'),'Ratio :', round(ratio[i],1),'\n')
-        for(name in spl('Open,Close,High,Low,Adjusted')) 
-          ticker.data[i:nperiods,name] = ticker.data[i:nperiods,name] / ratio[i]
+        cat('Abnormal price found for', ticker, format(index(data)[i],'%d-%b-%Y'),'Ratio :', round(ratio[i],1),'\n')
+        for(name in find.names('Open,Close,High,Low,Adjusted', data)) 
+          data[i:nperiods,name] = data[i:nperiods,name] / ratio[i]
       }
-          
+    
+    price = Ad(data)
+    ret = as.vector((price)/mlag(price)) - 1
+    threshold = iqr.mult * IQR(ret, na.rm=T)
+    index = which(ret > threshold | ret < -threshold)
+    
+    if(len(index) > 0)
+      for(i in index) {
+        cat('Abnormal price found for', ticker, format(index(data)[i],'%d-%b-%Y'),'based on IQR, Ratio :', round(ratio[i],1),'\n')
+        for(name in find.names('Open,Close,High,Low,Adjusted', data)) 
+          data[i:nperiods,name] = data[i:nperiods,name] / ratio[i]
+      }
+              
+    # backward ratio
+    price = Ad(data)
     ratio = as.vector(mlag(price)/(price))
     index = which(ratio > min.ratio)
 
     if(len(index) > 0)
       for(i in index) {
-        cat('Abnormal price found for', ticker, format(index(ticker.data)[i],'%d-%b-%Y'),'Inverse Ratio :', round(ratio[i],1),'\n')
-        for(name in spl('Open,Close,High,Low,Adjusted')) 
-          ticker.data[i:nperiods,name] = ticker.data[i:nperiods,name] * ratio[i]
+        cat('Abnormal price found for', ticker, format(index(data)[i],'%d-%b-%Y'),'Inverse Ratio :', round(ratio[i],1),'\n')        
+        for(name in find.names('Open,Close,High,Low,Adjusted', data)) 
+          data[i:nperiods,name] = data[i:nperiods,name] * ratio[i]
       }
-    data[[ticker]] = ticker.data 
-   }
+      
+    data      
 }
 
     

@@ -151,10 +151,54 @@ type.constraints <- function(constraints)
 }
 
 
+###############################################################################
+# create.basic.constraints - create basic constraints
+#' @export 
+###############################################################################
+create.basic.constraints <- function(
+	n,
+	const.lb = 0, 
+	const.ub = 1,
+	const.sum = 1
+)
+{
+	if(len(const.lb) == 1) const.lb = rep(const.lb, n)
+	if(len(const.ub) == 1) const.ub = rep(const.ub, n)
+
+	# 0 <= x.i <= 1
+	constraints = new.constraints(n, lb = const.lb, ub = const.ub)
+		constraints = add.constraints(diag(n), type='>=', b=const.lb, constraints)
+		constraints = add.constraints(diag(n), type='<=', b=const.ub, constraints)
+	
+	# SUM x.i = 1
+	if(!is.na(const.sum))
+		constraints = add.constraints(rep(1, n), type = '=', b=const.sum, constraints)
+	
+	return(constraints)
+}
 
 
-
-
+###############################################################################
+# create.basic.constraints - create basic constraints
+#' @export 
+###############################################################################
+merge.constraints <- function(constraints1, constraints2) {
+	if(constraints1$n != constraints2$n) stop('merge.constraints: both constraints must be based on same number of assets')
+	
+	if(constraints2$meq > 0) {
+		constraints1$A = cbind( constraints2$A[,1:constraints2$meq], constraints1$A, constraints2$A[,-c(1:constraints2$meq)] )
+		constraints1$b = c( constraints2$b[1:constraints2$meq], constraints1$b, constraints2$b[-c(1:constraints2$meq)] )
+		constraints1$meq = constraints1$meq + constraints2$meq
+	} else {
+		constraints1$A = cbind( constraints1$A, constraints2$A)
+		constraints1$b = c(constraints1$b, constraints2$b)
+	}
+	
+	constraints1$lb =  pmax(constraints1$lb, constraints2$lb, na.rm=T)
+	constraints1$ub =  pmin(constraints1$ub, constraints2$ub, na.rm=T)
+	
+	constraints1
+}
 
 
 

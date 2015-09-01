@@ -479,6 +479,96 @@ dev.off()
 
 }
 
+
+#******************************************************************************
+# Simulate Historical Prices
+#' @export 
+#******************************************************************************
+mat.3d = function(mat, n3dim) { array(mat, c(dim(mat), n3dim)) }
+
+# aperm(array(t(matrix(1:12, nr=6)),c(2,3,2)),c(2,1,3))
+#' @export 
+mat.slice.3d = function(mat, slice.at) { aperm(array(t(mat), c(ncol(mat), nrow(mat) / slice.at, slice.at)),c(2,1,3)) }
+
+
+# assuming strategy makes all descions at period.ends
+# asset.paths.at.period.ends function simulates price paths
+# that resemable history at each period.end
+#
+# please note that to generate prices at period.end
+# asset.paths.at.period.ends function examines historical
+# prices prior to and including period.end
+#' @export 
+asset.paths.at.period.ends <- function(
+	prices,
+	period.ends,
+	nsims = 100,
+	lookback.len = NA	# if lookback.len is missing genearte price scenarios for time T
+						# based on information from period.ends[T-1]:period.ends[T]
+) {
+	# if(any(is.na(prices))) stop('asset.paths.at.period.ends cannot handle missing values')
+	
+	load.packages('MASS')
+	
+	ret = prices / mlag(prices) - 1	
+		n = ncol(prices)
+		nperiods = nrow(prices)	
+	
+	# find value and location of first non-NA value
+	index = 1:nperiods
+	first.index = sapply(1:n, function(i) index[!is.na(prices[,i])][1])
+	first.value = sapply(1:n, function(i) prices[first.index[i],i])
+			
+	s0 = rep(1,n)
+	scenarios = array(NA, c(nperiods, n, nsims))
+	
+	period.ends.all = sort(unique(c(0, period.ends, len(period.ends))))
+
+	for(i in 2:len(period.ends.all)) {
+		# default lockback is to a prior period end
+		index.hist = index = (period.ends.all[i-1] + 1) : period.ends.all[i]
+			n.index = len(index)		
+
+		# handle case if user wants to base population data on different lookback			
+		if(!is.na(lookback.len)) 
+			index.hist = max(1, period.ends.all[i] - lookback.len + 1 ) : period.ends.all[i]
+			
+		hist = ret[index.hist,, drop=F]
+		
+		# only consider assets with historical data
+  		include.index = colSums(!is.na(hist)) != 0    
+  			if(!any(include.index)) continue
+  						
+  		hist = hist[,include.index, drop=F]
+  			
+  		# compute population parameters
+        mu = apply(hist, 2, mean, na.rm=T)
+        risk = apply(hist, 2, sd, na.rm=T)
+        correlation = cor(hist, use = 'complete.obs', method = 'pearson')
+        cov = correlation * (risk %*% t(risk))
+        
+        # sample from normal distribution with given population parameters
+        scenarios[index,include.index,] = mat.slice.3d(mvrnorm(n.index * nsims, mu, cov), nsims)
+
+		#temp = asset.paths(rep(1,n), mu, cov, nsims, periods = 1:n.index) 		
+	}
+	
+	# first return is always zero
+	scenarios[1,,] = 0
+		
+	for(i in 1:n)
+		for(j in 1:nsims) {
+			if(first.index[i] > 1) scenarios[first.index[i],i,j] = 0			
+			scenarios[first.index[i]:nperiods,i,j] = first.value[i] * cumprod(1 + scenarios[first.index[i]:nperiods,i,j])			
+		}
+	
+	# keep NA's as in the original data
+	scenarios = scenarios * mat.3d(1+0*prices, nsims)
+	
+	scenarios
+}
+
+
 ###############################################################################
 # Generate All Possible Combinations
 # there are 2^n - 1 distinct permutations
