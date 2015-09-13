@@ -1871,4 +1871,154 @@ data.clean.helper <- function
     data      
 }
 
+
+###############################################################################
+# Create data proxy, more details at
+# http://systematicinvestor.github.io/Data-Proxy/
+#' @export 
+###############################################################################
+make.data.proxy <- function(perl = "perl") {
+    #*****************************************************************
+    # Load external data
+    #******************************************************************   
+    library(SIT)
+    load.packages('quantmod')  
+
+	raw.data <- new.env()
     
+	#--------------------------------   
+    # TRJ_CRB file was downloaded from the 
+    # http://www.corecommodityllc.com/CoreIndexes.aspx
+    # select TR/CC-CRB Index-Total Return and click "See Chart"
+    # on Chart page click "Download to Spreadsheet" link
+    # copy TR_CC-CRB, downloaded file, to data folder
+    temp = extract.table.from.webpage( join(readLines("data/TR_CC-CRB")), 'EODValue' )
+    temp = join( apply(temp, 1, join, ','), '\n' )
+    raw.data$CRB = make.stock.xts( read.xts(temp, format='%m/%d/%y' ) )
+     
+	#--------------------------------   
+	# load 3-Month Treasury Bill from FRED (BIL)
+	filename = 'data/TB3M.Rdata'
+	if(!file.exists(filename)) {
+		TB3M = quantmod::getSymbols('DTB3', src='FRED', auto.assign = FALSE)
+		save(TB3M, file=filename)
+	}
+	load(file=filename)
+	TB3M[] = ifna.prev(TB3M)
+	#compute.raw.annual.factor(TB3M)
+	raw.data$TB3M = make.stock.xts(processTBill(TB3M, timetomaturity = 1/4, 261))
+	
+	
+	#--------------------------------   
+	# load 3 years t-bill from FRED (BIL)
+	filename = 'data/TB3Y.Rdata'
+	if(!file.exists(filename)) {
+		TB3Y = quantmod::getSymbols('DGS3', src='FRED', auto.assign = FALSE)
+		save(TB3Y, file=filename)
+	}
+	load(file=filename)
+	TB3Y[] = ifna.prev(TB3Y)
+	#compute.raw.annual.factor(TB3Y)
+	raw.data$TB3Y = make.stock.xts(processTBill(TB3Y, timetomaturity = 3, 261))
+
+	#--------------------------------   
+	# load 10 years t-bill from FRED (BIL)
+	filename = 'data/TB10Y.Rdata'
+	if(!file.exists(filename)) {
+		TB10Y = quantmod::getSymbols('DGS10', src='FRED', auto.assign = FALSE)
+		save(TB10Y, file=filename)
+	}
+	load(file=filename)
+	TB10Y[] = ifna.prev(TB10Y)
+	#compute.raw.annual.factor(TB10Y)
+	raw.data$TB10Y = make.stock.xts(processTBill(TB10Y, timetomaturity = 10, 261))
+
+	#--------------------------------   
+	# load 20 years t-bill from FRED (BIL)
+	filename = 'data/TB20Y.Rdata'
+	if(!file.exists(filename)) {
+		TB20Y = quantmod::getSymbols('GS20', src='FRED', auto.assign = FALSE)
+		save(TB20Y, file=filename)
+	}
+	load(file=filename)
+
+	TB20Y[] = ifna.prev(TB20Y)
+  
+	#compute.raw.annual.factor(TB10Y)
+	raw.data$TB20Y = make.stock.xts(processTBill(TB20Y, timetomaturity = 20, 12))
+
+	#--------------------------------
+	filename = 'data/GOLD.Rdata'
+	if(!file.exists(filename)) {
+		GOLD = bundes.bank.data.gold()
+		save(GOLD, file=filename)
+	}
+	load(file=filename)
+	raw.data$GOLD = make.stock.xts(GOLD)
+
+	#--------------------------------
+	# FTSE NAREIT U.S. Real Estate Index monthly total return series
+	# http://returns.reit.com/returns/MonthlyHistoricalReturns.xls
+	# https://r-forge.r-project.org/scm/viewvc.php/pkg/FinancialInstrument/inst/parser/download.NAREIT.R?view=markup&root=blotter
+	filename = 'data/NAREIT.xls'
+	if(!file.exists(filename)) {
+		url = 'http://returns.reit.com/returns/MonthlyHistoricalReturns.xls'
+		download.file(url, filename,  mode = 'wb')
+	}
+	
+	load.packages('gdata')
+	temp = read.xls(filename, pattern='Date', sheet='Index Data', stringsAsFactors=FALSE, perl=perl)
+	index = as.numeric(gsub(',','',temp$Index))
+	# monthly data, with 1-month-year format
+	NAREIT = make.xts(index, as.Date(paste(1,temp$Date),'%d %b-%y')) 
+	raw.data$NAREIT = make.stock.xts(NAREIT)
+	
+	
+	#--------------------------------
+
+
+	tickers = '
+COM = DBC;GSG + CRB
+
+RExUS = [RWX] + VNQ + VGSIX
+RE = [RWX] + VNQ + VGSIX
+RE.US = [ICF] + VGSIX
+
+EMER.EQ = [EEM] + VEIEX
+EMER.FI = [EMB] + PREMX
+
+GOLD = [GLD] + GOLD,
+US.CASH = [BIL] + TB3M,
+SHY + TB3Y,
+
+US.HY = [HYG] + VWEHX
+
+# Bonds
+US.BOND = [AGG] + VBMFX
+INTL.BOND = [BWX] + BEGBX
+
+JAPAN.EQ = [EWJ] + FJPNX
+EUROPE.EQ = [IEV] + FIEUX
+US.SMCAP = IWM;VB + NAESX
+TECH.EQ = [QQQ] + ^NDX
+US.EQ = [VTI] + VTSMX + VFINX
+US.MID = [VO] + VIMSX
+EAFE = [EFA] + VDMIX + VGTSX
+
+MID.TR = [IEF] + VFITX
+CORP.FI = [LQD] + VWESX
+TIPS = [TIP] + VIPSX + LSGSX
+LONG.TR = [TLT] + VUSTX
+'
+
+
+	data.proxy <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1970-01-01', env = data.proxy, raw.data = raw.data, auto.assign = T)
+
+	data.proxy.raw = raw.data
+	save(data.proxy.raw, file='data/data.proxy.raw.Rdata',compress='gzip') 
+	save(data.proxy, file='data/data.proxy.Rdata',compress='gzip') 
+}
+
+
+

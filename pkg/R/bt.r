@@ -88,7 +88,14 @@ bt.merge <- function
 
 
 ###############################################################################
-# Prepare backtest data
+# Prepare backtest data enviroment
+#
+# it usually contains:
+# * b$symbolnames
+# * b$universe
+# * b$prices
+# * b - asset hist data
+#
 #' @export 
 ###############################################################################
 bt.prep <- function
@@ -96,7 +103,8 @@ bt.prep <- function
 	b,				# enviroment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
 	dates = NULL,	# subset of dates
-	fill.gaps = F	# fill gaps introduced by merging
+	fill.gaps = F,	# fill gaps introduced by merging
+	basic = F		# control if xts object are created
 ) 
 {    
 	# setup
@@ -109,8 +117,8 @@ bt.prep <- function
 		out = bt.merge(b, align, dates)
 		
 		for( i in 1:nsymbols ) {
-			b[[ symbolnames[i] ]] = 
-				make.xts( coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE], out$all.dates)
+			temp = coredata( b[[ symbolnames[i] ]] )[ out$date.map[,i],, drop = FALSE]
+			b[[ symbolnames[i] ]] = iif(basic, temp, make.xts( temp, out$all.dates))
 		
 			# fill gaps logic
 			map.col = find.names('Close,Volume,Open,High,Low,Adjusted', b[[ symbolnames[i] ]])
@@ -140,6 +148,7 @@ bt.prep <- function
 	} else {
 		if(!is.null(dates)) b[[ symbolnames[1] ]] = b[[ symbolnames[1] ]][dates,]	
 		out = list(all.dates = index.xts(b[[ symbolnames[1] ]]) )
+		if(basic) b[[ symbolnames[1] ]] = coredata( b[[ symbolnames[1] ]] )
 	}
 
 	# dates
@@ -148,7 +157,7 @@ bt.prep <- function
 	# empty matrix		
 	dummy.mat = matrix(double(), len(out$all.dates), nsymbols)
 		colnames(dummy.mat) = symbolnames
-		dummy.mat = make.xts(dummy.mat, out$all.dates)
+		if(!basic) dummy.mat = make.xts(dummy.mat, out$all.dates)
 		
 	# weight matrix holds signal and weight information		
 	b$weight = dummy.mat
@@ -174,7 +183,8 @@ bt.prep.matrix <- function
 (
 	b,				# enviroment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
-	dates = NULL	# subset of dates
+	dates = NULL,	# subset of dates
+	basic = F		# control if xts object are created	
 )
 {    
 	align = align[1]
@@ -204,7 +214,7 @@ bt.prep.matrix <- function
 	}
 	
 	# empty matrix		
-	dummy.mat = make.xts(b$Cl, b$dates)
+	dummy.mat = iif(basic, b$Cl, make.xts(b$Cl, b$dates))
 		
 	# weight matrix holds signal and weight information		
 	b$weight = NA * dummy.mat
@@ -322,6 +332,7 @@ bt.prep.trim <- function
 	return(data.copy)
 }
  
+
 ###############################################################################
 # Helper function to backtest for type='share'
 #' @export 
@@ -339,7 +350,7 @@ bt.run.share <- function
 	capital = 100000,
 	commission = 0,
 	weight = b$weight,
-	dates = 1:nrow(b$prices)	
+	dates = 1:nrow(b$prices)
 ) 
 {
 	# make sure that prices are available, assume that
@@ -350,12 +361,10 @@ bt.run.share <- function
 	weight = mlag(weight, do.lag - 1)
 	do.lag = 1
 
-		
-	if(clean.signal) {
-		weight[] = (capital / prices) * bt.exrem(weight)
-	} else {
-		weight[] = (capital / prices) * weight
-	}
+	if(clean.signal)
+		weight[] = bt.exrem(weight)
+	weight = (capital / prices) * weight
+	
 	
 	bt.run(b,
 		trade.summary = trade.summary,
@@ -368,6 +377,7 @@ bt.run.share <- function
 		weight = weight,
 		dates = dates)	
 }
+
 
 ###############################################################################
 # Run backtest
@@ -462,10 +472,10 @@ bt.run <- function
 	weight = temp
 	
 	
-
 	# prepare output
-	bt = bt.summary(weight, ret, type, b$prices, capital, commission, dates.index)
-		bt$dates.index = dates.index 
+	bt = bt.summary(weight, ret, type, b$prices, capital, commission)
+		bt$dates.index = dates.index
+	bt = bt.run.trim.helper(bt, dates.index)
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
@@ -484,6 +494,28 @@ bt.run <- function
 	return(bt)
 }
 
+# trim bt object, used internally
+bt.run.trim.helper = function(bt, dates.index) {
+	bt$equity = bt$equity[dates.index]
+		bt$equity = bt$equity / as.double(bt$equity[1])
+		
+	bt$ret = bt$ret[dates.index]
+	
+	bt$weight = bt$weight[bt$dates.index,,drop=F]
+		bt$weight[1,] = 0	
+		
+	if (!is.null(bt$share)) {
+		bt$share = bt$share[dates.index,,drop=F]
+		bt$share[1,] = 0
+	}
+	
+	bt$best = max(bt$ret)
+	bt$worst = min(bt$ret)
+	bt$cagr = compute.cagr(bt$equity)
+	
+	bt
+}
+
 ###############################################################################
 # Backtest summary
 #' @export 
@@ -495,8 +527,7 @@ bt.summary <- function
 	type = c('weight', 'share'),
 	close.prices,
 	capital = 100000,
-	commission = 0,	# cents / share commission
-	dates.index = 1:nrow(weight)
+	commission = 0	# cents / share commission
 ) 
 {
 	# cents / share commission
@@ -523,14 +554,6 @@ bt.summary <- function
 		else 
 			commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
 	}
-	
-	# subset dates
-	if(len(dates.index) != nrow(weight)) {
-		weight = weight[dates.index,,drop=F]
-		ret = ret[dates.index,,drop=F]
-		close.prices = close.prices[dates.index,,drop=F]	
-	}
-	
 	
 	type = type[1]
     n = nrow(ret)

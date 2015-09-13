@@ -743,9 +743,11 @@ risk.parity.portfolio <- function(
 				
 		# re-scale weights to penalize for risk		
 		x = 1 / fn(ia)[risk.index]
-				
+			# if an asset has a negative fn this asset’s weight will be 0; 
+			x[x < 0] = 0
+		
 		# normalize weights to sum up to 1
-		set.risky.asset(x / sum(x), risk.index)
+		ifna(set.risky.asset(x / sum(x), risk.index), 0)
 	}	
 }
 
@@ -1018,6 +1020,46 @@ random.hist <- function(
 	}	
 }
 
+
+#*****************************************************************	
+# generate given number of historical scenarios
+# and average portfolio allocation algo weights 
+# across all scenarios
+#' @export 
+#*****************************************************************
+random.hist.weight = function(
+	fn,
+	data,
+	period.ends,
+	nsamples = 100, 
+	sample.len = 120,
+	silent = F	
+)
+{
+	prices = data$prices * data$universe
+	obj = fn(prices, data)
+		
+	scenarios = asset.paths.at.period.ends(data$prices, period.ends, nsamples, lookback.len=sample.len)
+	#plota.matplot(scale.one(make.xts(scenarios[,,j],data$dates)),main='Asset Perfromance')
+	
+	for(j in 1:nsamples) {
+		prices = make.xts(scenarios[,,j],data$dates)
+			colnames(prices) = colnames(data$prices)
+		prices = prices * data$universe
+		temp = fn(prices, data)
+		for(i in names(obj$weights))
+			obj$weights[[i]] = obj$weights[[i]] + temp$weights[[i]]
+			
+		if (j %% 5 == 0)
+			if (!silent)
+				cat(j, 'done', '\n')
+	}
+
+	for(i in names(obj$weights))
+		obj$weights[[i]] = obj$weights[[i]] / (nsamples + 1)
+		
+	obj
+}
 	
 	
 		
@@ -2562,7 +2604,8 @@ portfolio.allocation.helper <- function
 		
 	index.map = 1:ncol(ret)
    				
-	# construct portfolios			
+if(!is.na(start.i)) {
+	# construct portfolios
 	for( j in start.i:len(period.ends) ) {
 		i = period.ends[j]
 		
@@ -2634,6 +2677,7 @@ portfolio.allocation.helper <- function
 			
 		if( j %% log.frequency == 0) if(!silent) log(j, percent = (j - start.i) / (len(period.ends) - start.i))			
 	}
+}
 	
 	if( len(shrinkage.fns) == 1 ) {
 		names(weights) = gsub( paste('\\.', names(shrinkage.fns), '$', sep=''), '', names(weights) )

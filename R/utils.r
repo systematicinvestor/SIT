@@ -2089,6 +2089,122 @@ getSymbols.intraday <- function
   }
 }
 
+
+
+###############################################################################
+#' Work with expressions
+#' as.expression(quote({x=2+y}))
+#' @export 
+################################################################################
+convert2expr = function(expr) {
+	if(class(substitute(expr)) == '{') {
+		if(F) {
+			return(as.expression(substitute(expr)))
+		} else {
+			temp = deparse(substitute(expr))
+			return(parse(text = temp[-c(1,length(temp))]))
+		}
+	}
+	
+	if(is.character(expr)) return(parse(text = expr))
+	
+	expr
+}
+
+convert2expr.test = function() {
+	convert2expr({x=2+y})
+	convert2expr({x=2+y; a=b})
+	convert2expr({
+		x=2+y
+		a=b
+	})
+	
+	convert2expr(expression(x=2+y))
+	convert2expr(expression(x=2+y,a=b))
+	convert2expr('x=2+y')
+	convert2expr('x=2+y; a=b')
+	convert2expr('
+		x=2+y
+		a=b
+	')
+	
+	a = convert2expr({x=2+y})
+	expr.symbols(a)
+}
+
+
+
+
+remove.operators = function(tokens) { 
+	tokens = unique(trim( tokens[-grep('[=\\+\\-\\*/><\\(\\)\\{\\}]',tokens)] )) 
+	tokens[nchar(tokens) > 0 & tokens != 'expression' & tokens != 'convert2expr']
+}
+
+# http://adv-r.had.co.nz/Expressions.html
+# bizzare!!!
+# all.names(parse(text='x=2+y'))
+#[1] "=" "x" "+" "y"
+# all.names(expression(x=2+y))
+#[1] "+" "y"
+#
+# names(as.pairlist(expression(a+b, c=d)))
+# all.names(expression(a+b, c=d))
+#' @export 
+expr.symbols = function(expr) {
+	# use substitute to avoid expr evaluation
+	#cat(class(substitute(expr)), mode(substitute(expr)), is.expression(substitute(expr)), '\n')
+	
+	# need quote to avoid evaluation, all.names(quote({
+	if(mode(substitute(expr)) == 'call')
+		return(remove.operators(
+			c(names(as.pairlist(substitute(expr))),
+			all.names(substitute(expr)))
+		))		
+	
+	# if name no need to substitute
+	if(mode(substitute(expr)) == 'name')
+		if(is.expression(expr)) {	
+			return(remove.operators(
+				c(names(as.pairlist(expr)),
+				all.names(expr))
+			))		
+		} else {
+			return(remove.operators(
+				all.names(expr)
+		))
+		}
+	
+		
+	if(is.character(expr)) 
+		return(remove.operators(
+			all.names(parse(text=expr))
+		))
+
+	expr
+}
+
+expr.symbols.test = function() {
+
+	expr.symbols({
+		x = 2 + y+z
+		a=2+b
+	})
+	
+	
+	expr.symbols({x=y+2})
+	
+	expr.symbols('x=y+2')
+	
+	expr.symbols(expression(x=2+y))
+	
+	expr.symbols(expression(x=2+y, a=b))
+	
+	a = expression(x=2+y+zzasd)
+	expr.symbols(a)
+	
+}
+
+
 ###############################################################################
 # Log (feedback) functions
 ###############################################################################
