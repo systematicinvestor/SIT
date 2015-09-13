@@ -460,7 +460,7 @@ plotbt.holdings <- function
 	
 	# sync order of assets with plotbt.transition.map
 	# arrange so that most consient holdings are at the bottom 
-	weight = weight[, sort.list(colSums(weight!=0, na.rm=T), decreasing=T)]
+	weight = weight[, sort.list(colSums(weight!=0, na.rm=T), decreasing=T), drop=F]
 	
 	temp = 100 * as.vector(last(weight))
 	atemp = abs(temp)	

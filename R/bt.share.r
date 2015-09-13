@@ -569,6 +569,10 @@ bt.run.share.ex.test = function() {
 	)	
 	
 	
+	
+	#plotbt.holdings.time(models$test$weight)
+	
+	
 	# check shares
 	last(models$test.ex.lot$share[period.ends,], 20)
 	
@@ -652,7 +656,20 @@ bt.run.share.ex.test = function() {
 		strategy.performance.snapshoot(models, data=data)
 		
 	dev.off()
-  
+ 
+	
+
+	#*****************************************************************
+	# Example of using round lot externally
+	#******************************************************************
+	weight = rep(1/n, n)
+	price = coredata(last(prices))
+	share = rep(0, n)
+	cash = 100000
+	commission = list(cps = 0.01, fixed = 1.0, percentage = 0.0)
+	lot.size = rep(100, n)
+	
+	bt.run.share.ex.allocate(weight, weight, rep(T, n),
+		price, share, cash, commission, lot.size)
+			
 }
-
-
