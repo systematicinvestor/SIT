@@ -1339,7 +1339,7 @@ get.fama.french.data <- function(
   
   # url
   period = ifna(map[periodicity[1]], periodicity[1])
-  filename.zip = paste(name[1], period, '.zip', sep='')
+  filename.zip = paste(name[1], period, '_TXT.zip', sep='')
   filename.txt = paste(name[1], period, '.txt', sep='')
   url = paste('http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/', filename.zip, sep='')
         

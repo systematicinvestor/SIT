@@ -151,6 +151,12 @@ env <- function
 	values = list(...)
 	if(len(values) == 0) return(temp)
 	
+	# copy environment
+	if(len(values) == 1 && is.environment(values[[1]])) {
+		list2vars(values[[1]], temp)
+		return(temp)
+	}
+	
 	values.names = names(values)
 	names = as.character(substitute(c(...))[-1])
 		
@@ -205,7 +211,7 @@ vars2list <- function(...) {
 # assign(n, data[[n]], env)
 #' @export 
 list2vars <- function(data, env = parent.frame()) {
-	for(n in ls(data))
+	for(n in ls(data, all.names=T))
 		env[[n]] = data[[n]]
 }
 ###############################################################################
@@ -215,7 +221,7 @@ list2vars <- function(data, env = parent.frame()) {
 check.args = function(default.args, args=NULL) {
 	if(is.null(args)) return(default.args)
 	
-	for(n in setdiff(ls(default.args), ls(args)))
+	for(n in setdiff(ls(default.args, all.names=T), ls(args, all.names=T)))
 		args[[n]] = default.args[[n]]
 			
 	args
@@ -2010,12 +2016,12 @@ getSymbols.extra <- function
 	Symbols = unique(unlist(map))
   
 	# find overlap with raw.data
-	Symbols = setdiff(Symbols, ls(raw.data))
+	Symbols = setdiff(Symbols, ls(raw.data, all.names=T))
 
 	# download
 	data = new.env()
 	if(len(Symbols) > 0) match.fun(getSymbols.fn)(Symbols, env=data, auto.assign = T, ...)
-	for(n in ls(raw.data)) data[[n]] = raw.data[[n]]
+	for(n in ls(raw.data, all.names=T)) data[[n]] = raw.data[[n]]
   
 	# reconstruct, please note getSymbols replaces ^ symbols
 	if (set.symbolnames) env$symbolnames = names(map)
@@ -2084,7 +2090,7 @@ getSymbols.intraday <- function
 {
   if(len(Symbols) > 0) {
     match.fun(getSymbols.fn)(Symbols, env = env, auto.assign = auto.assign, ...)
-    data.today = getQuote.yahoo.today(ls(env))
+    data.today = getQuote.yahoo.today(ls(env, all.names=T))
     bt.append.today(env, data.today)
   }
 }

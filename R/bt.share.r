@@ -568,11 +568,6 @@ bt.run.share.ex.test = function() {
 		lot.size=50, control = list(round.lot = list(select = 'minimum.turnover', diff.target = 5/100))
 	)	
 	
-	
-	
-	#plotbt.holdings.time(models$test$weight)
-	
-	
 	# check shares
 	last(models$test.ex.lot$share[period.ends,], 20)
 	
@@ -673,3 +668,4 @@ bt.run.share.ex.test = function() {
 		price, share, cash, commission, lot.size)
 			
 }
+
