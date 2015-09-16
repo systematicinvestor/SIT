@@ -1791,6 +1791,52 @@ quantumonline.info <- function
 }
 
 
+###############################################################################	
+#' URL for various data providers
+#' @export 
+###############################################################################
+hist.quotes.url <- function
+(
+	ticker = 'IBM',
+	from = '1900-01-01', 
+	to = Sys.Date(),
+	src = spl('yahoo,google,quotemedia')
+)
+{
+	if(class(from) != 'Date') from = as.Date(from, '%Y-%m-%d')	
+	if(class(to) != 'Date') to = as.Date(to, '%Y-%m-%d')
+	
+	switch(src[1],
+		yahoo = paste('http://ichart.finance.yahoo.com/table.csv?',
+         's=', ticker,  
+         '&a=', sprintf('%.2d', date.month(from) - 1),
+         format(from, '&b=%d&c=%Y'),
+         '&d=', sprintf('%.2d', date.month(to) - 1),
+         format(to, '&e=%d&f=%Y'),
+         '&g=d&q=q&y=0&z=file&x=.csv',
+         sep=''),
+         
+		google = paste('http://finance.google.com/finance/historical?',
+         'q=', ticker,  
+         '&startdate=', format(from, '%b+%d+%Y'),
+         '&enddate=', format(to, '%b+%d+%Y'),
+         '&output=csv',
+         sep=''),
+         
+		quotemedia = paste('http://app.quotemedia.com/quotetools/getHistoryDownload.csv?webmasterId=501&',
+         'symbol=', ticker,  
+         '&startMonth=', sprintf('%.2d', date.month(from) - 1),
+         format(from, '&startDay=%d&startYear=%Y'),
+         '&endMonth=', sprintf('%.2d', date.month(to) - 1),
+         format(to, '&endDay=%d&endYear=%Y'),
+         '&isRanged=true',
+         sep=''),
+         
+    # default
+    ''
+ ) 	
+}  
+
 ###############################################################################
 # Remove extreme data points
 #' @export 

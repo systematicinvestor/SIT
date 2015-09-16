@@ -4,7 +4,8 @@
 \usage{
   getSymbols.extra(Symbols = NULL, env = parent.frame(),
     getSymbols.fn = getSymbols, raw.data = new.env(),
-    set.symbolnames = F, auto.assign = T, ...)
+    set.symbolnames = F, auto.assign = T, try.extend = T,
+    ...)
 }
 \description{
   Syntax to specify tickers: * Basic : XLY * Rename:

@@ -1934,47 +1934,8 @@ parse.expr = function(expr) {
 	sapply(expr, function(x) spl(x,'#')[1])
 }
 
-###############################################################################
-#' Helper function to extend functionality of getSymbols
-#'
-#' Syntax to specify tickers:
-#' * Basic : XLY
-#' * Rename: BOND=TLT
-#' * Extend: XLB+RYBIX
-#' * Mix above: XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX
-#' Symbols = spl('XLY, BOND=TLT,XLY+RYBIX,XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX')
-
-#' tickers=spl('XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX,
-#' XLE+RYEIX+VGENX+FSENX+PRNEX+DREVX,
-#' XLF+FIDSX+SCDGX+DREVX,
-#' XLI+FSCGX+VFINX+FEQIX+DREVX,
-#' XLK+RYTIX+KTCBX+FSPTX+FTCHX+FTRNX+DREVX,
-#' XLP+FDFAX+FSPHX+OARDX+DREVX,
-#' XLU+FSUTX+DREVX,
-#' XLV+VGHCX+VFINX+DREVX,
-#' XLY+FSRPX+DREVX,
-#' BOND+IEI+VFIUX+VFITX+FSTGX+FGOVX+STVSX+FGMNX+FKUSX')
-#' 
-#' data <- new.env()
-#'   getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
-#' bt.start.dates(data)
-#' 
 #' @export 
-################################################################################
-getSymbols.extra <- function 
-(
-  Symbols = NULL, 
-  env = parent.frame(), 
-  getSymbols.fn = getSymbols,
-  raw.data = new.env(),   # extra pre-loaded raw data
-  set.symbolnames = F,
-  auto.assign = T,  
-  ...
-) 
-{
-	Symbols = parse.expr(Symbols)
-	if(len(Symbols) < 1) return(Symbols)
-  
+map.symbols = function(Symbols) {
   	Symbols = toupper(Symbols)
     
 	# split
@@ -2013,6 +1974,54 @@ getSymbols.extra <- function
 		#values = spl(iif(len(spl(s, '=')) > 1, spl(s, '=')[2], s), '\\+')
 		#map[[trim(name)]] = trim(values)   
 	}
+	map
+}
+
+
+###############################################################################
+#' Helper function to extend functionality of getSymbols
+#'
+#' Syntax to specify tickers:
+#' * Basic : XLY
+#' * Rename: BOND=TLT
+#' * Extend: XLB+RYBIX
+#' * Mix above: XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX
+#' Symbols = spl('XLY, BOND=TLT,XLY+RYBIX,XLB=XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX')
+
+#' tickers=spl('XLB+RYBIX+FSDPX+FSCHX+PRNEX+DREVX,
+#' XLE+RYEIX+VGENX+FSENX+PRNEX+DREVX,
+#' XLF+FIDSX+SCDGX+DREVX,
+#' XLI+FSCGX+VFINX+FEQIX+DREVX,
+#' XLK+RYTIX+KTCBX+FSPTX+FTCHX+FTRNX+DREVX,
+#' XLP+FDFAX+FSPHX+OARDX+DREVX,
+#' XLU+FSUTX+DREVX,
+#' XLV+VGHCX+VFINX+DREVX,
+#' XLY+FSRPX+DREVX,
+#' BOND+IEI+VFIUX+VFITX+FSTGX+FGOVX+STVSX+FGMNX+FKUSX')
+#' 
+#' data <- new.env()
+#'   getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
+#' bt.start.dates(data)
+#' 
+#' @export 
+################################################################################
+getSymbols.extra <- function 
+(
+  Symbols = NULL, 
+  env = parent.frame(), 
+  getSymbols.fn = getSymbols,
+  raw.data = new.env(),   # extra pre-loaded raw data
+  set.symbolnames = F,
+  auto.assign = T,
+  try.extend = T,  
+  ...
+) 
+{
+	Symbols = parse.expr(Symbols)
+	if(len(Symbols) < 1) return(Symbols)
+  
+	map = map.symbols(Symbols)
+	
 	Symbols = unique(unlist(map))
   
 	# find overlap with raw.data
@@ -2028,12 +2037,15 @@ getSymbols.extra <- function
 	
   for(s in names(map)) {
     env[[ s ]] = data[[ gsub('\\^', '', map[[ s ]][1]) ]]
+   if(try.extend)    
     if( len(map[[ s ]]) > 1)
       for(i in 2:len(map[[ s ]]))
         if(is.null(data[[ gsub('\\^', '', map[[ s ]][i]) ]]))
           cat('Not Downloaded, main =', s, 'missing' , gsub('\\^', '', map[[ s ]][i]), '\n', sep='\t')    
         else
           env[[ s ]] = extend.data(env[[ s ]], data[[ gsub('\\^', '', map[[ s ]][i]) ]], scale=T)
+          
+          
     if (!auto.assign)
           return(env[[ s ]])      
   } 
@@ -2090,10 +2102,55 @@ getSymbols.intraday <- function
 {
   if(len(Symbols) > 0) {
     match.fun(getSymbols.fn)(Symbols, env = env, auto.assign = auto.assign, ...)
-    data.today = getQuote.yahoo.today(ls(env, all.names=T))
+
+    # same logic as in getSymbols.extra
+	Symbols = parse.expr(Symbols)
+	if(len(Symbols) < 1) return(Symbols) 
+	map = map.symbols(Symbols)
+		map = sapply(map, first)
+	
+	data.today = getQuote.yahoo.today(unique(map))
+		lookup = 1:nrow(data.today)
+		names(lookup) = toupper(trim(data.today$Symbol))
+	
+	data.today = data.today[lookup[map],]
+		data.today$Symbol = names(map)
+		
     bt.append.today(env, data.today)
   }
 }
+
+
+# test for getSymbols.intraday function
+getSymbols.intraday.test <- function() { 
+	tickers = '
+	LQD + VWESX
+	DBC + CRB
+	VTI +VTSMX # (or SPY)
+	ICF + VGSIX # (or IYR)
+	CASH = SHY
+	'
+	
+	data.intraday  = env()
+	
+	getSymbols.extra(tickers, src = 'yahoo', from = '2012-01-01', env = data.intraday,
+		raw.data = data.proxy.raw, set.symbolnames = T, auto.assign = T,
+		getSymbols.fn = getSymbols.intraday)
+	
+	last(data.intraday$CASH,5)
+	last(data.intraday$VTI,5)
+	
+	data = env()
+	
+	getSymbols.extra(tickers, src = 'yahoo', from = '2012-01-01', env = data,
+		raw.data = data.proxy.raw, set.symbolnames = T, auto.assign = T)
+	
+	last(data$CASH,5)
+	last(data$VTI,5)
+}
+
+
+
 
 
 
