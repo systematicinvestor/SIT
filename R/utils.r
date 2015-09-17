@@ -2110,6 +2110,7 @@ getSymbols.intraday <- function
 		map = sapply(map, first)
 	
 	data.today = getQuote.yahoo.today(unique(map))
+		data.today[data.today == 'N/A'] = NA
 		lookup = 1:nrow(data.today)
 		names(lookup) = toupper(trim(data.today$Symbol))
 	
@@ -2341,3 +2342,45 @@ ls.v <- function(env=sys.frame(-1))unlist(lapply(ls(env=env),function(x)if(!is.f
 parse.number <- function(x) {
   as.numeric(gsub('[^0-9\\+-\\.]', '', x) ) 
 }
+
+###############################################################################
+#' Flexiable utility function to Map value(s) to vector
+#'
+#' @param value value(s) to use for mapping
+#' @param labels names of vector columns
+#' @param default default value, \strong{defaults to 0}
+#'
+#' @return vector
+#'
+#' Possible scenarios:
+#' one number, applied to all assets
+#' array, same number of entrys as assets
+#' named list, each name corresponds asset
+#'	plus have a fallback asset if nothing provided
+#'
+#' @examples
+#' \dontrun{ 
+#' map2vector(1, 5)
+#' map2vector(c(1,2,3,4,5), 5)
+#' map2vector(c(1,2,NA,4,5), 5, 100)
+#' map2vector(list(a=1,b=4), 'a,b,c,d,e', 100)
+#' map2vector(list(a=1,C=4), 'a,b,c,d,e', 100)
+#' }
+#' @export 
+###############################################################################
+map2vector = function(value, labels, default = 0) {
+	if( is.character(labels) ) labels = spl(labels)
+	n = iif( is.numeric(labels), labels, len(labels) )
+		
+	if( len(value) == 0 ) return(rep(default, n))
+		
+	if( is.list(value) ) {
+		out = rep(default, n)
+		out[ match(toupper(names(value)), toupper(labels)) ] = unlist(value)
+		out
+	} else		
+		ifna(iif( len(value) == 1, rep(value, n), value), default)
+}
+
+
+

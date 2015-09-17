@@ -2017,9 +2017,13 @@ bt.end.dates <- function
 #' @export 
 ###############################################################################
 bt.append.today <- function(b, data.today) {
-	tickers = data.today$Symbol
-	Yesterday = data.today$Yesterday	
-	data = make.stock.xts(read.xts(data.today, date.column=find.names('Date',data.today),format='%m/%d/%Y', decreasing=NULL))
+	date.column = find.names('Date',data.today)
+	valid.index = which(!is.na(data.today[,date.column,with=F]))	
+	data.today = data.today[valid.index]
+	
+	data = make.stock.xts(read.xts(data.today, date.column=date.column,format='%m/%d/%Y', decreasing=NULL))	
+		tickers = data.today$Symbol
+		Yesterday = data.today$Yesterday	
 	
 	# todo, better logic for merging Intraday and EOD data
 	for(i in 1:len(tickers)) {

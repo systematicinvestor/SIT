@@ -20,12 +20,6 @@
 ###############################################################################
 
 
-#TODO: make 	dividend.foreign.withholding.tax, lot.size either
-#* one number, applied to all assets
-#* array, same number of entrys as assets
-#* named list, each name corresponds asset
-#	plus have a fallback asset if nothing provided
-#
 ###############################################################################
 #' New Share Back Test functionality to properly capture portfolio changes.
 #' This is an event driven back test that updates portfolio at every trade event
@@ -95,10 +89,7 @@ bt.run.share.ex <- function
 			trade.dividend = rowSums(mlag(weight1) != 0 & dividends > 0, na.rm=T) > 0
 			trade.split = rowSums(mlag(weight1) != 0 & splits > 0, na.rm=T) > 0
 			
-		if( len(dividend.foreign.withholding.tax) > 0 ) 
-			dividend.foreign.withholding.tax = ifna(iif( len(dividend.foreign.withholding.tax) == 1, rep(dividend.foreign.withholding.tax, n), dividend.foreign.withholding.tax), 0)
-		else
-			dividend.foreign.withholding.tax = rep(0, n)
+		dividend.foreign.withholding.tax = map2vector(dividend.foreign.withholding.tax, colnames(prices), 0)
 
 		event.index = which(trade.index | trade.dividend | trade.split)
 	} else
@@ -124,14 +115,14 @@ bt.run.share.ex <- function
 		commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
 		
 	# validate lot.size
-	if( len(lot.size) > 0 ) 
-		lot.size = ifna(iif( len(lot.size) == 1, rep(lot.size, n), lot.size), 1)
-		
+	lot.size = map2vector(lot.size, colnames(prices), 1)
 	
 	# setup event driven back test loop
 	cash.wt = cash = rep(capital, nperiods)
-	com = rep(0, nperiods)
+	event.type = div = com = rep(0, nperiods)
+		event.type.def = list(none=0, trade=1, split=2, dividend=3)
 	share.wt = share = matrix(0, nperiods, n)
+		colnames(share) = colnames(prices)
 	last.trade = 0
 	weight.last = weight1[1,]
 	
@@ -155,12 +146,15 @@ bt.run.share.ex <- function
 					cashflow = share[i,a] * dividends[i,a] * 
 						iif(share[i,a] < 0, 1, 1 - dividend.foreign.withholding.tax[a])
 					cash[i] = cash[i] + cashflow
-					cash.wt[i] = cash.wt[i] + cashflow			
+					cash.wt[i] = cash.wt[i] + cashflow
+					div[i] = cashflow
+					event.type[i] = event.type.def$dividend
 			}
 			# check what happends if dividend and split are on the same day
 			if( trade.split[i] ) {
 				for(a in which(share[i,] !=0 & splits[i,] > 0))
 					share[i,a] = share.wt[i,a] = share[i,a] / splits[i,a]
+				event.type[i] = event.type.def$split
 			}
 		}
 		
@@ -170,10 +164,12 @@ bt.run.share.ex <- function
 				weight.change.index = !is.na(weight[i,]),
 				price = prices[i,], share = share[i,], cash = cash[i],
 				commission, lot.size, control = control$round.lot)
-				
+			
+			# only update current ones, not the ones used for weights
 			share[i,] = out$share
 			cash[i] = out$cash
 			com[i] = out$com
+			event.type[i] = event.type.def$trade
 		}
 		last.trade = i
 	}
@@ -194,8 +190,13 @@ bt.run.share.ex <- function
 	
 bt$share = share
 bt$cash = cash
-bt$com = com
 bt$value = cash + rowSums(share * prices)
+
+bt$com = com
+bt$div = div
+bt$event.type = factor(event.type, as.character(unlist(event.type.def)), names(event.type.def))
+
+
 	
 	bt$weight = share.wt * prices / (cash.wt + rowSums(share.wt * prices))
 	value = c(capital, cash + rowSums(share * prices))
@@ -746,6 +747,15 @@ bt.unadjusted.add.div.split = function(data.raw, yahoo.round.up.nearest.cents=F)
 		dividend = getDividends(ticker, from = '1900-01-01')	
 		split = getSplits(ticker, from = '1900-01-01')	
 		
+		
+# un-adjust split, faster version of adjRatios(splits=merge(split, index(dividend)))[,1]
+#split1 = split
+#	split1[] = rev(cumprod(rev(coredata(split))))
+#x = mlag(merge(split1, index(dividend)), -1)
+#x[] = ifna(x[ifna.prevx.rev(x)],1)
+##all(x == adjRatios(splits=merge(split, index(dividend)))[,1])
+		
+		
 		# Please see quantmod:::adjustOHLC for more details
 		# un-adjust dividends for splits (Yahoo already adjusts div for splits)
     	if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
@@ -973,6 +983,29 @@ IBM = read.xts(txt,sep=' ', format='%b-%d-%Y')
 
 }
 	
+
+###############################################################################	
+#' Summarize bt.run.share.ex events
+#' @export 
+###############################################################################
+bt.make.trade.event.summary.table = function(bt, to.text=F) {
+	index = bt$event.type != 'none'
+	
+	# create summary table: event.type, date, shares, cash, com, div, value	
+	out = data.frame(
+		Type = bt$event.type,
+		bt$share,
+		Cash=bt$cash,
+		Com=bt$com,
+		Div=bt$div,
+		Value=bt$value
+	)[index,]
+	rownames(out) = format(index(bt$equity)[index], '%Y-%m-%d')
+	
+	if(to.text) to.nice(out,0)
+	else out
+}
+
 ###############################################################################	
 #' Test for bt.run.share.unadjusted functionality
 #' @export 
@@ -1067,6 +1100,11 @@ bt.run.share.unadjusted.test = function() {
 		plotbt.transition.map(models$test.ex$weight)
 		plotbt.transition.map(models$test.unadjusted$weight)
 
+		
+	# create table
+	mlast(bt.make.trade.event.summary.table(models$test.unadjusted), 20)
+		
+		
 
 	#*****************************************************************
 	# Load historical data
@@ -1175,6 +1213,9 @@ bt.run.share.unadjusted.test = function() {
 	layout(1:2)
 		plotbt.transition.map(models$test.unadjusted$weight)
 		plotbt.transition.map(models$test.unadjusted1$weight)
+		
+	# create table
+	mlast(bt.make.trade.event.summary.table(models$test.unadjusted), 20)
 		
 
 	
