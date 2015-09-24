@@ -590,11 +590,14 @@ date.ends <- function(dates, periodicity, by=1, skip=0, last.date=T, calendar = 
 	dates = as.Date(dates)
 		n = len(dates)
   
-  	# getHolidayList
-  	load.packages('RQuantLib')
   
 	holidays = NULL   
-	if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)     
+	if(!is.null(calendar)) {
+	  	# getHolidayList
+  		load.packages('RQuantLib')
+	
+		holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)
+	}
 		before = business.days(dates[1] - 60, dates[1] - 1, holidays)
     	n.before = len(before) 
 
@@ -743,11 +746,14 @@ business.days.location.end <- function(dates, calendar = null, fn.ends = date.mo
   dates = as.Date(dates)
   n = len(dates)
   
-  # getHolidayList
-  load.packages('RQuantLib')
   
 holidays = NULL   
-if(!is.null(calendar)) holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)   
+if(!is.null(calendar)) {
+	# getHolidayList
+	load.packages('RQuantLib')
+ 
+	holidays = getHolidayList(calendar, dates[1] - 60, dates[1] - 1)   
+}
   
   before = business.days(dates[1] - 60, dates[1] - 1, holidays)
     n.before = len(before) 
