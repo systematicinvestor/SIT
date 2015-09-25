@@ -2329,7 +2329,7 @@ random.string <- function(lenght = 12) { join(sample(c(0:9, letters, LETTERS),le
 ###############################################################################
 #' List function / variables in enviroment
 #'
-#' http://www.mail-archive.com/r-help@stat.math.ethz.ch/msg22679.html
+#' http://www.mail-archive.com/r-help@@stat.math.ethz.ch/msg22679.html
 #'
 #' @export 
 #' @rdname ListEnvFunctions

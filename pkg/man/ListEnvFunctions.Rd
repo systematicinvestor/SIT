@@ -8,6 +8,6 @@
   ls.v(env = sys.frame(-1))
 }
 \description{
-  http://www.mail-archive.com/r-help
+  http://www.mail-archive.com/r-help@stat.math.ethz.ch/msg22679.html
 }
 

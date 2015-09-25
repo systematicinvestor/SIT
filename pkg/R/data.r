@@ -1927,7 +1927,6 @@ make.data.proxy <- function(perl = "perl") {
     #*****************************************************************
     # Load external data
     #******************************************************************   
-    library(SIT)
     load.packages('quantmod')  
 
 	raw.data <- new.env()

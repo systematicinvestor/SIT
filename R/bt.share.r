@@ -319,8 +319,8 @@ bt.run.share.ex <- function
 		# copy from last trade
 		index = (last.trade + 1) : nperiods
 			n.index = len(index)
-		share.wt[index,] = rep.row(share[last.trade], n.index)
-		share[index,] = rep.row(share[last.trade], n.index)
+		share.wt[index,] = rep.row(share[last.trade,], n.index)
+		share[index,] = rep.row(share[last.trade,], n.index)
 		cash.wt[index] = cash[last.trade]
 		cash[index] = cash[last.trade]
 	}
@@ -376,7 +376,7 @@ bt$equity = cumprod(1 + bt$ret)
 	bt$dates.index = dates2index(b$prices, dates)
 	
 	# prepare output
-	bt = SIT:::bt.run.trim.helper(bt, bt$dates.index)
+	bt = bt.run.trim.helper(bt, bt$dates.index)
 
 	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
 
@@ -811,7 +811,6 @@ bt.run.share.ex.test = function() {
 	#*****************************************************************
 	# Load historical data
 	#*****************************************************************
-	library(SIT)
 	load.packages('quantmod')
 	
 	tickers = 'SPY'
@@ -1034,7 +1033,6 @@ bt.run.share.unadjusted.test.data = function() {
 	#*****************************************************************
 	# Load historical data
 	#*****************************************************************
-	library(SIT)
 	load.packages('quantmod')
 	
 	tickers = 'IBM'
@@ -1275,7 +1273,6 @@ bt.run.share.unadjusted.test = function() {
 	#*****************************************************************
 	# Load historical data
 	#*****************************************************************
-	library(SIT)
 	load.packages('quantmod')
 	
 	tickers = 'IBM'
@@ -1370,7 +1367,6 @@ bt.run.share.unadjusted.test = function() {
 	#*****************************************************************
 	# Load historical data
 	#*****************************************************************
-	library(SIT)
 	load.packages('quantmod')
 	
 	tickers = 'SPY'
