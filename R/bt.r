@@ -495,20 +495,17 @@ bt.run <- function
 }
 
 # trim bt object, used internally
+#' @export 
 bt.run.trim.helper = function(bt, dates.index) {
-	bt$equity = bt$equity[dates.index]
-		bt$equity = bt$equity / as.double(bt$equity[1])
-		
-	bt$ret = bt$ret[dates.index]
-	
-	bt$weight = bt$weight[bt$dates.index,,drop=F]
-		bt$weight[1,] = 0	
-		
-	if (!is.null(bt$share)) {
-		bt$share = bt$share[dates.index,,drop=F]
-		bt$share[1,] = 0
+	n.dates = len(dates.index) 
+	for(n in ls(bt)) {
+		if( !is.null(dim(bt[[n]])) && nrow(bt[[n]]) > n.dates )
+			bt[[n]] = bt[[n]][dates.index,,drop=F]
+		else if( len(bt[[n]]) > n.dates )
+			bt[[n]] = bt[[n]][dates.index]			
 	}
 	
+	bt$equity = bt$equity / as.double(bt$equity[1])
 	bt$best = max(bt$ret)
 	bt$worst = min(bt$ret)
 	bt$cagr = compute.cagr(bt$equity)
