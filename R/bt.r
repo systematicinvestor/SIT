@@ -499,8 +499,10 @@ bt.run <- function
 bt.run.trim.helper = function(bt, dates.index) {
 	n.dates = len(dates.index) 
 	for(n in ls(bt)) {
-		if( !is.null(dim(bt[[n]])) && nrow(bt[[n]]) > n.dates )
-			bt[[n]] = bt[[n]][dates.index,,drop=F]
+		if( !is.null(dim(bt[[n]])) ) {
+			if( nrow(bt[[n]]) > n.dates )
+				bt[[n]] = bt[[n]][dates.index,,drop=F]
+		}
 		else if( len(bt[[n]]) > n.dates )
 			bt[[n]] = bt[[n]][dates.index]			
 	}
