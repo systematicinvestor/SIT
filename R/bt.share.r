@@ -75,26 +75,43 @@ bt.run.share.ex <- function
 		#monthly.income = list(
 		#	cashflows = NULL,	# xts object with cashflows, indicates both timing and amount
 		#	invest = spl('cash,rebalance,update'), # indicates how to adjust portfolio after cashflow
-		#	cashflow.fn = NULL, # if specified, cashflows are computed as a function of total equity
+		#	cashflow.fn = function(info, i, i.prev) round.to((info$cash[i] + sum(info$shares[i,] * prices[i,]))*(5/100), 100), # if specified, cashflows are computed as a function of total equity
 		#	type = spl('regular,fee.rebate')
 		#),
 		#
 		#MER = list(
 		#	cashflows = NULL,
 		#	invest = spl('cash,rebalance,update'),
-		#	cashflow.fn = NULL,
+		#	cashflow.fn = function(info, i, i.prev) sum((info$cash + rowSums(info$shares * prices))[(i.prev+1):i]*(2/100 / 365)) ,
 		#	type = 'fee.rebate'
 		#),
 		#
 		#margin.cost = list(
 		#	cashflows = NULL,
 		#	invest = spl('cash,rebalance,update'),
-		#	cashflow.fn = NULL,
+		#	cashflow.fn = function(info, i, i.prev) sum(iif(info$cash < 0, -info$cash, 0)[(i.prev+1):i]*(2/100 / 365))
 		#	type = 'fee.rebate'
-		#)		
+		#),
+		# value = cash + sum(price * share)
+		# short = sum(price * iif(share<0,share,0))
+		# long = sum(price * iif(share>0,share,0))
+		# margin = iif(long > value, long - value, 0)
+		# 
+		# portfolio can accure interest on (cash + short), if (cash + short) > 0
+		# portfolio can accure short rebate on -short i.e. short rebate = FED rate - borrow rate
+		#	this can turn negative
+		#
+		#taxes = list(
+		#	cashflows = NULL,
+		#	invest = spl('cash,rebalance,update'),
+		#	cashflow.fn = NULL, # function need to access gain/loss information
+		#	type = 'fee.rebate'
+		#)				
 	),
 	
 	adjusted = T,
+	
+	# following functionality only works for unadjusted data
 	dividend.control = list(
 		foreign.withholding.tax = NULL,
 		# http://canadiancouchpotato.com/2012/09/17/foreign-withholding-tax-explained/
@@ -105,92 +122,79 @@ bt.run.share.ex <- function
 		# rebalance - force full rebalance
 		# update - minimally update portfolio to allocate dividend
 		#   only add new positions, such that abs(shares) only increases
-	)
+	),
 	
+	tax.control = NULL
+	#tax.control = default.tax.control()
 ) 
 {
+	#---------------------------------------------------------
 	# defs
+	#---------------------------------------------------------
 	invest.type.def = list(none=0, cash=1, rebalance=2, update=3)
 	cashflow.type.def = list(regular=0, fee.rebate=1)
 
-
+	#---------------------------------------------------------
 	# process cashflows
-	cashflows.n = len(cashflow.control)
-	cashflows = dummy = NA * prices[,1]
-	if( cashflows.n > 0 ) {
-		last.cashflow.index = rep(0, cashflows.n)
+	#---------------------------------------------------------
+	dummy = NA * prices[,1]
+	cashflows = list(
+		n = len(cashflow.control),
+		cash = dummy
+	)
 	
-		cashflows.type = rep('', cashflows.n)
-		for(i in 1:cashflows.n) cashflows.type[i] = ifnull(cashflow.control[[i]]$type, 'regular')[1] 
-		cashflows.type = cashflow.type.def[[ tolower(cashflows.type) ]]
+	if( cashflows$n > 0 ) {
+		cashflows$last.index = rep(0, cashflows$n)
+	
+		cashflows$type = rep('', cashflows$n)
+		for(i in 1:cashflows$n) cashflows$type[i] = ifnull(cashflow.control[[i]]$type, 'regular')[1] 
+		cashflows$type = cashflow.type.def[[ tolower(cashflows$type) ]]
 
-		cashflows.invest = rep('', cashflows.n)
-		for(i in 1:cashflows.n) cashflows.invest[i] = ifnull(cashflow.control[[i]]$invest, 'cash')[1] 
-		cashflows.invest = invest.type.def[[ tolower(cashflows.invest) ]]
+		cashflows$invest = rep('', cashflows$n)
+		for(i in 1:cashflows$n) cashflows$invest[i] = ifnull(cashflow.control[[i]]$invest, 'cash')[1] 
+		cashflows$invest = invest.type.def[[ tolower(cashflows$invest) ]]
 		
-		cashflows.fn = lapply(cashflow.control, function(x) x$cashflow.fn)
+		cashflows$fn = lapply(cashflow.control, function(x) iif(is.null(x$cashflow.fn), x$cashflow.fn, match.fun(x$cashflow.fn)))
 
-		cashflows = matrix(NA, nrow, cashflows.n)
-			colnames(cashflows) = names(cashflow.control)
-		for(i in 1:cashflows.n)
+		cashflows$cash = matrix(NA, nrow(prices), cashflows$n)
+			colnames(cashflows$cash) = names(cashflow.control)
+		for(i in 1:cashflows$n)
 			if( !is.null(cashflow.control[[i]]$cashflows) ) {
 				dummy[] = NA
 				dummy[index(cashflow.control[[i]]$cashflows)] = cashflow.control[[i]]$cashflows
-				cashflows[,i] = dummy
+				cashflows$cash[,i] = dummy
 			}
 	}
-	cashflows = coredata(ifna(cashflows, 0))
-	trade.cashflow = rowSums(cashflows != 0) > 0
-
-
+	cashflows$cash = coredata(ifna(cashflows$cash, 0))
+	
+	#---------------------------------------------------------
+	# process weight
+	#---------------------------------------------------------
 	# make sure we don't have any abnormal weights
 	weight[!is.na(weight) & is.na(prices)] = 0
 	
-	# lag logic, to be back compatible with bt.run.share
-	# default logic is to use current weights to trade at close i.e. no lag
-	weight = iif( do.lag == 1, weight, mlag(weight, do.lag - 1) )
+		# lag logic, to be back compatible with bt.run.share
+		# default logic is to use current weights to trade at close i.e. no lag
+		weight = iif( do.lag == 1, weight, mlag(weight, do.lag - 1) )
 	
 	weight = coredata(weight)
 		temp = bt.exrem(weight)
+		
 	if(clean.signal) {
 		weight = temp
 	} else { # always clean up 0's
 		index = ifna(weight == 0, F)
 		weight[index] = temp[index]
 	}
-	# back filled weights
-	weight1 = ifna( bt.apply.matrix(weight, ifna.prev), 0)
 	
-		
-	# find trades
-	trade = !is.na(weight)
-		trade.index = rowSums(trade) > 0
-	
-		
-	
-	
-	# unadjusted logic
-	if(!adjusted) {
-		dividends = coredata(bt.apply(b, function(x) x[,'Dividend']))
-		splits = coredata(bt.apply(b, function(x) x[,'Split']))		
-			trade.dividend = rowSums(mlag(weight1) != 0 & dividends > 0, na.rm=T) > 0
-			trade.split = rowSums(mlag(weight1) != 0 & splits > 0, na.rm=T) > 0
-			
-		dividend.control$foreign.withholding.tax = map2vector(dividend.control$foreign.withholding.tax, colnames(prices), 0)
-		dividend.control$invest = ifnull(dividend.control$invest, 'cash')
-			dividend.control$invest = invest.type.def[[ tolower(dividend.control$invest[1]) ]]
-
-		event.index = which(trade.index | trade.cashflow | trade.dividend | trade.split)
-	} else
-		event.index = which(trade.index | trade.cashflow)			
-		
-	# prices
+	#---------------------------------------------------------
+	# process prices
+	#---------------------------------------------------------
 	prices = coredata(prices)
 		n = ncol(prices)
-		nperiods = nrow(prices)
-	
 	
 	# execution.price logic
+	trade = !is.na(weight)
 	if( sum(trade) > 0 ) {
 		execution.price = coredata(b$execution.price)
 		prices[trade] = iif( is.na(execution.price[trade]), prices[trade], execution.price[trade] )
@@ -200,20 +204,170 @@ bt.run.share.ex <- function
 	# weights account for missing prices i.e. no price means no allocation
 	prices[] = ifna( bt.apply.matrix(prices, ifna.prev), 1)
 	
-	
-	# validate commission
+	#---------------------------------------------------------
+	# validate
+	#---------------------------------------------------------
 	if( !is.list(commission) )
 		commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
 		
-	# validate lot.size
 	lot.size = map2vector(lot.size, colnames(prices), 1)
 	
+	dividend.control$foreign.withholding.tax = map2vector(dividend.control$foreign.withholding.tax, colnames(prices), 0)
+	dividend.control$invest = ifnull(dividend.control$invest, 'cash')
+		dividend.control$invest = invest.type.def[[ tolower(dividend.control$invest[1]) ]]
+	
+	#---------------------------------------------------------
+	# execute internal version of bt.run.share.ex
+	#---------------------------------------------------------
+	bt = bt.run.share.ex.internal(b, prices, capital, commission, weight,
+		lot.size, control, cashflows, adjusted, dividend.control, tax.control)			
+
+	#---------------------------------------------------------
+	# process results
+	#---------------------------------------------------------
+	# make ret -> equity, weight xts
+	bt$ret = make.xts(bt$ret, index(b$prices))
+	bt$weight = make.xts(bt$weight, index(b$prices))
+
+			
+	bankrupt = which(bt$ret <= -1)
+	if(len(bankrupt) > 0) bt$ret[bankrupt[1]:n] = -1
+  
+	
+	bt$equity = cumprod(1 + bt$ret)
+ 
+	
+	# convert dates to dates.index
+	bt$dates.index = dates2index(b$prices, dates)
+	# prepare output
+	bt = bt.run.trim.helper(bt, bt$dates.index)
+
+
+	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
+
+	if( !silent ) {
+		# print last signal / weight observation
+		cat('Latest weights :\n')
+		print(round(100*last(bt$weight),2))
+		cat('\n')
+
+		cat('Performance summary :\n')
+		cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
+    	cat('', sapply(cbind(bt$cagr, bt$best, bt$worst), function(x) round(100*x,1)), '\n', sep = '\t')  
+		cat('\n') 
+	}
+
+	bt
+}
+
+###############################################################################
+#' default.round.lot.control	
+#' @export 
+###############################################################################
+default.tax.control = function(nonqualified = c()) {
+	list(
+		capital.gain = list(
+			short.term.tax = 35/100,
+			long.term.tax = 15/100,
+			wash.sale.min.holding.period = 30, # 30 days
+			long.term.min.holding.period = 365 # one year
+		),
+		
+		dividend = list(			
+			qualified.tax = 20/100,
+			qualified.min.holding.period = 60, # 60 days
+			nonqualified.tax = 35/100,
+			nonqualified = nonqualified # tickers of stocks that do not qualify for preferential tax rate
+		)
+	)
+}
+
+
+# internal version, all inputs are assumed preprocessed
+bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
+		lot.size, control, cashflows, adjusted, dividend.control, tax.control
+)			
+{
+	#---------------------------------------------------------
+	# defs
+	#---------------------------------------------------------
+	invest.type.def = list(none=0, cash=1, rebalance=2, update=3)
+	cashflow.type.def = list(regular=0, fee.rebate=1)
+	
+	#---------------------------------------------------------
+	# setup
+	#---------------------------------------------------------
+	# back filled weights
+	weight1 = ifna( bt.apply.matrix(weight, ifna.prev), 0)
+	
+	
+	# find cashflows
+	trade.cashflow = rowSums(cashflows$cash != 0) > 0
+	
+		
+	# find trades
+	trade = !is.na(weight)
+		trade.index = rowSums(trade) > 0
+				
+	#---------------------------------------------------------
+	# unadjusted logic
+	#---------------------------------------------------------
+	if(!adjusted) {
+		dividends = coredata(bt.apply(b, function(x) x[,'Dividend']))
+		splits = coredata(bt.apply(b, function(x) x[,'Split']))		
+			trade.dividend = rowSums(mlag(weight1) != 0 & dividends > 0, na.rm=T) > 0
+			trade.split = rowSums(mlag(weight1) != 0 & splits > 0, na.rm=T) > 0
+			
+		event.index = which(trade.index | trade.cashflow | trade.dividend | trade.split)
+	} else
+		event.index = which(trade.index | trade.cashflow)			
+		
+
+	#---------------------------------------------------------
+	# taxes
+	#---------------------------------------------------------				
+	if( !is.null(tax.control) ) {
+		# should interact with foreign dividend tax	
+		holdings = env(
+			n.trades = rep(0, n),
+			# start with 100 rows, if goes above 100, increase by 100
+			share = matrix(0, 100, n),	# fifo vector of trades for each assset
+			date = matrix(0, 100, n),	# index / date of each trade
+			price = matrix(0, 100, n)	# entry price each trade			
+		)
+		
+		wash.sale = env(
+			n.trades = rep(0, n),
+			date = matrix(0, 100, n),
+			share = matrix(0, 100, n),
+			loss.per.share = matrix(0, 100, n),
+			long.term = matrix(T, 100, n)
+		)
+				
+		tax = env(
+			long.term.cap = rep(0, nperiods),
+			short.term.cap = rep(0, nperiods),
+			qualified.div = rep(0, nperiods),
+			non.qualified.div = rep(0, nperiods)
+		)	
+	}
+	
+	#---------------------------------------------------------
 	# setup event driven back test loop
-	cash.wt = cash = rep(capital, nperiods)
+	#---------------------------------------------------------
+	nperiods = nrow(prices)	
+	n = ncol(prices)
+			
+	cash.wt = rep(capital, nperiods)
 	event.type = div = com = cashflow = fee.rebate = rep(0, nperiods)
 		event.type.def = list(none=0, trade=1, split=2, dividend=3, cashflow=4)
-	share.wt = share = matrix(0, nperiods, n)
-		colnames(share) = colnames(prices)
+	share.wt = matrix(0, nperiods, n)
+		colnames(share.wt) = colnames(prices)
+		
+	info = list(
+		cash = cash.wt,
+		share = share.wt
+	)
 		
 	last.trade = 0
 	weight.last = weight1[1,]
@@ -225,22 +379,28 @@ bt.run.share.ex <- function
 			# copy from last trade
 			index = (last.trade + 1) : i
 				n.index = len(index)
-			share.wt[index,] = rep.row(share[last.trade,], n.index)
-			share[index,] = rep.row(share[last.trade,], n.index)
-			cash.wt[index] = cash[last.trade]
-			cash[index] = cash[last.trade]
+			share.wt[index,] = rep.row(info$share[last.trade,], n.index)
+			info$share[index,] = rep.row(info$share[last.trade,], n.index)
+			cash.wt[index] = info$cash[last.trade]
+			info$cash[index] = info$cash[last.trade]
 			
 			weight.last = weight1[i-1,]
 		}
 		
 		# unadjusted logic
 		if(!adjusted) {
-			if( trade.dividend[i] ) {
-				for(a in which(share[i,] !=0 & dividends[i,] > 0))
-					asset.cashflow = share[i,a] * dividends[i,a] * 
-						iif(share[i,a] < 0, 1, 1 - dividend.control$foreign.withholding.tax[a])
-						
-				cash[i] = cash[i] + asset.cashflow
+			if( trade.dividend[i] ) {			
+			
+				if( !is.null(tax.control) ) {
+					tax.update.dividends(tax.control, dividend.control, holdings, tax, info$share[i,], dividends[i,], i, bt$dates)
+				}
+					
+				# for(a in which(info$share[i,] !=0 & dividends[i,] > 0))
+				asset.cashflow = sum(info$share[i,] * dividends[i,] * 
+					iif(info$share[i,] < 0, 1, 1 - dividend.control$foreign.withholding.tax)
+					)
+				
+				info$cash[i] = info$cash[i] + asset.cashflow
 				cash.wt[i] = cash.wt[i] + asset.cashflow
 				div[i] = asset.cashflow
 				event.type[i] = event.type.def$dividend
@@ -253,33 +413,32 @@ bt.run.share.ex <- function
 			
 			# check what happends if dividend and split are on the same day
 			if( trade.split[i] ) {
-				for(a in which(share[i,] !=0 & splits[i,] > 0))
-					share[i,a] = share.wt[i,a] = share[i,a] / splits[i,a]
+				for(a in which(info$share[i,] !=0 & splits[i,] > 0))
+					info$share[i,a] = share.wt[i,a] = info$share[i,a] / splits[i,a]
 				event.type[i] = event.type.def$split
 			}
 		}
 		
-		# need to be completed
+		# need to be completed / tested
 		if( trade.cashflow[i] ) {
-			for(c in (1:cashflows.n)[cashflows[i,] != 0]) {
-				# fix need to call cashflows.fn
-				if( is.null(cashflows.fn[[i]]) )
-					cashflows[i,c] = cashflows[i,c]
+			for(c in (1:cashflows$n)[cashflows$cash[i,] != 0]) {				
+				if( !is.null(cashflows$fn[[c]]) )
+					cashflows$cash[i,c] = cashflows$fn(info, i, cashflows$last.index[c])
 			
-				cash[i] = cash[i] + cashflows[i,c]
+				info$cash[i] = info$cash[i] + cashflows$cash[i,c]
 				
-				if(cashflows.type[i] == cashflow.type.def$regular)
-					cashflow[i] = cashflow[i] + cashflows[i,c]
+				if(cashflows$type[c] == cashflow.type.def$regular)
+					cashflow[i] = cashflow[i] + cashflows$cash[i,c]
 				else
-					fee.rebate[i] = fee.rebate[i] + cashflows[i,c]
+					fee.rebate[i] = fee.rebate[i] + cashflows$cash[i,c]
 					
 				event.type[i] = event.type.def$cashflow
 				
-				last.cashflow.index[c] = i
+				cashflows$last.index[c] = i
 				
-				if(cashflows.invest[c]$invest == invest.type.def$rebalance | cashflows.invest[c]$invest == invest.type.def$update) {
+				if(cashflows$invest[c] == invest.type.def$rebalance | cashflows$invest[c] == invest.type.def$update) {
 					trade.index[i] = T
-					if(trade.invest.type == invest.type.def$none) trade.invest.type = cashflows.invest[c]
+					if(trade.invest.type == invest.type.def$none) trade.invest.type = cashflows$invest[c]
 				}							
 			}
 		}
@@ -293,7 +452,7 @@ bt.run.share.ex <- function
 			if(trade.invest.type == invest.type.def$rebalance)
 				out = bt.run.share.ex.allocate(weight.new = weight1[i,], weight.prev = weight.last,
 					weight.change.index = !is.na(weight[i,]),
-					price = prices[i,], share = share[i,], cash = cash[i],
+					price = prices[i,], share = info$share[i,], cash = info$cash[i],
 					commission, lot.size, control = control$round.lot)
 			
 			# update - minimally update portfolio to allocate cash
@@ -301,14 +460,19 @@ bt.run.share.ex <- function
 			if(trade.invest.type == invest.type.def$update) {
 				out = bt.run.share.ex.invest(weight.new = weight1[i,], weight.prev = weight.last,
 					weight.change.index = !is.na(weight[i,]),
-					price = prices[i,], share = share[i,], cash = cash[i], 
+					price = prices[i,], share = info$share[i,], cash = info$cash[i], 
 					cashflow = cashflow[i] + fee.rebate[i] + div[i],
 					commission, lot.size, control = control$round.lot)
 			}
-			
+
+			if( !is.null(tax.control) && sum(info$share[i,] != out$share) > 0 ) {
+				tax.update.holdings(tax.control, holdings, tax, wash.sale, 
+					info$share[i,], out$share, prices[i,], i, b$dates)
+			}
+						
 			# only update current ones, not the ones used for weights
-			share[i,] = out$share
-			cash[i] = out$cash
+			info$share[i,] = out$share
+			info$cash[i] = out$cash
 			com[i] = out$com
 			event.type[i] = event.type.def$trade
 		}
@@ -319,33 +483,47 @@ bt.run.share.ex <- function
 		# copy from last trade
 		index = (last.trade + 1) : nperiods
 			n.index = len(index)
-		share.wt[index,] = rep.row(share[last.trade,], n.index)
-		share[index,] = rep.row(share[last.trade,], n.index)
-		cash.wt[index] = cash[last.trade]
-		cash[index] = cash[last.trade]
+		share.wt[index,] = rep.row(info$share[last.trade,], n.index)
+		info$share[index,] = rep.row(info$share[last.trade,], n.index)
+		cash.wt[index] = info$cash[last.trade]
+		info$cash[index] = info$cash[last.trade]
+	}
+
+
+	#---------------------------------------------------------
+	# setup output structure
+	#---------------------------------------------------------
+	bt = list(
+		type = 'share', 
+		capital = capital,
+		share = info$share,
+		cash = info$cash,
+		value = info$cash + rowSums(info$share * prices),
+		com = com,
+		div = div,
+		
+		weight = share.wt * prices / (cash.wt + rowSums(share.wt * prices)),
+		
+		event.type = factor(event.type, as.character(unlist(event.type.def)), names(event.type.def))
+	)
+	
+	if( cashflows$n > 0 ) {
+		bt$cashflows = cashflows$cash
+		
+		bt$cashflow = cashflow
+		bt$fee.rebate = fee.rebate
 	}
 	
-	
-	# setup output structure
-	bt = list(type = 'share', capital = capital)
-	
-bt$share = share
-bt$cash = cash
-bt$value = cash + rowSums(share * prices)
+	if( !is.null(tax.control) ) {
+		bt$long.term.cap = tax$long.term.cap
+		bt$short.term.cap = tax$short.term.cap
+		bt$qualified.div = tax$qualified.div
+		bt$non.qualified.div = tax$non.qualified.div
+	}
 
-bt$com = com
-bt$div = div
-if( cashflows.n > 0 ) {
-	bt$cashflows = cashflows
-	
-	bt$cashflow = cashflow
-	bt$fee.rebate = fee.rebate
-}
-bt$event.type = factor(event.type, as.character(unlist(event.type.def)), names(event.type.def))
-
-
-	bt$weight = share.wt * prices / (cash.wt + rowSums(share.wt * prices))
-	
+	#---------------------------------------------------------
+	# compute returns
+	#---------------------------------------------------------
 	value = c(capital, bt$value)
 		bt$ret = (value / mlag(value) - 1)[-1]
 	if(sum(abs(cashflow)) > 0) {
@@ -353,49 +531,273 @@ bt$event.type = factor(event.type, as.character(unlist(event.type.def)), names(e
 		# * negative cashflow: assume money will be taken out after the close
 		#   return = (total value[T] without cashflow[T]) / total value[T-1]		
 		index = cashflow < 0
-		ret[index] = (c(capital, bt$value - cashflow) / mlag(value) - 1)[-1][index]
+		bt$ret[index] = (c(capital, bt$value - cashflow) / mlag(value) - 1)[-1][index]
 
 		# * positive cashflow: assume money were availbale a day before and just sat in account
 		#   return = (total value[T] including cashflow) / (total value[T-1] + cashflow[T])
 		index = cashflow > 0
 		value1 = c(capital, bt$value + mlag(cashflow, -1))
-		ret[index] = (value / mlag(value1) - 1)[-1][index]
-	}
-	
-# make ret -> equity, weight xts
-bt$ret = make.xts(bt$ret, index(b$prices))
-bt$weight = make.xts(bt$weight, index(b$prices))
-		
-	bankrupt = which(bt$ret <= -1)
-	if(len(bankrupt) > 0) bt$ret[bankrupt[1]:n] = -1
-  
-bt$equity = cumprod(1 + bt$ret)
- 
-	
-	# convert dates to dates.index
-	bt$dates.index = dates2index(b$prices, dates)
-	
-	# prepare output
-	bt = bt.run.trim.helper(bt, bt$dates.index)
-
-	if( trade.summary ) bt$trade.summary = bt.trade.summary(b, bt)
-
-	if( !silent ) {
-		# print last signal / weight observation
-		cat('Latest weights :\n')
-		print(round(100*last(bt$weight),2))
-		cat('\n')
-
-		cat('Performance summary :\n')
-		cat('', spl('CAGR,Best,Worst'), '\n', sep = '\t')  
-    cat('', sapply(cbind(bt$cagr, bt$best, bt$worst), function(x) round(100*x,1)), '\n', sep = '\t')  
-		cat('\n') 
+		bt$ret[index] = (value / mlag(value1) - 1)[-1][index]
 	}
 	 
-	return(bt)
+	bt
 }
+
+
+bt.run.share.ex.n.days = function(index.today, index.hist, dates) {
+	as.numeric(dates[index.today] - dates[index.hist])
+}
+
+
+
+#download both div and splits in ome file - getSplits
+#http://ichart.finance.yahoo.com/x?s=IBM&a=00&b=2&c=1962&d=09&e=6&f=2015&g=v&y=0&z=30000
+#		
+# update dividends and compute taxes
+tax.update.dividends = function(tax.control, dividend.control, info, holdings, tax, share, dividend, index, dates) 
+{
+	# offset by foreign.withholding.tax
+	qualified.div = dividends  * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$qualified.tax)
+	non.qualified.div = dividends * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$nonqualified.tax)
+	qualified.div.adj = non.qualified.div.adj = 0
+					
+	# long position, separate between qualified and non.qualified
+	pos.cashflow = share > 0 & dividend > 0
+	# loop over all qualified divs
+	for(a in which(pos.cashflow & !tax.control$dividend$nonqualified)) {
+		n.trades = 1:holdings$n.trades[a]							
+		trade.days = bt.run.share.ex.n.days(i, holdings$date[n.trades,a], dates)
+			
+		# find holdings that breach qualified.min.holding.period and move them from qualified to non.qualified
+		nonqualified.trade.days = trade.days < tax.control$dividend$qualified.min.holding.period
+		qualified.div.adj = qualified.div.adj - qualified.div * holdings$share[nonqualified.trade.days,a]
+		non.qualified.div.adj = non.qualified.div.adj + non.qualified.div * holdings$share[nonqualified.trade.days,a]
+	}
+						
+	tax$qualified.div[index] = tax$qualified.div[index] + qualified.div.adj +  sum(
+		(share * qualified.div)[pos.cashflow & !tax.control$dividend$nonqualified]
+		)
+		
+	tax$non.qualified.div[index] = tax$non.qualified.div[index] + non.qualified.div.adj + sum(
+		(share * non.qualified.div)[pos.cashflow & tax.control$dividend$nonqualified]
+		)
+	
+	#http://www.fool.com/personal-finance/taxes/2002/12/06/dividends-paid-on-short-sales.aspx
+	# short position - add to cost basis
+	for(a in which(share < 0 & dividend > 0)) {
+		n.trades = 1:holdings$n.trades[a]							
+		holdings$price[n.trades,a] = holdings$price[n.trades,a] - dividend[a]
+	}
+}				
+		
+
+# record wash sale, called every time there is a loosing trade
+record.wash.sale = function(a, n.trades, pnl, price, trigger, holdings, wash.sale) {
+	wash.sale.index = pnl[n.trades] < 0
+	n.wash.sale.index = sum(wash.sale.index)
+	
+	if( n.wash.sale.index > 0 ) {
+		# increase size of arrays by 100 if needed to store trades
+		if( wash.sale$n.trades[a] + n.wash.sale.index > nrow(wash.sale$share) ) {
+			n = ncol(wash.sale$date)
+			wash.sale$date = rbind(wash.sale$date, matrix(0, 100, n))
+			wash.sale$share = rbind(wash.sale$share, matrix(0, 100, n))
+			wash.sale$loss.per.share = rbind(wash.sale$loss.per.share, matrix(0, 100, n))
+			wash.sale$long.term = rbind(wash.sale$long.term, matrix(T, 100, n))
+		}
+	
+		n1 = wash.sale$n.trades[a] + 1:n.wash.sale.index					
+		wash.sale$date[n1,a] = holdings$date[n.trades,a][wash.sale.index]
+		wash.sale$share[n1,a] = holdings$share[n.trades,a][wash.sale.index]
+		wash.sale$loss.per.share[n1,a] = (price[a] - holdings$price[n.trades,a])[wash.sale.index]
+		wash.sale$long.term[n1,a] = trigger[n.trades][wash.sale.index]
+		wash.sale$n.trades[a] = wash.sale$n.trades[a] + n.wash.sale.index
+	}
+}
+
+# check if wash sale took place, only called on new trade enrty
+check.wash.sale = function(a, dates, tax, tax.control, holdings, wash.sale) {
+	# no losses recorded
+	if(wash.sale$n.trades[a] == 0) return
+		
+	i = holdings$n.trades[a]
+	index = holdings$date[i,a]
+	
+	n.trades = 1:wash.sale$n.trades[a]	
+	trade.days = bt.run.share.ex.n.days(index , wash.sale$date[n.trades,a], dates)
+		trigger = trade.days <= tax.control$capital.gain$wash.sale.min.holding.period
+		n.trigger = sum(trigger)
+	
+	# all loses are past the wash.sale.min.holding.period
+	if( n.trigger == 0 ) {
+		wash.sale$n.trades[a] = 0
+		return
+	}
+	
+	# detected wash sale, the proper way is to split trade to match number of shares for each loss trade
+	# we are simplifying here; no trade splitting, just cost adjusment
+	share1 = abs(holdings$share[i,a])
+	run.share = cumsum(abs(wash.sale$share[n.trades,a][trigger]))
+	n1 = which( run.share > share1 )
+	
+	# entry has more shares than loss
+	if( len(n1) == 0 || mlast(run.share) == share1 ) {
+		loss = wash.sale$loss.per.share[n.trades,a][trigger]*wash.sale$share[n.trades,a][trigger]
+	
+		holdings$price[i,a] = holdings$price[i,a] - sum(loss) / holdings$share[i,a]	
+		wash.sale$n.trades[a] = 0
+		
+		tax$long.term.cap[index] = tax$long.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger], loss, 0) )
+		tax$short.term.cap[index] = tax$short.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger], 0, loss) )
+		
+		return	
+	}
+	
+	# there are suffient losses
+	n1 = n1[1]
+	trigger.index = which(trigger)
+	
+	# matching exactly
+	if( run.share[n1] == share1 ) {
+		loss = wash.sale$loss.per.share[n.trades,a][trigger][1:n1]*wash.sale$share[n.trades,a][trigger][1:n1]
+		
+		holdings$price[i,a] = holdings$price[i,a] - sum(loss) / holdings$share[i,a]	
+	
+		tax$long.term.cap[index] = tax$long.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger][1:n1], loss, 0) )
+		tax$short.term.cap[index] = tax$short.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger][1:n1], 0, loss) )
+					
+		n1 = n1 + 1	
+	} else {
+		# split trade
+		share.left = run.share[n1] - share1
+		last.index = trigger.index[n1]
+		wash.sale$share[last.index,a] = wash.sale$share[last.index,a] - share.left
+
+		loss = wash.sale$loss.per.share[n.trades,a][trigger][1:n1]*wash.sale$share[n.trades,a][trigger][1:n1]
+		
+		holdings$price[i,a] = holdings$price[i,a] - sum(loss) / holdings$share[i,a]	
+	
+		tax$long.term.cap[index] = tax$long.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger][1:n1], loss, 0) )
+		tax$short.term.cap[index] = tax$short.term.cap[index] - sum( iif(wash.sale$long.term[n.trades,a][trigger][1:n1], 0, loss) )
+		
+		wash.sale$share[last.index,a] = share.left
+	}
 				
+	# shift arrays
+	if(n1 > 1) {		
+		from.index = trigger.index[n1]:wash.sale$n.trades[a]
+		to.index = 1:len(from.index)
+		wash.sale$date[to.index,a] = wash.sale$date[from.index,a]
+		wash.sale$share[to.index,a] = wash.sale$share[from.index,a]
+		wash.sale$loss.per.share[to.index,a] = wash.sale$loss.per.share[from.index,a]
+		wash.sale$long.term[to.index,a] = wash.sale$long.term[from.index,a]
+		wash.sale$n.trades[a] = len(to.index)												
+	}
+}
+
+
+
+
+
+
+
+
+# update holdings and compute taxes
+tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, share1, price, index, dates) 
+{				
+	n = len(price)
+	
+	for(a in (1:n)[share0 != share1]) {				
+		n.trades = 1:holdings$n.trades[a]
+		
+		# flip
+		if( sign(share0[a] * share1[a]) <= 0) {
+			# liquidate all
+			if(share0[a] != 0) {
+				pnl = holdings$share[n.trades,a] * (price[a] - holdings$price[n.trades,a])
+				trade.days = bt.run.share.ex.n.days(index, holdings$date[n.trades,a], dates)
+					trigger = trade.days > tax.control$capital.gain$long.term.min.holding.period
+				tax$long.term.cap[i] = tax$long.term.cap[i] + sum(iif(trigger, pnl, 0))
+				tax$short.term.cap[i] = tax$short.term.cap[i] + sum(iif(trigger, 0, pnl))
 				
+				# record losses for wash sale checking
+				record.wash.sale(a, n.trades, pnl, price, trigger, holdings, wash.sale)
+			}
+			# enter new position
+			if(share1[a] != 0) {
+				holdings$share[1,a] = share1[a]
+				holdings$price[1,a] = price[a]
+				holdings$date[1,a] = index				
+				holdings$n.trades[a] = 1
+# wash sale - check	
+check.wash.sale(a, dates, tax, tax.control, holdings, wash.sale)
+
+			
+			} else
+				holdings$n.trades[a] = 0
+		} else {			
+			# add
+			if( abs(share1[a]) > abs(share0[a]) ) {
+				# increase size of arrays by 100 if needed to store trades
+				if( holdings$n.trades[a] + 1 > nrow(holdings$share) ) {
+					holdings$share = rbind(holdings$share, matrix(0, 100, n))
+					holdings$price = rbind(holdings$price, matrix(0, 100, n))
+					holdings$date  = rbind(holdings$date, matrix(0, 100, n))
+				}
+				n1 = holdings$n.trades[a] + 1
+				holdings$share[n1,a] = share1[a]
+				holdings$price[n1,a] = price[a]
+				holdings$date[n1,a]  = index				
+				holdings$n.trades[a] = n1			
+# wash sale - check				
+check.wash.sale(a, dates, tax, tax.control, holdings, wash.sale)
+			}
+			
+			# remove, assume FIFO - first-in first-out
+			if( abs(share1[a]) < abs(share0[a]) ) {
+				pnl = holdings$share[n.trades,a] * (price[a] - holdings$price[n.trades,a])
+				
+				trade.days = bt.run.share.ex.n.days(index, holdings$date[n.trades,a], dates)
+					trigger = trade.days > tax.control$capital.gain$long.term.min.holding.period
+
+				run.share = cumsum(holdings$share[n.trades,a])
+				n1 = which( abs(run.share) >= abs(share1[a]) )[1]
+				
+				# matching exactly
+				if( run.share[n1] == share1[a] ) {
+					tax$long.term.cap[i] = tax$long.term.cap[i] + sum(iif(trigger, pnl, 0)[1:n1])
+					tax$short.term.cap[i] = tax$short.term.cap[i] + sum(iif(trigger, 0, pnl)[1:n1])
+					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale)
+					n1 = n1 + 1	
+				} else {
+				# split trade
+					share.left = run.share[n1] - share1[a]
+					pnl[n1] = pnl[n1] - (holdings$share[n1,a] - share.left) *
+						(price[a] - holdings$price[n1,a])
+
+					tax$long.term.cap[i] = tax$long.term.cap[i] + sum(iif(trigger, pnl, 0)[1:n1])
+					tax$short.term.cap[i] = tax$short.term.cap[i] + sum(iif(trigger, 0, pnl)[1:n1])
+
+					holdings$share[n1,a] = holdings$share[n1,a] - share.left
+					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale)
+					
+					holdings$share[n1,a] = share.left
+				}
+				
+				# shift arrays
+				if(n1 > 1) {					
+					from.index = n1:holdings$n.trades[a]
+					to.index = 1:len(from.index)					
+					holdings$share[to.index,a] = holdings$share[from.index,a]
+					holdings$price[to.index,a] = holdings$price[from.index,a]
+					holdings$date[to.index,a] = holdings$date[from.index,a]
+					holdings$n.trades[a] = len(to.index)												
+				}
+			}
+		}
+	}
+}	
+		
 
 ###############################################################################
 #' default.round.lot.control	
@@ -436,25 +838,32 @@ bt.run.share.ex.invest = function
 # Basic cases, try to satisfy with cash
 	if(cashflow >= 0) {
 		# do nothing
-		retunr(list(share = share, cash = cash, com = 0))
+		return(list(share = share, cash = cash, com = 0))
 	} else {
 		# current cash
 		current.cash = sum(price * share) + cash - sum(price * abs(share))
 		if(current.cash >= 0)
-			retunr(list(share = share, cash = cash, com = 0))
+			return(list(share = share, cash = cash, com = 0))
 		# otherwise continue to satisfy the cash requirement		
 	}
 	
 # Case A, simple: allocate abs(cashflow) proportionate to weight and to existing share / cash
+# does not work for negative cashflow because we need cash to pay commisions
 	n = len(share)
 	out = bt.run.share.ex.allocate(weight.new = weight.new, weight.prev = rep(0, n),
 		weight.change.index = rep(T, n),
 		price = price, share = rep(0, n), cash = abs(cashflow),
 		commission, lot.size, control = control)
 	if(cashflow >= 0)
-		retunr(list(share = share + out$share, cash = (cash - cashflow) + out$cash, com = out$com))
-	else
-		retunr(list(share = share - out$share, cash = (cash - cashflow) - out$cash, com = out$com))
+		return(list(share = share + out$share, cash = (cash - cashflow) + out$cash, com = out$com))
+	else {
+		out = bt.run.share.ex.allocate(weight.new = weight.new, weight.prev = rep(0, n),
+			weight.change.index = rep(T, n),
+			price = price, share = rep(0, n), cash = abs(cashflow) + 5 * out$com,
+			commission, lot.size, control = control)
+		
+		return(list(share = share - out$share, cash = cash + sum(share*price) - (sum((share - out$share)*price) + out$com), com = out$com))
+	}
 	
 # Case B, better: do full rebalance, 
 # for cashflow(+) freeze weights that has abs(share.new) < abs(share) and repeat
@@ -749,6 +1158,11 @@ round.lot = function(weight, price, capital, lot.size) {
 ###############################################################################
 round.lot.basic.base = function(weight, price, capital, lot.size) {
 	sign(weight) * floor(abs(weight * capital / price / lot.size)) * lot.size
+}
+
+#' @export 
+round.to = function(x, to) {
+	sign(x) * floor(abs(x) / to) * to
 }
 
 ###############################################################################	
@@ -1490,3 +1904,136 @@ bt.run.share.unadjusted.test = function() {
 
 
 
+###############################################################################	
+#' Test for bt.run.share.ex cashflow functionality
+#' @export 
+###############################################################################
+bt.run.share.ex.test.cashflow = function() {
+	#*****************************************************************
+	# Load historical data
+	#*****************************************************************
+	load.packages('quantmod')
+	
+	tickers = 'SPY'
+	tickers = 'SPY,XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLK,XLU'
+	
+	
+	data <- new.env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T, set.symbolnames=T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='remove.na', fill.gaps = T)
+	
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+#source('../bt.share.r')
+
+
+	
+	prices = data$prices
+	  n = ncol(prices)
+	  nperiods = nrow(prices)
+	
+	period.ends = date.ends(data$prices,'months')
+	  
+	models = list()
+	
+	commission = list(cps = 0.01, fixed = 1.0, percentage = 0.0)
+	
+	#*****************************************************************
+	# Buy Hold
+	#******************************************************************
+	data$weight[] = NA
+	  #data$weight[1,] = 1
+	  data$weight[period.ends,] = ntop(prices[period.ends,], n)
+	models$test = bt.run.share(data, clean.signal=F, silent=F, commission=commission)
+	
+	data$weight[] = NA
+	  #data$weight[1,] = 1
+	  data$weight[period.ends,] = ntop(prices[period.ends,], n)
+	models$test.ex = bt.run.share.ex(data, clean.signal=F, silent=F, commission=commission)
+
+	data$weight[] = NA
+	  #data$weight[1,] = 1
+	  data$weight[period.ends,] = ntop(prices[period.ends,], n)
+	models$test.ex.lot = bt.run.share.ex(data, clean.signal=F, silent=F, commission=commission, lot.size=50)
+	
+	
+	event.at = function(x, period = 'month', amount = 0, period.ends = date.ends(x,period)) {
+		cashflow = x[period.ends,1]
+			cashflow[] = amount
+		cashflow
+	}
+	
+	data$weight[] = NA
+	  data$weight[period.ends,] = ntop(prices[period.ends,], n)
+	models$test.ex.lot.cashflow = bt.run.share.ex(data, clean.signal=F, silent=F, commission=commission, 
+		lot.size=50,
+		cashflow.control = list(
+			monthly.income = list(
+				cashflows = event.at(prices, 'quarter', 1000),
+				#cashflows = event.at(prices, 'week', 1000),
+				invest = 'cash',
+				type = 'regular'
+			)
+		)
+	)
+	
+	# info tables
+	mlast(bt.make.trade.event.summary.table(models$test.ex.lot.cashflow), 20)
+	
+	mlast(bt.make.cashflow.event.summary.table(models$test.ex.lot.cashflow), 20)
+	
+	matplot(
+	cbind(
+	models$test.ex.lot$value,
+	models$test.ex.lot.cashflow$value
+	)
+	)
+	
+
+	#*****************************************************************
+	# Report
+	#****************************************************************** 	
+	#strategy.performance.snapshoot(models, T)
+
+	#plotbt.transition.map(models$test.unadjusted$weight)
+	
+	# put all reports into one pdf file
+	pdf(file = 'report.c.pdf', width=8.5, height=11)
+		
+		strategy.performance.snapshoot(models, data=data)
+		
+	dev.off()
+ 
+		
+	
+	
+}	
+
+
+
+# Tests
+bt.run.share.ex.invest.test = function() {
+
+	# Start with Cash 
+	#commission = list(cps = 0.0, fixed = 0.0, percentage = 0.0)
+	commission = list(cps = 0.01, fixed = 1.0, percentage = 0.0)
+	weight.prev = c(10,0) / 10
+	share = c(100, 0)
+	price = c(1,2)
+	cash = 0
+	lot.size=c()
+	
+	weight.new = c(10,0) / 10
+	weight.change.index = c(T, T)
+	cashflow = -10
+	cash = cash + cashflow
+
+	a = bt.run.share.ex.invest(weight.new,weight.prev,weight.change.index,price,share,cash,cashflow,commission,lot.size,F)
+
+	a
+	
+	
+	
+}	

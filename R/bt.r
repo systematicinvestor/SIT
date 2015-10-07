@@ -502,8 +502,7 @@ bt.run.trim.helper = function(bt, dates.index) {
 		if( !is.null(dim(bt[[n]])) ) {
 			if( nrow(bt[[n]]) > n.dates )
 				bt[[n]] = bt[[n]][dates.index,,drop=F]
-		}
-		else if( len(bt[[n]]) > n.dates )
+		} else if( len(bt[[n]]) > n.dates )
 			bt[[n]] = bt[[n]][dates.index]			
 	}
 	
@@ -879,7 +878,7 @@ bt.trade.summary <- function
 	weight1 = mlag(weight, -1)
 	tstart = weight != weight1 & weight1 != 0
 	tend = weight != 0 & weight != weight1	
-		#tstart[1, weight[1,] != 0] = T
+		tstart[1, weight[1,] != 0] = T
 		n = nrow(weight)
 		tend[n, weight[n,] != 0] = T
 		tend[1, ] = F
