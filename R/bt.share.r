@@ -1436,11 +1436,17 @@ bt.run.share.ex.test = function() {
 }
 
 
+
+
 ###############################################################################	
 #' Append dividend and split columns
 #' @export 
 ###############################################################################
-bt.unadjusted.add.div.split = function(data.raw, yahoo.round.up.nearest.cents=F) {
+bt.unadjusted.add.div.split = function(
+	data.raw, 
+	yahoo.round.up.nearest.cents=F,
+	infer.div.split.from.adjusted=F # caution, please see example in test.implied.div.split
+) {
 	if( !exists('symbolnames', data.raw, inherits = F) ) 
 		tickers = ls(data.raw)
 	else
@@ -1453,9 +1459,29 @@ bt.unadjusted.add.div.split = function(data.raw, yahoo.round.up.nearest.cents=F)
 		price = data.raw[[ticker]]		
 		price$Dividend = price$Split = 0
 
-		# need full history	
-		dividend = getDividends(ticker, from = '1900-01-01')	
-		split = getSplits(ticker, from = '1900-01-01')	
+		if(infer.div.split.from.adjusted) {
+			close = Cl(price)
+			adjusted = Ad(price)
+	
+#Determine Dividend and Split from adjusted and un-adjusted prices
+#Implied Dividend: (Pt1+Dt1)/Pt0 = At1/At0 => Dt1 = Pt0 * At1/At0 - Pt1
+#Implied Split: St1 * Pt1/Pt0 = At1/At0 => St1 = Pt1/Pt0 * At0/At1			
+			implied.split = close / mlag(close) * mlag(adjusted) / adjusted
+				isplit.index = implied.split < 0.8 | implied.split > 1.2
+			isplit = implied.split[isplit.index]
+				isplit = round(100 * isplit) / 100
+			split = isplit
+		
+			implied.div = mlag(close) * adjusted / mlag(adjusted) - close
+				idiv.index = implied.div > 1e-3
+			idiv = implied.div[idiv.index & !isplit.index]
+				idiv = round(1e3 * idiv) / 1e3
+			dividend = idiv
+				
+		} else {
+			# need full history	
+			dividend = getDividends(ticker, from = '1900-01-01')	
+			split = getSplits(ticker, from = '1900-01-01')	
 		
 		
 # un-adjust split, faster version of adjRatios(splits=merge(split, index(dividend)))[,1]
@@ -1466,10 +1492,11 @@ bt.unadjusted.add.div.split = function(data.raw, yahoo.round.up.nearest.cents=F)
 ##all(x == adjRatios(splits=merge(split, index(dividend)))[,1])
 		
 		
-		# Please see quantmod:::adjustOHLC for more details
-		# un-adjust dividends for splits (Yahoo already adjusts div for splits)
-    	if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
-			dividend = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+			# Please see quantmod:::adjustOHLC for more details
+			# un-adjust dividends for splits (Yahoo already adjusts div for splits)
+    		if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
+				dividend = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+		}
 		
 		# use unadjusted dividends to compute retruns based on Close      	
 		dividend = dividend[index(price)]
@@ -1497,6 +1524,56 @@ bt.unadjusted.add.div.split = function(data.raw, yahoo.round.up.nearest.cents=F)
 		data.raw[[ticker]] = price
 	}
 }
+
+
+
+#Determine Dividend and Split from adjusted and un-adjusted prices
+#Implied Dividend: (Pt1+Dt1)/Pt0 = At1/At0 => Dt1 = Pt0 * At1/At0 - Pt1
+#Implied Split: St1 * Pt1/Pt0 = At1/At0 => St1 = Pt1/Pt0 * At0/At1
+test.implied.div.split = function(ticker) {
+	#*****************************************************************
+	# Load historical data
+	#*****************************************************************
+	load.packages('quantmod')
+	
+	ticker = 'IBM'
+		
+	data <- new.env()
+	getSymbols.extra(ticker, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T, set.symbolnames=T)
+	
+	# need full history	
+	dividend = getDividends(ticker, from = '1900-01-01')	
+	split = getSplits(ticker, from = '1900-01-01')	
+
+	# un-adjust dividends for splits (Yahoo already adjusts div for splits)
+	dividend1 = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+
+	
+			
+	close = Cl(data$IBM)
+	adjusted = Ad(data$IBM)
+	
+	implied.split = close / mlag(close) * mlag(adjusted) / adjusted
+		isplit.index = implied.split < 0.8 | implied.split > 1.2
+	isplit = implied.split[isplit.index]
+		isplit = round(100 * isplit) / 100
+		
+	cbind(isplit['1970::'], split['1970::'])
+
+	implied.div = mlag(close) * adjusted / mlag(adjusted) - close
+	idiv.index = implied.div > 1e-3
+	idiv = implied.div[idiv.index & !isplit.index]
+		idiv = round(1e3 * idiv) / 1e3
+	len(idiv['1970::'])
+    len(dividend1['1970::'])
+
+	setdiff( index(dividend1['1970::']), index(idiv['1970::']))
+	setdiff( index(idiv['1970::']), index(dividend1['1970::']) )
+    
+	cbind(idiv['1970::'], dividend1['1970::'])	
+}	
+    
+
 
 ###############################################################################	
 #' Test for bt.run.share.unadjusted functionality
