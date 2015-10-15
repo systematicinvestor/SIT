@@ -431,16 +431,37 @@ get.CRB.test <- function()
 # http://finance.yahoo.com/q/cp?s=^DJI+Components
 #' @export 
 ###############################################################################
-dow.jones.components <- function()
+dow.jones.components.0 <- function()
 {
   url = 'http://finance.yahoo.com/q/cp?s=^DJI+Components'
   txt = join(readLines(url))
 
   # extract table from this page
   temp = extract.table.from.webpage(txt, 'Volume', has.header = T)
-  tickers = temp[, 'Symbol']
+  temp[, 'Symbol']
+}
 
-  return(tickers)
+dow.jones.components <- function()
+{
+  url = 'http://money.cnn.com/data/dow30/'
+  txt = join(readLines(url))
+  
+  # extract links
+  temp = gsub(pattern = '">', replacement = '<td>', txt, perl = TRUE)
+  temp = gsub(pattern = '</a>', replacement = '</td>', temp, perl = TRUE) 
+
+  # extract table from this page
+  temp = extract.table.from.webpage(temp, 'Volume', has.header = T)
+  trim(temp[,'Company'])
+}	
+
+dow.jones.components.1 <- function()
+{
+  load.packages('readxl,httr')
+  dir.create(paste(getwd(), 'temp', sep='/'), F)
+  GET('http://www.djaverages.com/?go=export-components&symbol=DJI', write_disk('temp/DJI.xls', overwrite=TRUE))
+  temp = read_excel('temp/DJI.xls')
+  temp$Ticker
 }
   
 ###############################################################################

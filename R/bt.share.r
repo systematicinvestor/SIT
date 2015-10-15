@@ -1457,33 +1457,36 @@ bt.unadjusted.add.div.split = function(
 	#****************************************************************** 	
 	for(ticker in spl(tickers)) {
 		price = data.raw[[ticker]]		
-		price$Dividend = price$Split = 0
+		price$Dividend = price$Split = 0		
 
 		if(infer.div.split.from.adjusted) {
-			close = Cl(price)
-			adjusted = Ad(price)
+			close = coredata(Cl(price))
+			adjusted = coredata(Ad(price))
 	
 #Determine Dividend and Split from adjusted and un-adjusted prices
 #Implied Dividend: (Pt1+Dt1)/Pt0 = At1/At0 => Dt1 = Pt0 * At1/At0 - Pt1
 #Implied Split: St1 * Pt1/Pt0 = At1/At0 => St1 = Pt1/Pt0 * At0/At1			
 			implied.split = close / mlag(close) * mlag(adjusted) / adjusted
-				isplit.index = implied.split < 0.8 | implied.split > 1.2
+				isplit.index = ifna(implied.split < 0.9 | implied.split > 1.2,F)
 			isplit = implied.split[isplit.index]
 				isplit = round(100 * isplit) / 100
-			split = isplit
 		
 			implied.div = mlag(close) * adjusted / mlag(adjusted) - close
-				idiv.index = implied.div > 1e-3
-			idiv = implied.div[idiv.index & !isplit.index]
+				idiv.index = ifna(implied.div > 1e-3, F) & !isplit.index
+			idiv = implied.div[idiv.index]
 				idiv = round(1e3 * idiv) / 1e3
-			dividend = idiv
 				
+			price$Dividend[idiv.index] = idiv
+			price$Split[isplit.index] = isplit 				
+			
+			
 		} else {
 			# need full history	
 			dividend = getDividends(ticker, from = '1900-01-01')	
 			split = getSplits(ticker, from = '1900-01-01')	
-		
-		
+				split = split[split > 0]
+				dividend = dividend[dividend > 0]
+
 # un-adjust split, faster version of adjRatios(splits=merge(split, index(dividend)))[,1]
 #split1 = split
 #	split1[] = rev(cumprod(rev(coredata(split))))
@@ -1496,24 +1499,24 @@ bt.unadjusted.add.div.split = function(
 			# un-adjust dividends for splits (Yahoo already adjusts div for splits)
     		if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
 				dividend = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
-		}
-		
-		# use unadjusted dividends to compute retruns based on Close      	
-		dividend = dividend[index(price)]
-		split = split[index(price)]
-		
-		# http://www.theglobeandmail.com/globe-investor/investor-education/four-dividend-dates-every-investor-needs-to-know/article19273251/
-		if( is.xts(dividend) && nrow(dividend) > 0 )
-		if( nrow(price[index(dividend)]) != nrow(dividend) ) 
-			stop(paste('Missing Price date for dividend. Symbol =', ticker))
-		else
-			price$Dividend[index(dividend)] = dividend
+						
+			# use unadjusted dividends to compute retruns based on Close      	
+			dividend = dividend[index(price)]
+			split = split[index(price)]
 			
-		if( is.xts(split) && nrow(split) > 0 )
-		if( nrow(price[index(split)]) != nrow(split) ) 
-			stop(paste('Missing Price date for split. Symbol =', ticker))
-		else
-			price$Split[index(split)] = split
+			# http://www.theglobeandmail.com/globe-investor/investor-education/four-dividend-dates-every-investor-needs-to-know/article19273251/
+			if( is.xts(dividend) && nrow(dividend) > 0 )
+			if( nrow(price[index(dividend)]) != nrow(dividend) ) 
+				stop(paste('Missing Price date for dividend. Symbol =', ticker))
+			else
+				price$Dividend[index(dividend)] = dividend
+				
+			if( is.xts(split) && nrow(split) > 0 )
+			if( nrow(price[index(split)]) != nrow(split) ) 
+				stop(paste('Missing Price date for split. Symbol =', ticker))
+			else
+				price$Split[index(split)] = split
+		}		
 		
 		# round up to the nearest cents - this is the only way to match IBM prices
 		if(yahoo.round.up.nearest.cents) {
@@ -1546,10 +1549,11 @@ test.implied.div.split = function(ticker) {
 	split = getSplits(ticker, from = '1900-01-01')	
 
 	# un-adjust dividends for splits (Yahoo already adjusts div for splits)
-	dividend1 = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+	if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
+		dividend1 = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+	else
+		dividend1 = dividend
 
-	
-			
 	close = Cl(data$IBM)
 	adjusted = Ad(data$IBM)
 	
@@ -1571,8 +1575,120 @@ test.implied.div.split = function(ticker) {
 	setdiff( index(idiv['1970::']), index(dividend1['1970::']) )
     
 	cbind(idiv['1970::'], dividend1['1970::'])	
+	
+	#*****************************************************************
+	# Check DOW components
+	#*****************************************************************
+	tickers = dow.jones.components()
+
+for(ticker in tickers) {
+		
+	data <- new.env()
+	getSymbols.extra(ticker, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	
+	# need full history	
+	dividend = getDividends(ticker, from = '1900-01-01')	
+	split = getSplits(ticker, from = '1900-01-01')	
+		split = split[split > 0]
+		dividend = dividend[dividend > 0]
+
+	# un-adjust dividends for splits (Yahoo already adjusts div for splits)
+	if(is.xts(split) && is.xts(dividend) && nrow(split) > 0 && nrow(dividend) > 0)
+		dividend1 = dividend * 1/adjRatios(splits=merge(split, index(dividend)))[,1]
+	else
+		dividend1 = dividend
+
+	close = Cl(data[[ticker]])
+	adjusted = Ad(data[[ticker]])
+	
+	implied.split = close / mlag(close) * mlag(adjusted) / adjusted
+		isplit.index = ifna(implied.split < 0.9 | implied.split > 1.1, F)
+	isplit = implied.split[isplit.index]
+		isplit = round(100 * isplit) / 100
+		
+	if(len(isplit)>0)		
+		cat(ticker, 'SPL', len(isplit['1970::']) - len(split['1970::']), max(round(isplit['1970::'],3) - round(split['1970::'],3)), '\n')
+	else
+		cat(ticker, 'SPL', len(isplit['1970::']) - len(split['1970::']), '\n')		
+	#cbind(round(isplit['1970::'],3), round(split['1970::'],3))
+
+	implied.div = mlag(close) * adjusted / mlag(adjusted) - close
+	idiv.index = ifna(implied.div > 1e-3, F)
+	idiv = implied.div[idiv.index & !isplit.index]
+		idiv = round(1e3 * idiv) / 1e3
+	len(idiv['1970::'])
+    len(dividend1['1970::'])
+
+	cat(ticker, 'DIV', len(idiv['1970::']) - len(dividend1['1970::']),    
+		len(setdiff( index(dividend1['1970::']), index(idiv['1970::']))),
+		len(setdiff( index(idiv['1970::']), index(dividend1['1970::']) )),
+		max(round(idiv['1970::'],3)- round(dividend1['1970::'],3)), '\n')
+	
+	setdiff( index(dividend1['1970::']), index(idiv['1970::']))
+	setdiff( index(idiv['1970::']), index(dividend1['1970::']) )
+    
+	#cbind(round(idiv['1970::'],3), round(dividend1['1970::'],3))
+}	
+		
 }	
     
+#*****************************************************************
+# Problems with infered div and split data
+#*****************************************************************
+# KO has wrong dividned, split adjusted, there is Aug 13, 2012	2: 1 Stock Split
+# http://finance.yahoo.com/q/hp?s=KO&a=00&b=2&c=1962&d=09&e=14&f=2015&g=v
+# Nov 28, 2001	0.09 Dividend
+# Sep 12, 2001	0.18 Dividend
+# Jun 13, 2001	0.09 Dividend
+#
+# http://www.nasdaq.com/symbol/ko/dividend-history
+# 11/28/2001 	Cash	0.18 	-- 	11/28/2001 	--
+# 6/13/2001 	Cash	0.18 	-- 	6/15/2001 	--
+# 3/13/2001 	Cash	0.18 	-- 	3/15/2001 	--
+#
+# implied dividend is correct
+#http://finance.yahoo.com/q/hp?s=KO&a=08&b=2&c=2001&d=09&e=14&f=2001&g=d
+#> idiv['2001']
+#2001-03-13 0.176
+#2001-06-13 0.180
+#2001-09-17 0.218
+#2001-11-28 0.176
+#
+#============================================================
+#
+# DIS split is not detected
+#http://finance.yahoo.com/q/hp?s=DIS&a=00&b=2&c=1962&d=09&e=14&f=2015&g=v
+#Jun 13, 2007	1014: 1000 Stock Split
+#
+#============================================================
+#
+# DD  split is not detected
+#http://finance.yahoo.com/q/hp?s=DD&a=00&b=2&c=1962&d=09&e=14&f=2015&g=v
+#Jul 1, 2015	1053: 1000 Stock Split
+# => hence incorrect div is implied
+#
+#============================================================
+#
+# MSFT big div is treated as split
+# Nov 15, 2004	3.08 Dividend
+# http://finance.yahoo.com/q/hp?s=MSFT&a=02&b=13&c=1986&d=09&e=14&f=2015&g=v
+#
+#============================================================
+#
+# PG has split and div on the same day
+#May 19, 1970	0.02188 Dividend
+#May 19, 1970	2: 1 Stock Split
+#http://finance.yahoo.com/q/hp?s=PG&a=00&b=2&c=1970&d=09&e=14&f=2015&g=v&z=66&y=132
+#
+#============================================================
+#
+# VZ missing splits -spinoffs
+#Jul 2, 2010	1000000: 937889 Stock Split
+#Apr 1, 2008	100000: 99537 Stock Split
+#Nov 20, 2006	100000: 96334 Stock Split
+#
+#============================================================
+
 
 
 ###############################################################################	
@@ -1833,6 +1949,7 @@ bt.run.share.unadjusted.test = function() {
 		
 		# copy unadjusted prices
 		data.raw = env(data)
+		data.raw1 = env(data)
 	
 		# adjusted prices
 		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
@@ -1899,6 +2016,45 @@ bt.run.share.unadjusted.test = function() {
 	models$test.unadjusted = bt.run.share.ex(data.raw, clean.signal=F, silent=F, commission=commission,
 		lot.size=50, adjusted = F)
 	  
+
+		
+		
+	#*****************************************************************
+	# For each asset, append dividend and split columns
+	#****************************************************************** 	
+data.raw = data.raw1	
+	bt.unadjusted.add.div.split(data.raw, yahoo.round.up.nearest.cents = T, infer.div.split.from.adjusted=T)
+	
+	bt.prep(data.raw, align='remove.na', fill.gaps = T)
+	
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data.raw$prices
+	  n = ncol(prices)
+	  nperiods = nrow(prices)
+	
+	period.ends = date.ends(data.raw$prices,'months')
+	  
+	#models = list()
+	
+	commission = list(cps = 0.01, fixed = 1.0, percentage = 0.0)
+	
+
+	#*****************************************************************
+	# New Back-test
+	#******************************************************************
+	data.raw$weight[] = NA
+		#data.raw$weight[1,] = 1
+		data.raw$weight[period.ends,] = 1		
+	models$test.unadjusted1 = bt.run.share.ex(data.raw, clean.signal=F, silent=F, commission=commission,
+		lot.size=50, adjusted = F)
+		
+				
+		
+		
+		
 	#*****************************************************************
 	# Report
 	#****************************************************************** 	
@@ -1976,7 +2132,10 @@ bt.run.share.unadjusted.test = function() {
 	
 	#*****************************************************************
 	# For each asset, append dividend and split columns
-	#****************************************************************** 	
+	#****************************************************************** 		
+	#data.raw1 = env(data.raw)
+	#data.raw = data.raw1
+	#bt.unadjusted.add.div.split(data.raw, infer.div.split.from.adjusted=T)
 	bt.unadjusted.add.div.split(data.raw)
 	
 	bt.prep(data.raw, align='remove.na', fill.gaps = T)
@@ -2438,3 +2597,77 @@ tax.cashflows = function(info, index, last.index) {
 		
 	-tax
 }
+
+
+
+
+
+
+
+###############################################################################	
+# General notes on new functionality
+###############################################################################
+#
+#
+#Using un-adjusted vs adjusted prices in after tax back-test should produce similar results, but not exact because
+#============================================
+#* adjusted prices back-test assumes that dividends are automatically reinvested, 
+#while un-adjusted prices back-test deposits dividends into cash account that is allocated 
+#during next re-balance. There might be some commissions associated with deployment of dividends 
+#in this case.
+#
+# i.e. in test.ex.lot.tax we don't pay any taxes since divs are reinvested
+#in test.unadjusted.tax we pay taxes on divs plus commisions costs to invest divs
+#
+#* the un-adjusted prices back-test compute commissions based on actual price of shares at the time, 
+#while the adjusted prices back-test compute commissions based on adjusted prices that might very small 
+#far back in the history. Hence, there might be a difference in commissions.
+#
+ 
+
+
+
+#
+#bt.run.share vs bt.run.share.ex - different assumptions in calculations of shares
+#=========================================
+#the bt.run.share function scales number of shares to the original capital at each rebalance. 
+#To glance at SIT back-test logic for bt.run.share, please have a look at
+#  https://systematicinvestor.wordpress.com/2013/11/05/commissions/
+#
+#This problem with bt.run.share function is one of the reason i'm working on 
+#bt.run.share.ex. bt.run.share.ex function properly tracks capital evolution 
+#and is not causing artificial turnover.
+#
+#Following simple example that should clarify the logic in bt.run.share.  
+#bt.run.share function computes number of shares at each rebalance using following formula, 
+#please note capital is fixed and never changes :
+#share = weight * capital / price
+#
+#Following is an extreme case example:
+#Let's say capital = $10, weight is 50/50
+#
+#period one prices are ($1 and $1) hence share = (0.5, 0.5) * $10 / ($1, $1) = we have 5 shares and 5 shares
+#period two prices are ($5 and $5) hence share = (0.5, 0.5) * $10 / ($5, $5) = we have 1 share and 1 share
+#above introduces artificial turnover that you see with bt.run.share function
+#
+     
+
+# Testing with stock that  never distributed any dividend (GOOGL). 
+#
+# The difference bwtn the unadjusted and the adjusted returns. 
+#
+#Actually GOOGL had split on Apr 3, 2014
+#Hence number of shares was adjusted and on the next rebalance, shares were rounded up to closest 100's
+#and commisions were paid
+#Apr 3, 2014	1998: 1000 Stock Split
+#http://finance.yahoo.com/q/hp?s=GOOGL&a=7&b=19&c=2004&d=9&e=14&f=2015&g=d&z=66&y=330
+#
+#> mlast(bt.make.trade.event.summary.table(models$test.unadjusted.tax), 25)
+#            Type  GOOGL     Cash   Com
+#2014-03-31 trade  950.0 2737.991 0.000
+#2014-04-03 split 1898.1 2737.991 0.000
+#2014-04-30 trade 1900.0 1720.699 1.019
+#
+# The turnover is not null because there is initial turnover when position is started. I.e. Cash -> Equity Allocation
+#
+
