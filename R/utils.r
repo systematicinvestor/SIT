@@ -466,7 +466,7 @@ date.week <- function(dates)
 #' @rdname DateFunctions
 date.month <- function(dates) 
 { 
-  return(as.double(format(dates, '%m')))
+	as.POSIXlt(dates)$mon + 1
 }
 
 # (((1:12)-1) %/% 3)+1  
@@ -478,11 +478,11 @@ date.quarter <- function(dates)
   (((date.month(dates))-1) %/% 3)+1 
 }
 
+# lubridate
 #' @export 
 #' @rdname DateFunctions
-date.year <- function(dates) 
-{ 
-  return(as.double(format(dates, '%Y')))
+date.year = function (dates) {
+	as.POSIXlt(dates)$year + 1900
 }
 
 
