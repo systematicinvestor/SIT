@@ -93,8 +93,8 @@ bt.run.share.ex <- function
 		#	type = 'fee.rebate'
 		#),
 		# value = cash + sum(price * share)
-		# short = sum(price * iif(share<0,share,0))
-		# long = sum(price * iif(share>0,share,0))
+		# short = sum((price * share)[share<0])
+		# long = sum((price * share)[share>0])
 		# margin = iif(long > value, long - value, 0)
 		# 
 		# portfolio can accure interest on (cash + short), if (cash + short) > 0
@@ -171,6 +171,7 @@ bt.run.share.ex <- function
 	# process weight
 	#---------------------------------------------------------
 	# make sure we don't have any abnormal weights
+	weight[is.nan(weight) | is.infinite(weight)] = NA
 	weight[!is.na(weight) & is.na(prices)] = 0
 	
 		# lag logic, to be back compatible with bt.run.share
@@ -474,7 +475,7 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 		
 		
 		# update share[i,] and cash[i]
-		if( trade.index[i] ) {
+		if( trade.index[i] ) {	
 			# if there is a big cashflow, we might want to override weight.change.index
 			# to set all to TRUE to work with full portfolio instead of subset
 			
@@ -900,7 +901,7 @@ bt.run.share.ex.invest = function
 		# current cash
 		current.cash = sum(price * share) + cash - sum(price * abs(share))
 		# value - long
-		current.cash = sum(price * share) + cash - sum(price * iif(share>0,share,0))
+		current.cash = (sum(price * share) + cash) - sum((price * share)[share>0])
 		if(current.cash >= 0)
 			return(list(share = share, cash = cash, com = 0))
 		# otherwise continue to satisfy the cash requirement		
@@ -979,6 +980,7 @@ bt.run.share.ex.allocate = function
 	cashflow = 0
 ) {
 	
+
 	# total value, as if everything is liquidated
 	value = sum(price * share) + cash
 
@@ -1080,7 +1082,7 @@ allocate.lot = function(value, share, lot.size) {
 
 		# drop current allocation from possible ones
 		if( cashflow < 0 )
-			if( -cashflow > (value - sum(price * iif(share > 0, share, 0))) )
+			if( (value - sum((price * share)[share > 0])) < 0 )
 				share1 = share1[-1,,drop=F]		
 		
 		# create list of possible portfolios and compute commisions, cash, weight diff

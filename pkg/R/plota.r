@@ -797,6 +797,7 @@ plota.scale.volume <- function(y)
 
 ###############################################################################
 # plota.test - test for plota functions
+#' @export
 ###############################################################################
 plota.test <- function() {
 	load.packages('quantmod')
