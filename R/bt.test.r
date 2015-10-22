@@ -7909,12 +7909,33 @@ load.hist.stock.data <- function()
 	# Load historical data
 	#****************************************************************** 
 	load.packages('quantmod')
-		
-	stock.folder = 'c:\\Stocks\\Data\\'
-	tickers = spl('UUP,EMB,HYG')
 	
-	data <- new.env()
+	tickers = 'MMM, AA, CAT, KO, HPQ'
+		tickers = trim(spl(tickers))
+	
+	data = env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1970-01-01', env = data, auto.assign = T)
+	bt.prep(data, align='remove.na', fill.gaps = T)
 
+	#*****************************************************************
+	# Create test data
+	#****************************************************************** 
+		
+	# one file per ticker
+	for(ticker in tickers)
+		write.xts(data[[ticker]], paste0(ticker, '.csv'), format='%m/%d/%Y')
+	
+	# one file
+	write.xts(bt.apply(data, Ad), 'adjusted.csv', format='%m/%d/%Y')
+	
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	stock.folder = ''
+	
+	data = env()
 		
 	# load historical data, select data load method
 	data.load.method = 'basic'
@@ -7932,16 +7953,22 @@ load.hist.stock.data <- function()
 		}	
 	}else if(data.load.method == 'custom.one.file') {
 		# read from one csv file, column headers are tickers
-		filename = 'hex.csv'
+		filename = 'adjusted.csv'
 		all.data = read.xts(paste(stock.folder, filename, sep=''), format='%m/%d/%Y')
+		
+		# alternatively reading xls/xlsx
+		#load.packages('readxl')
+		#all.data = read.xts(read_excel('adjusted.xls'))
+		
 		for(n in names(all.data)) {
 			data[[n]] = all.data[,n]
 			colnames(data[[n]]) = 'Close'
 			data[[n]]$Adjusted = data[[n]]$Open = data[[n]]$High = data[[n]]$Low = data[[n]]$Close
 		}
-	}		
-		
+	}	
 	
+			
+		
 	# prepare data for back test
 		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)							
 	bt.prep(data, align='remove.na')

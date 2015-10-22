@@ -1506,13 +1506,13 @@ read.xts <- function
   ...
 )
 {
+load.packages('data.table')
 if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
   data = x
   dates = as.matrix(data[,date.column,drop=F])
   data  = data[,-date.column,drop=F]
 } else {
-  filename = x
-  load.packages('data.table')
+  filename = x  
 if(!is.data.table(x)) {
   # set autostart
   out = fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
