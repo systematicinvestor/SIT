@@ -309,25 +309,26 @@ ntop <- function
 	
 	for( i in 1:nrow(data) ) {
 		x = temp[i,]
-		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
-		index = which(!is.na(x))
-		x[] = NA
-		
-		if(len(index)>0) {
-			n = min(topn, len(index))
+		index = !is.na(x)
+			index.n = sum(index)	
+				
+		if( index.n > 0 ) {
+			o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
+			x[] = 0
+			n = min(topn, index.n)
 			x[o[1:n]] = 1/n
-		}
+		} else x[] = 0
 		temp[i,] = x
 	}
-	temp[is.na(temp)] = 0
 	
 	# work with xts
 	out = data
 	out[] = temp		
-	return( out )
+	out
 }
 
 
+#' @export 
 ntop.helper <- function
 (
 	x, 		# matrix with observations
@@ -335,16 +336,18 @@ ntop.helper <- function
 	dirMaxMin = TRUE
 ) 
 {
-	o = sort.list(x, na.last=TRUE, decreasing = dirMaxMin)
-	index = which(!is.na(x))
-	x[] = 0
+	x = as.vector(x)
+	index = !is.na(x)
+		index.n = sum(index)	
 		
-	if(len(index)>0) {
-		n = min(n,len(index))
+	if( index.n > 0 ) {
+		o = sort.list(x, na.last=TRUE, decreasing = dirMaxMin)
+		x[] = 0	
+		n = min(n, index.n)
 		x[o[1:n]] = 1/n
-	}
+	} else x[] = 0
 	
-	return(x) 
+	x
 }	
 
 ntop.speed.test <- function()
@@ -407,23 +410,25 @@ ntop.keep <- function
 	
 	for( i in 1:nrow(temp) ) {
 		x = temp[i,]
-		o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
-		index = which(!is.na(x))
-		x[] = NA
+		index = !is.na(x)
+			index.n = sum(index)	
 			
-		if(len(index)>0) {
-			n = min(topn, len(index))
+		if( index.n > 0 ) {
+			o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
+			x[] = 0		
+			n = min(topn, index.n)
 			x[o[1:n]] = 1
 		
 			# keepn logic
-			if( i>=2 ) {
-				y = coredata(temp[(i-1),])		# prev period selection
-				n1 = min(keepn,len(index))
+			if( i >= 2 ) {
+				y = temp[(i-1),]		# prev period selection
+				n1 = min(keepn, index.n)
 				y[-o[1:n1]] = NA	# remove all not in top keepn
 				
-				index1 = which(!is.na(y))
-				if(len(index1)>0) {
-					x[] = NA
+				index1 = !is.na(y)
+					index1.n = sum(index1)	
+				if( index1.n > 0 ) {
+					x[] = 0
 					x[index1] = 1
 					
 					for( j in 1:n ) {
@@ -432,10 +437,9 @@ ntop.keep <- function
 					}
 				}
 			}
-		}		
-		temp[i,] = x/sum(x,na.rm=T)	
+		} else x[] = 0		
+		temp[i,] = x/sum(x)	
 	}
-	temp[is.na(temp)] = 0
 	
 	# work with xts
 	out = data

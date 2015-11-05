@@ -1944,13 +1944,13 @@ data.clean.helper <- function
 # http://systematicinvestor.github.io/Data-Proxy/
 #' @export 
 ###############################################################################
-make.data.proxy <- function(perl = "perl") {
+make.data.proxy <- function() {
     #*****************************************************************
     # Load external data
     #******************************************************************   
     load.packages('quantmod')  
 
-	raw.data <- new.env()
+	raw.data = env()
     
 	#--------------------------------   
     # TRJ_CRB file was downloaded from the 
@@ -1958,9 +1958,12 @@ make.data.proxy <- function(perl = "perl") {
     # select TR/CC-CRB Index-Total Return and click "See Chart"
     # on Chart page click "Download to Spreadsheet" link
     # copy TR_CC-CRB, downloaded file, to data folder
-    temp = extract.table.from.webpage( join(readLines("data/TR_CC-CRB")), 'EODValue' )
-    temp = join( apply(temp, 1, join, ','), '\n' )
-    raw.data$CRB = make.stock.xts( read.xts(temp, format='%m/%d/%y' ) )
+    filename = 'data/TR_CC-CRB'
+    if(file.exists(filename)) {
+    	temp = extract.table.from.webpage( join(readLines(filename)), 'EODValue' )
+    	temp = join( apply(temp, 1, join, ','), '\n' )
+    	raw.data$CRB = make.stock.xts( read.xts(temp, format='%m/%d/%y' ) )
+    }
      
 	#--------------------------------   
 	# load 3-Month Treasury Bill from FRED (BIL)
@@ -2032,11 +2035,10 @@ make.data.proxy <- function(perl = "perl") {
 		download.file(url, filename,  mode = 'wb')
 	}
 	
-	load.packages('gdata')
-	temp = read.xls(filename, pattern='Date', sheet='Index Data', stringsAsFactors=FALSE, perl=perl)
-	index = as.numeric(gsub(',','',temp$Index))
-	# monthly data, with 1-month-year format
-	NAREIT = make.xts(index, as.Date(paste(1,temp$Date),'%d %b-%y')) 
+	load.packages('readxl')	
+	temp = read_excel(filename, sheet='Index Data', skip=7)
+	NAREIT = make.xts(temp$Index, as.Date(temp$Date)) 
+
 	raw.data$NAREIT = make.stock.xts(NAREIT)
 	
 	
@@ -2078,7 +2080,7 @@ LONG.TR = [TLT] + VUSTX
 '
 
 
-	data.proxy <- new.env()
+	data.proxy = env()
 	getSymbols.extra(tickers, src = 'yahoo', from = '1970-01-01', env = data.proxy, raw.data = raw.data, auto.assign = T)
 
 	data.proxy.raw = raw.data

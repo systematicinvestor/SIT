@@ -5,6 +5,7 @@
 \alias{date.ends.index}
 \alias{date.month.ends}
 \alias{date.quarter.ends}
+\alias{date.semiannual.ends}
 \alias{date.week.ends}
 \alias{date.year.ends}
 \title{Dates Index Functions}
@@ -14,6 +15,8 @@
   date.month.ends(dates, last.date = T)
 
   date.quarter.ends(dates, last.date = T)
+
+  date.semiannual.ends(dates, last.date = T)
 
   date.year.ends(dates, last.date = T)
 

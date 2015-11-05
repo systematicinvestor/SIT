@@ -443,46 +443,192 @@ run.count <- function
 #' @export 
 #' @rdname DateFunctions
 ###############################################################################
-date.dayofweek <- function(dates) 
-{ 
+#' @export 
+#' @rdname DateFunctions
+date.dayofweek <- function(dates) { 
+  as.POSIXlt(dates)$wday
+}
+date.dayofweek0 <- function(dates) { 
   return(as.double(format(dates, '%w')))
 }
 
+
 #' @export 
 #' @rdname DateFunctions
-date.day <- function(dates) 
-{ 
+date.day <- function(dates) { 
+  as.POSIXlt(dates)$mday
+}
+date.day0 <- function(dates) { 
   return(as.double(format(dates, '%d')))
 }
 
+# wday 0–6 day of the week, starting on Sunday.
+# %U Week of the year as decimal number (00–53) using Sunday as the first day 1 of the week (and typically with the first Sunday of the year as day 1 of week 1). The US convention.
 #' @export 
 #' @rdname DateFunctions
-date.week <- function(dates) 
-{ 
+date.week <- function(dates) { 
+	dates = as.POSIXlt(dates)
+	offset = (7 + dates$wday - dates$yday %% 7) %%7
+	(dates$yday +  offset)%/% 7
+}
+date.week0 <- function(dates) { 
   return(as.double(format(dates, '%U')))
 }
+
  
 #' @export 
 #' @rdname DateFunctions
-date.month <- function(dates) 
-{ 
+date.month <- function(dates) { 
 	as.POSIXlt(dates)$mon + 1
 }
-
-# (((1:12)-1) %/% 3)+1  
-# date.quarter(Sys.Date())
-#' @export 
-#' @rdname DateFunctions
-date.quarter <- function(dates) 
-{ 
-  (((date.month(dates))-1) %/% 3)+1 
+date.month0 <- function(dates) { 
+	return(as.double(format(dates, '%m')))
 }
 
+
+quarter.map = c(1,1,1,2,2,2,3,3,3,4,4,4)
+
+#' @export 
+#' @rdname DateFunctions
+date.quarter <- function(dates) { 	
+  quarter.map[date.month(dates)] 
+}
+# (((1:12)-1) %/% 3)+1  
+date.quarter0 <- function(dates) { 	
+	(((date.month(dates))-1) %/% 3)+1
+}
+
+
+semiannual.map = c(1,1,1,1,1,1,2,2,2,2,2,2)
+
+#' @export 
+#' @rdname DateFunctions
+date.semiannual = function (dates) {
+	semiannual.map[date.month(dates)] 
+}
+
+
+# ?DateTimeClasses
+# ?strptime 
 # lubridate
 #' @export 
 #' @rdname DateFunctions
 date.year = function (dates) {
 	as.POSIXlt(dates)$year + 1900
+}
+date.year0 = function (dates) {
+	return(as.double(format(dates, '%Y')))
+}
+
+date.all = function(dates) 
+{
+	dates = as.POSIXlt(dates)
+	offset = (7 + dates$wday - dates$yday %% 7) %%7
+
+	list(
+		dayofweek = dates$wday,
+		mday = dates$mday,
+		yday = dates$yday,
+		week = (dates$yday +  offset)%/% 7,
+		month = dates$mon + 1,		
+		quarter = quarter.map[dates$mon + 1],
+		semiannual = semiannual.map[dates$mon + 1],
+		year = dates$year + 1900	
+	)
+}
+
+
+date.period.test = function() {
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.week0(dates))!=0 , diff(date.week(dates))!=0 )
+
+	load.packages('rbenchmark')
+
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)
+
+	library(rbenchmark)
+	benchmark(
+    	test1 = diff(date.week0(dates))!=0, 
+       	test2 = diff(date.week(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)
+
+   	#------------------------------------------
+   	
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.dayofweek0(dates))!=0 , diff(date.dayofweek(dates))!=0 )
+   	
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)	
+   	
+	benchmark(
+    	test1 = diff(date.dayofweek0(dates))!=0, 
+       	test2 = diff(date.dayofweek(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)
+   	
+	#------------------------------------------
+   	
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.day0(dates))!=0 , diff(date.day(dates))!=0 )
+   	
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)	
+   	
+	benchmark(
+    	test1 = diff(date.day0(dates))!=0, 
+       	test2 = diff(date.day(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)   	
+   	
+	#------------------------------------------
+   	
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.month0(dates))!=0 , diff(date.month(dates))!=0 )
+   	
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)	
+   	
+	benchmark(
+    	test1 = diff(date.month0(dates))!=0, 
+       	test2 = diff(date.month(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)   	
+   	
+	#------------------------------------------
+   	
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.quarter0(dates))!=0 , diff(date.quarter(dates))!=0 )
+   	
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)	
+   	
+	benchmark(
+    	test1 = diff(date.quarter0(dates))!=0, 
+       	test2 = diff(date.quarter(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)   	
+
+	#------------------------------------------
+ 
+	dates = seq(Sys.Date()-100000, Sys.Date(), 1)
+	all.equal(diff(date.year0(dates))!=0 , diff(date.year(dates))!=0 )
+   	
+	dates = seq(Sys.Date()-10000, Sys.Date(), 1)	
+   	
+	benchmark(
+    	test1 = diff(date.year0(dates))!=0, 
+       	test2 = diff(date.year(dates))!=0, 
+       	columns = c("test", "replications", "elapsed", "relative"),
+       	order = "relative",
+       	replications = 200
+   	)   	   	  	
 }
 
 
@@ -524,14 +670,24 @@ date.quarter.ends <- function(dates, last.date=T)
 
 #' @export 
 #' @rdname DateFunctionsIndex
+date.semiannual.ends = function(dates, last.date=T) 
+{ 
+  ends = which(diff( 10*date.year(dates) + date.semiannual(dates) ) != 0)
+  ends.add.last.date(ends, len(dates), last.date)
+}
+
+#' @export 
+#' @rdname DateFunctionsIndex
 date.year.ends <- function(dates, last.date=T) 
 { 
   ends = which(diff( date.year(dates) ) != 0)
   ends.add.last.date(ends, len(dates), last.date)
 }
 
+
+
 # helper function to add last date
-ends.add.last.date <- function(ends, last.date, action=T) 
+ends.add.last.date = function(ends, last.date, action=T) 
 {
   if(action)
     unique(c(ends, last.date))
@@ -539,36 +695,46 @@ ends.add.last.date <- function(ends, last.date, action=T)
     ends
 }
 
+
 #' @export 
 #' @rdname DateFunctionsIndex
-date.ends.fn <- function(periodicity) {
+date.ends.fn = function(periodicity) {
   switch(periodicity,
     weeks = date.week.ends,
     week = date.week.ends,
     weekly = date.week.ends,
+	w = date.week.ends,
     
     months = date.month.ends,
     month = date.month.ends,
     monthly = date.month.ends,
+	m = date.month.ends,
     
     quarters = date.quarter.ends,
     quarter = date.quarter.ends,
     quarterly = date.quarter.ends,
-        
+	q = date.quarter.ends,
+
+	semiannual = date.semiannual.ends,
+	semiannually = date.semiannual.ends,
+	s = date.semiannual.ends,
+		
     years = date.year.ends,
     year = date.year.ends,
     yearly = date.year.ends,
     annual = date.year.ends,
     annually = date.year.ends,
+	y = date.year.ends,
     
     # default
-    NULLL)  
+    NULL)  
 }
+
 
 # 'date.ends(data$prices,'year')
 #' @export 
 #' @rdname DateFunctionsIndex
-date.ends <- function(dates, periodicity, by=1, skip=0, last.date=T, calendar = NULL) {
+date.ends = function(dates, periodicity, by=1, skip=0, last.date=T, calendar = NULL) {
 	if( is.xts(dates) ) dates = index(dates)
 	periodicity = trim(tolower(periodicity))
 	

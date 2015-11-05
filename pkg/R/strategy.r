@@ -1870,15 +1870,17 @@ min.var2 <- function(power.function = 1)
 #' @export 		
 static.group <- function(group) 
 {	
-	group = group
+	group = as.numeric(group)
 	function
 	(
 		ia			# input assumptions
 	)
 	{
-		return(group[ia$index])	
+		group[ia$index]
 	}		
 }		
+	
+	
 	
 	
 	# Find groups using clustering algorithm
@@ -2162,8 +2164,9 @@ dev.off()
 			if(!is.function(group.fn)) return(fn(ia, constraints))
 			
 			group = as.numeric(group.fn(ia))
-				
-			ngroups = max(group)
+
+			groups = unique(group)
+				ngroups = len(groups)
 			if(ngroups == 1) return(fn(ia, constraints))
 					
 			weight0 = rep(NA, ia$n)
@@ -2173,7 +2176,7 @@ dev.off()
 				
 			# compute weights within each group	
 			for(g in 1:ngroups) {
-				index = group == g
+				index = group == groups[g]
 				if( sum(index) == 1 ) {
 					weight0[index] = 1
 					hist.g[,g] = ia$hist.returns[, index, drop=F]
@@ -2200,7 +2203,7 @@ dev.off()
 					
 			# mutliply out group.weights by within group weights
 			for(g in 1:ngroups)
-					weight0[group == g] = weight0[group == g] * group.weights[g]
+					weight0[group == groups[g]] = weight0[group == groups[g]] * group.weights[g]
 			
 			weight0			
 		}

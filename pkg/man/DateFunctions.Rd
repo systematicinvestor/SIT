@@ -3,6 +3,7 @@
 \alias{date.dayofweek}
 \alias{date.month}
 \alias{date.quarter}
+\alias{date.semiannual}
 \alias{date.week}
 \alias{date.year}
 \title{Dates Functions}
@@ -16,6 +17,8 @@
   date.month(dates)
 
   date.quarter(dates)
+
+  date.semiannual(dates)
 
   date.year(dates)
 }
