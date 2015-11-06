@@ -2165,11 +2165,15 @@ dev.off()
 			
 			group = as.numeric(group.fn(ia))
 
-			groups = unique(group)
+			groups = unique(group[!is.na(group)])
 				ngroups = len(groups)
-			if(ngroups == 1) return(fn(ia, constraints))
+			if(ngroups == 1) return(fn.within(ia, constraints))
+			
 					
-			weight0 = rep(NA, ia$n)
+			weight0 = rep(0, ia$n)
+			
+			if(ngroups == 0) return(weight0)
+			group[is.na(group)] = Inf			
 				
 			# returns for each group			
 			hist.g = NA * ia$hist.returns[,1:ngroups]
@@ -2201,7 +2205,7 @@ dev.off()
 			# find group weights
 			group.weights = match.fun(fn)(ia.g, constraints.g)
 					
-			# mutliply out group.weights by within group weights
+			# multiply out group.weights by within group weights			
 			for(g in 1:ngroups)
 					weight0[group == groups[g]] = weight0[group == groups[g]] * group.weights[g]
 			
