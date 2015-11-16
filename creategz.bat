@@ -18,6 +18,13 @@ for %%a in (R\*.r) do (
 	copy/b c:\temp\code.r+"%%a" c:\temp\code.r
 )
 
+
+:: merge with SIT.date
+for %%a in (..\1gitblog\SIT.date\R\*.r) do (
+	echo. >>c:\temp\code.r
+	copy/b c:\temp\code.r+"%%a" c:\temp\code.r
+)
+
 remove_r_comments c:\temp\code.r c:\temp\code1.r
 del c:\temp\code.r
 copy/b Readme.txt+c:\temp\code1.r c:\temp\code.r

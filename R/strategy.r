@@ -1208,6 +1208,41 @@ dev.off()
 }
 
 
+max.div.portfolio.test <- function() 
+{
+
+	#*****************************************************************
+	# Load historical data
+	#****************************************************************** 
+	load.packages('quantmod')
+		
+	tickers = spl('SPY,QQQ,EEM,IWM,EFA,TLT,IYR,GLD')
+	
+	data = env()
+	getSymbols.extra(tickers, src = 'yahoo', from = '1980-01-01', env = data, set.symbolnames = T, auto.assign = T)
+		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
+	bt.prep(data, align='keep.all', fill.gaps = T)
+
+
+	#*****************************************************************
+	# Setup
+	#*****************************************************************
+	prices = data$prices
+	
+	period.ends = date.ends(prices, 'month')
+
+	hist.returns = prices[period.ends] / mlag(prices[period.ends]) - 1
+	
+	# Create historical input assumptions
+	ia = create.historical.ia(hist.returns, 12)
+	
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
+	
+	load.packages('quantmod,quadprog')
+
+	max.div.portfolio(ia, constraints)
+}
+
 #*****************************************************************
 # Max Sharpe portfolio using non-linear solver, based on
 # http://stackoverflow.com/questions/10526243/quadprog-optimization

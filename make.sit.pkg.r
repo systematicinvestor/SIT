@@ -43,7 +43,8 @@ write.dcf(list(
     License = 'GPL-3', 
     LazyLoad = 'yes',
     Author = 'Michael Kapler <TheSystematicInvestor@gmail.com>', 
-    Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>'
+    Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>',
+    Depends = 'SIT.date'
     ), 
     file = file.path('pkg', "DESCRIPTION")
 )
