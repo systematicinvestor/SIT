@@ -1223,7 +1223,6 @@ max.div.portfolio.test <- function()
 		for(i in data$symbolnames) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
 	bt.prep(data, align='keep.all', fill.gaps = T)
 
-
 	#*****************************************************************
 	# Setup
 	#*****************************************************************
@@ -1238,9 +1237,169 @@ max.div.portfolio.test <- function()
 	
 	constraints = create.basic.constraints(ia$n, 0, 1, 1)
 	
-	load.packages('quantmod,quadprog')
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
 
-	max.div.portfolio(ia, constraints)
+	sol1 = max.div.portfolio(ia, constraints)
+	
+	#*****************************************************************
+	# Replication
+	#*****************************************************************	
+	# Properties of the Most Diversified Portfolio by Yves Choueifaty
+	# http://papers.ssrn.com/sol3/papers.cfm?abstract_id=1895459
+	# p21 min wEw s.t. w[i] > 0 and Sum(w[i] * sigma[i]) = 1
+	# normalize weights to sum up to 1	
+	max.div.portfolio2 <- function
+	(
+		ia,				# input assumptions
+		constraints		# constraints
+	)
+	{
+		risk.index = get.risky.asset.index(ia)
+
+		constraints = new.constraints(ia$n, lb = 0)
+ 		constraints = add.constraints(diag(ia$n), type = ">=", b = 0, constraints)
+			constraints = add.constraints(ia$risk, type = '=', b = 1, constraints)	
+		x = min.var.portfolio(ia, constraints)
+		
+		# normalize weights to sum up to 1
+		set.risky.asset(x / sum(x), risk.index)
+	}
+	
+	sol2 = max.div.portfolio2(ia, constraints)
+	
+	# weights
+	round(100*cbind(sol1,sol2),2)
+		
+	# risk contributions
+	round(100*t(portfolio.risk.contribution(rbind(sol1,sol2), ia)),2)
+			
+	#*****************************************************************
+	# Example from paper: Base
+	#*****************************************************************	
+	ia = list(
+		n = 2,
+		symbols = spl('A,B'),
+		risk = c(20, 10) / 100,
+		correlation = matrix(c(1, 0.5, 0.5, 1), 2, 2),
+		expected.return = c(1,1)		
+	)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+	ia.base = ia
+	
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
+	
+	sol = list(
+	EW = equal.weight.portfolio(ia, constraints),
+	ERC = equal.risk.contribution.portfolio(ia, constraints),
+	MV = min.var.portfolio(ia, constraints),
+	MDP = max.div.portfolio(ia, constraints),
+	MDP2 = max.div.portfolio1(ia, constraints)
+	)
+	
+	# weights
+	round(100*t(sapply(sol,c)))
+		
+	# risk contributions
+	round(100*portfolio.risk.contribution(t(sapply(sol,c)), ia))
+		
+	#*****************************************************************
+	# Example from paper: Duplication
+	#*****************************************************************	
+	ia = list(
+		n = 3,
+		symbols = spl('A,A1,B'),
+		risk = c(20, 20, 10) / 100,
+		correlation = matrix(c(1, 1, 0.5, 1, 1, 0.5, 0.5, 0.5, 1), 3, 3),
+		expected.return = c(1,1,1)		
+	)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+	
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
+	
+	sol = list(
+	EW = equal.weight.portfolio(ia, constraints),
+	ERC = equal.risk.contribution.portfolio(ia, constraints),
+	MV = min.var.portfolio(ia, constraints),
+	MDP = max.div.portfolio(ia, constraints),
+	MDP2 = max.div.portfolio1(ia, constraints)
+	)
+	
+	# weights
+	weights = t(sapply(sol,c))
+	round(100*weights)
+		
+	weights.base = cbind(rowSums(weights[,1:2]), weights[,3])
+	round(100*weights.base)
+	
+	# risk contributions
+	round(100*portfolio.risk.contribution(weights.base, ia.base))
+	
+	#*****************************************************************
+	# Example from paper: Leverage
+	#*****************************************************************	
+	ia = list(
+		n = 2,
+		symbols = spl('LA,B'),
+		risk = c(5, 10) / 100,
+		correlation = matrix(c(1, 0.5, 0.5, 1), 2, 2),
+		expected.return = c(1,1)		
+	)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+	
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
+	
+	sol = list(
+	EW = equal.weight.portfolio(ia, constraints),
+	ERC = equal.risk.contribution.portfolio(ia, constraints),
+	MV = min.var.portfolio(ia, constraints),
+	MDP = max.div.portfolio(ia, constraints),
+	MDP2 = max.div.portfolio1(ia, constraints)
+	)
+	
+	# weights
+	weights = t(sapply(sol,c))
+	round(100*weights)
+		
+	weights.base = cbind(weights[,1] / 4, weights[,2])	
+		weights.base = weights.base/rowSums(weights.base)
+	round(100*weights.base)
+	
+	
+	# risk contributions
+	round(100*portfolio.risk.contribution(weights.base, ia.base))
+	
+	#*****************************************************************
+	# Example from paper: Polico
+	#*****************************************************************	
+	ia = list(
+		n = 3,
+		symbols = spl('A,B,Polico'),
+		risk = c(20, 10, 11.46) / 100,
+		correlation = matrix(c(1, 0.5, 0.982, 0.5, 1, 0.655, 0.982, 0.655, 1), 3, 3),
+		expected.return = c(1,1,1)		
+	)
+	ia$cov = ia$correlation * (ia$risk %*% t(ia$risk))
+	
+	constraints = create.basic.constraints(ia$n, 0, 1, 1)
+	
+	sol = list(
+	EW = equal.weight.portfolio(ia, constraints),
+	ERC = equal.risk.contribution.portfolio(ia, constraints),
+	MV = min.var.portfolio(ia, constraints),
+	MDP = max.div.portfolio(ia, constraints),
+	MDP2 = max.div.portfolio1(ia, constraints)
+	)
+	
+	# weights
+	weights = t(sapply(sol,c))
+	round(100*weights)
+		
+	weights.base = cbind(weights[,1] +  1/2 * weights[,3], weights[,2] +  1/4 * weights[,3])	
+		weights.base = weights.base/rowSums(weights.base)
+	round(100*weights.base)
+	
+	# risk contributions
+	round(100*portfolio.risk.contribution(weights.base, ia.base))	
 }
 
 #*****************************************************************
