@@ -4,7 +4,7 @@
 \usage{
   read.xts(x, date.fn = paste, index.class = "Date",
     decreasing = FALSE, sep = ",", date.column = 1,
-    skip = -1L, ...)
+    skip = 0L, ...)
 }
 \arguments{
   \item{filename}{file name}

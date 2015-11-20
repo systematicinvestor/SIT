@@ -1075,7 +1075,7 @@ read.xts <- function
   decreasing = FALSE,
   sep = ',',
   date.column = 1,
-  skip = -1L,
+  skip = 0L,
   ...
 )
 {

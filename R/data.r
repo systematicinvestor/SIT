@@ -1331,8 +1331,69 @@ cat('\t\t\t Missing data for ', symbol, '\n');
   } 
 }
 
+###############################################################################     
+# Data contains historical time series for both 
+# * Spot ( Unadjusted - unadjusted-futures ) and 
+# * Future ( Adjusted - back-adjusted-futures)
+#
+# First step, I updated Spot to include roll yield (i.e. spot.adjust.roll)
+# Next, I computed returns as change in futures relative to the spot.adjust.roll level
+#I.e. return is
+#
+# (unadjusted-futures[t-1] + (back-adjusted-futures[t] - back-adjusted-futures[t-1])) 
+# ------------------------------------------------------------------------------------  - 1
+# unadjusted-futures[t-1] 
+#
+#   Change in back-adjusted-futures
+# = --------------------------------
+#   Prior Unadjusted-futures level (which i adjusted for roll yield)
+#
+# http://www.automated-trading-system.com/crude-oil-contango-and-roll-yield-for-commodity-trading/
+###############################################################################     
+getSymbols.TB.test = function() {
+	filename = 'temp/Futures/CL20_I0B.TXT'
+	i = 'CL'
+	data = env()
+      fr <- read.csv(filename, header = FALSE) 
+      fr <- make.xts(fr[,-1], as.Date(as.character(fr[,1]),'%Y%m%d'))     
+      colnames(fr) <- spl('Open,High,Low,Close,Volume,OpenInterest,DeliveryMonth,Unadjusted')[1:ncol(fr)]
+      fr$Adjusted = fr$Close
+      data[[i]] = fr
 
+	# Unadjusted is Spot (unadjusted-futures)
+	# Adjusted is Close is Future (back-adjusted-futures)
 
+    # adjust spot for roll overs
+    spot = as.vector(data[[i]]$Unadjusted)
+      dspot = spot - mlag(spot)
+    futures = as.vector(data[[i]]$Adjusted)
+      dfutures = futures - mlag(futures)
+    index = which(round(dspot - dfutures,4) != 0 )
+  
+    spot.adjust.roll = spot
+      spot.adjust.roll[(index-1)] = spot.adjust.roll[index] - dfutures[index]
+      
+    # compute returns
+    reta = (mlag(spot.adjust.roll) + futures - mlag(futures)) / mlag(spot.adjust.roll)
+      reta[1] = 1
+      n = len(spot)
+    
+    new.series = cumprod(reta)
+    Close = spot[n] * new.series / new.series[n]    
+    
+	plot.data = as.xts(list(
+		Unadjusted = data[[i]]$Unadjusted, 
+		Adjusted = data[[i]]$Adjusted,
+		Implied.Close = make.xts(Close, index(data[[i]]))
+	))
+
+png(filename = 'plot_CL_2009.png', width = 600, height = 500, units = 'px', pointsize = 12, bg = 'white')			    
+
+	plota.matplot( scale.one(plot.data['2009']), main='Crude oil, CL - 2009')
+	
+dev.off()	
+	
+}
 
 
 ###############################################################################

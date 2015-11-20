@@ -881,7 +881,7 @@ bt.trade.summary <- function
 		tstart[1, weight[1,] != 0] = T
 		n = nrow(weight)
 		tend[n, weight[n,] != 0] = T
-		tend[1, ] = F
+		#tend[1, ] = F
 		trade = ifna(tstart | tend, FALSE)
 	
 	# prices
