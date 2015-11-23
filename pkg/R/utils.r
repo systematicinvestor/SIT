@@ -214,6 +214,18 @@ list2vars <- function(data, env = parent.frame()) {
 	for(n in ls(data, all.names=T))
 		env[[n]] = data[[n]]
 }
+
+#' @export 
+debug.save = function() {		
+	gall <<- parent.frame()
+}
+
+#' @export 
+debug.load = function() {
+	list2vars(gall,  parent.frame())
+}
+
+
 ###############################################################################
 # Check default argumnets
 #' @export 
@@ -701,6 +713,7 @@ repmat <- function
   m # number of copies along columns
 )
 {
+  if( is.null(dim(v)) ) v = matrix(v,1)
   kronecker( matrix(1, n, m), v )
 }
 
@@ -725,7 +738,7 @@ rep.row <- function
   nr # number of copies along rows
 )
 {
-  if(nr == 1) m
+  if(nr == 1) matrix(m, 1) 
   else matrix(m, nr=nr, nc=len(m), byrow=T)
 }
 
@@ -1944,22 +1957,39 @@ parse.number <- function(x) {
 #' map2vector(c(1,2,NA,4,5), 5, 100)
 #' map2vector(list(a=1,b=4), 'a,b,c,d,e', 100)
 #' map2vector(list(a=1,C=4), 'a,b,c,d,e', 100)
+#' map2vector(labels= 'a,b,c,d,e', 100)
+#' map2vector({
+#'   a=10
+#'   b=2
+#'   },'a,b,c', 100)
 #' }
 #' @export 
 ###############################################################################
-map2vector = function(value, labels, default = 0) {
+map2vector = function(expr, labels, default = 0) {
+	if( is.xts(labels) ) labels = names(labels)
 	if( is.character(labels) ) labels = spl(labels)
 	n = iif( is.numeric(labels), labels, len(labels) )
+	
+	if( len(expr) == 0 ) return(rep(default, n))
+	
+	if(mode(substitute(expr)) == 'call') {
+		value = rep(default, n)
+			names(value) = labels
+			
+		# idea from within
+		e = evalq(environment(), as.list(value))
+		eval(substitute(expr), e)
+			
+		temp = unlist(as.list(e))
+		value[names(temp)] = temp
+		return(value)
+	}
 		
-	if( len(value) == 0 ) return(rep(default, n))
-		
-	if( is.list(value) ) {
+	if( is.list(expr) ) {
 		out = rep(default, n)
-		out[ match(toupper(names(value)), toupper(labels)) ] = unlist(value)
+		out[ match(toupper(names(expr)), toupper(labels)) ] = unlist(expr)
 		out
 	} else		
-		ifna(iif( len(value) == 1, rep(value, n), value), default)
+		ifna(iif( len(expr) == 1, rep(expr, n), expr), default)
 }
-
-
 

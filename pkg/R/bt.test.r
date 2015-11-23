@@ -1750,7 +1750,9 @@ dev.off()
 }
 
 
-# Rebalancing method based on maximum deviation
+# Maximum Deviation Rebalancing: rebalance to the target mix when asset weights deviate more than a given percentage from the target mix.
+# Also support rebalancing.ratio, same as above, but rebalance half-way to target
+#' @export 	
 bt.max.deviation.rebalancing <- function
 (
 	data,
@@ -1760,7 +1762,8 @@ bt.max.deviation.rebalancing <- function
 	rebalancing.ratio = 0,	# 0 means rebalance all-way to target.allocation
 							# 0.5 means rebalance half-way to target.allocation
 	start.index = 1,
-	period.ends = 1:nrow(model$weight)							
+	period.ends = 1:nrow(model$weight),
+	fast = T							
 ) 
 {
 	nperiods = nrow(model$weight)
@@ -1789,14 +1792,21 @@ bt.max.deviation.rebalancing <- function
 					data$weight[action.index,] = temp + 
 						rebalancing.ratio * (weight[action.index,] - temp)					
 					
-				model = bt.run.share(data, clean.signal=F, silent=T)
+				# please note the bt.run.share.ex somehow gives slighly better results
+				if(fast)
+					model = bt.run.share.fast(data)
+				else
+					model = bt.run.share.ex(data, clean.signal=F, silent=T)
 				
 				start.index = index[1]
 			} else break			
 		} else break		
 	}
+	
+	model = bt.run.share.ex(data, clean.signal=F, silent=F)
 	return(model)
 }
+
 
 
 

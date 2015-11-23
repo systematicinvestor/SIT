@@ -2550,7 +2550,8 @@ event.at = function(x, period = 'month', amount = 1, period.ends = date.ends(x,p
 		cashflow[] = amount
 	cashflow
 }	
-	
+
+
 	
 #' @export 	
 look.at.taxes = function(m) {
@@ -2727,4 +2728,125 @@ tax.cashflows = function(info, index, last.index) {
 #
 # The turnover is not null because there is initial turnover when position is started. I.e. Cash -> Equity Allocation
 #
+
+
+
+# ToDo it would be nice to have an option to do an incremental back-test
+# i.e. append new data and only re-run the updated portion of back-test
+#
+# bt.run - really fast with no bells or whisles
+# working directly with xts is alot slower, so use coredata
+#' @export 	
+bt.run.share.fast <- function
+(
+	b,					# enviroment with symbols time series
+	clean.signal = T,	# flag to remove excessive signal	
+	do.lag = 1, 		# lag signal
+	capital = 100000,
+	lot.size = c()
+) 
+{
+	#---------------------------------------------------------
+	# process weight
+	#---------------------------------------------------------	
+	# make sure we don't have any abnormal weights
+	weight = b$weight
+	weight[is.nan(weight) | is.infinite(weight)] = NA
+	weight[!is.na(weight) & is.na(b$prices)] = 0
+	
+		# lag logic, to be back compatible with bt.run.share
+		# default logic is to use current weights to trade at close i.e. no lag
+		weight = iif( do.lag == 1, weight, mlag(weight, do.lag - 1) )
+	
+	weight = coredata(weight)
+if(F) {	
+		temp = bt.exrem(weight)
+		
+	if(clean.signal) {
+		weight = temp
+	} else { # always clean up 0's
+		index = ifna(weight == 0, F)
+		weight[index] = temp[index]
+	}	
+}	
+	#---------------------------------------------------------
+	# process prices
+	#---------------------------------------------------------
+	prices = coredata(prices)
+		n = ncol(prices)
+		nperiods = nrow(prices)
+		
+	# find trades
+	trade = !is.na(weight)
+		trade.index = which(rowSums(trade) > 0)
+	
+	#---------------------------------------------------------
+	# setup event driven back test loop
+	#---------------------------------------------------------
+	cash.wt = cash = rep(capital, nperiods)
+	share.wt = share = matrix(0, nperiods, n)	
+	last.trade = 0
+	lot.size = map2vector(lot.size, colnames(prices), 1)
+	lot.size = rep(1,n)
+
+	for(i in trade.index) {
+		if(last.trade > 0) {
+			# copy from last trade
+			index = (last.trade + 1) : i
+				n.index = len(index)
+			share.wt[index,] = rep.row(share[last.trade,], n.index)
+			cash.wt[index] = cash[last.trade]
+			
+			share[index,] = rep.row(share[last.trade,], n.index)
+			cash[index] = cash[last.trade]
+		}
+		
+		p = prices[i,]
+			p[is.na(p)] = 1
+		w = weight[i,]
+			w[is.na(w)] = 0
+		
+		# update share[i,] and cash[i]
+		value = cash[i] + sum(p * share[i,])
+		#share[i,] = value * w / p
+		
+		# not going to work for missing prices, probbaly need an index
+		#share[i,] = round.lot.basic.base(w, p, value, lot.size)
+		share[i,] = round.lot.basic(w, p, value, lot.size)
+		cash[i] = value - sum(share[i,] * p)
+			
+		last.trade = i
+	}
+		
+	if( last.trade > 0 & last.trade < nperiods) {
+		# copy from last trade
+		index = (last.trade + 1) : nperiods
+			n.index = len(index)
+		share.wt[index,] = rep.row(share[last.trade,], n.index)
+		cash.wt[index] = cash[last.trade]
+						
+		share[index,] = rep.row(share[last.trade,], n.index)
+		cash[index] = cash[last.trade]
+	}		
+	
+	# prepare output
+	bt = list(type = 'share', capital = capital, share=share)
+	bt$value = cash + rowSums(share * prices, na.rm=T)	
+	#bt$weight = share * prices / bt$value
+	bt$weight = share.wt * prices / (cash.wt + rowSums(share.wt * prices, na.rm=T))
+
+	
+	value = c(capital, bt$value)
+	bt$ret = (value / mlag(value) - 1)[-1]
+    bt$equity = cumprod(1 + bt$ret)
+
+    bt
+}
+
+
+
+
+
+
+
 
