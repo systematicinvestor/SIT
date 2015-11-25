@@ -1177,7 +1177,47 @@ DEXSZUS     Switzerland/U.S.
 }
 
 
+###############################################################################
+# Download Strategic Portfolios from wealthsimple.com
+# 
+#http://faq.wealthsimple.com/article/121-how-has-the-risk-level-1-portfolio-performed
+#http://faq.wealthsimple.com/article/130-how-has-the-risk-level-10-portfolio-performed
+#http://faq.wealthsimple.com/article/127-how-has-the-risk-level-7-portfolio-performed
+#' @export 
+###############################################################################     
+wealthsimple.portfolio = function(portfolio.number = 10) {
+	# download
+	url = paste0('http://faq.wealthsimple.com/article/', 120+portfolio.number, '-how-has-the-risk-level-',portfolio.number,'-portfolio-performed')
+	txt = join(readLines(url))
+  
+	# extract
+	temp = extract.table.from.webpage(txt, 'Breakdown', has.header = F)
+
+	# parse
+	temp = gsub(pattern = '%', replacement = '', temp)
+	temp  = trim(temp[,c(2,4)])
+	temp  = temp[!is.na(temp[,1]),]
+
+	# create output
+	value = as.numeric(temp[,2])
+	names(value) = temp[,1]
+	value
+}
+
  
+wealthsimple.portfolio.test = function() {
+	# create list of all portolios
+	portfolios = list()
+	for(i in 1:10)
+		portfolios[[i]] = wealthsimple.portfolio(i)
+		
+	portfolios = t(sapply(portfolios, identity))
+	
+	# look at evolution of mixes
+	plota.stacked(1:10, portfolios/100, flip.legend = T, type='s', xaxp=c(1,10,9), las=1,
+		main='Wealthsimple Transition Matrix', xlab='Risk Portfolio')
+}	
+	
 
 ###############################################################################
 # getSymbols interface to tradingblox free futures and forex data

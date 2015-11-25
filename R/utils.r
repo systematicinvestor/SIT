@@ -1993,3 +1993,13 @@ map2vector = function(expr, labels, default = 0) {
 		ifna(iif( len(expr) == 1, rep(expr, n), expr), default)
 }
 
+###############################################################################
+#' Reverse mapping
+#'
+#' @export 
+###############################################################################
+rev.map = function(map) {
+	value = names(map)
+		names(value) = map
+	value
+}

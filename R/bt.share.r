@@ -979,8 +979,6 @@ bt.run.share.ex.allocate = function
 	control = default.round.lot.control(),
 	cashflow = 0
 ) {
-	
-
 	# total value, as if everything is liquidated
 	value = sum(price * share) + cash
 
@@ -1049,7 +1047,7 @@ allocate.lot = function(value, share, lot.size) {
 	new.total.weight = sum(abs(weight.new[weight.change.index]))
 	if(new.total.weight == 0) {
 		shares = rep.row(share, 2)
-		share[2, weight.change.index] = 0
+		shares[2, weight.change.index] = 0
 	} else {
 		allocate.value = value * sum(abs(weight.new)) - sum(abs(share * price)[!weight.change.index])
 		lot.size = lot.size[weight.change.index]
@@ -1059,9 +1057,8 @@ allocate.lot = function(value, share, lot.size) {
 		shares = rep.row(share, 3)
 		shares[2, weight.change.index] = round.lot.basic(w, p, allocate.value, lot.size)			
 		shares[3, weight.change.index] = round.lot.basic.base(w, p, allocate.value, lot.size)
-		share = shares
 	}
-	share	
+	shares	
 }
 
 
