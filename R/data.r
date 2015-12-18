@@ -431,16 +431,6 @@ get.CRB.test <- function()
 # http://finance.yahoo.com/q/cp?s=^DJI+Components
 #' @export 
 ###############################################################################
-dow.jones.components.0 <- function()
-{
-  url = 'http://finance.yahoo.com/q/cp?s=^DJI+Components'
-  txt = join(readLines(url))
-
-  # extract table from this page
-  temp = extract.table.from.webpage(txt, 'Volume', has.header = T)
-  temp[, 'Symbol']
-}
-
 dow.jones.components <- function()
 {
   url = 'http://money.cnn.com/data/dow30/'
@@ -454,6 +444,16 @@ dow.jones.components <- function()
   temp = extract.table.from.webpage(temp, 'Volume', has.header = T)
   trim(temp[,'Company'])
 }	
+
+dow.jones.components.0 <- function()
+{
+  url = 'http://finance.yahoo.com/q/cp?s=^DJI+Components'
+  txt = join(readLines(url))
+
+  # extract table from this page
+  temp = extract.table.from.webpage(txt, 'Volume', has.header = T)
+  temp[, 'Symbol']
+}
 
 dow.jones.components.1 <- function()
 {
@@ -908,6 +908,11 @@ extend.data.proxy <- function(data, data.proxy = NULL, proxy.filename = 'data.pr
 # Leveraged series
 ###############################################################################  
 # Create Leveraged series with data from the unlevereged.
+#
+# Please use only with Adjusted time series. For example create.leveraged(data$QQQ, leverage=2)
+# will produce erroneous values because QQQ had 2: 1 Stock Split on Mar 20, 2000 
+# Hence at 2x leverage the value goes to zero.
+#
 # @example create.leveraged(tlt, 2)
 # @example extend.data(data$UBT, create.leveraged(data$TLT, leverage=2), scale=T)
 # @example extend.data(data$TMF, create.leveraged(data$TLT, leverage=3), scale=T)

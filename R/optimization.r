@@ -681,6 +681,7 @@ remove.equality.constraints.old <- function(qp.data)
 	
 ###############################################################################
 # Run linear least squares regression with constraints
+#' @export 
 ###############################################################################
 lm.constraint <- function
 (
