@@ -307,18 +307,14 @@ ntop <- function
 		return( out )
 	}
 	
+	index.n = rowSums(!is.na(temp))
 	for( i in 1:nrow(data) ) {
-		x = temp[i,]
-		index = !is.na(x)
-			index.n = sum(index)	
-				
-		if( index.n > 0 ) {
-			o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
-			x[] = 0
-			n = min(topn, index.n)
-			x[o[1:n]] = 1/n
-		} else x[] = 0
-		temp[i,] = x
+		if( index.n[i] > 0 ) {
+			o = sort.list(temp[i,], na.last = TRUE, decreasing = dirMaxMin)
+			temp[i,] = 0
+			n = min(topn, index.n[i])
+			temp[i,o[1:n]] = 1/n
+		} else temp[i,] = 0
 	}
 	
 	# work with xts
@@ -337,8 +333,7 @@ ntop.helper <- function
 ) 
 {
 	x = as.vector(x)
-	index = !is.na(x)
-		index.n = sum(index)	
+	index.n = sum(!is.na(x))	
 		
 	if( index.n > 0 ) {
 		o = sort.list(x, na.last=TRUE, decreasing = dirMaxMin)
@@ -407,44 +402,42 @@ ntop.keep <- function
 {
 	# work with matrix
 	temp = coredata(data)
-	
+	index.n = rowSums(!is.na(temp))
+		
 	for( i in 1:nrow(temp) ) {
-		x = temp[i,]
-		index = !is.na(x)
-			index.n = sum(index)	
-			
-		if( index.n > 0 ) {
+		if( index.n[i] > 0 ) {
+			x = temp[i,]
 			o = sort.list(x, na.last = TRUE, decreasing = dirMaxMin)
-			x[] = 0		
-			n = min(topn, index.n)
+			x[] = 0
+			n = min(topn, index.n[i])
 			x[o[1:n]] = 1
 		
 			# keepn logic
 			if( i >= 2 ) {
 				y = temp[(i-1),]		# prev period selection
-				n1 = min(keepn, index.n)
-				y[-o[1:n1]] = NA	# remove all not in top keepn
+				n1 = min(keepn, index.n[i])
+				y[-o[1:n1]] = 0		# remove all not in top keepn
 				
-				index1 = !is.na(y)
+				index1 = y != 0
 					index1.n = sum(index1)	
 				if( index1.n > 0 ) {
 					x[] = 0
 					x[index1] = 1
 					
 					for( j in 1:n ) {
-						if( sum(x,na.rm=T) == topn ) break
+						if( sum(x) == topn ) break
 						x[o[j]] = 1
 					}
 				}
 			}
-		} else x[] = 0		
-		temp[i,] = x/sum(x)	
+			temp[i,] = x/sum(x)	
+		} else temp[i,] = 0		
 	}
 	
 	# work with xts
 	out = data
 	out[] = temp		
-	return( out )
+	out
 }
 
 
