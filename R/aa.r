@@ -1899,6 +1899,20 @@ plot.ef <- function
 	}
 }
 
+# Add portfolios to plot
+#' @export 
+plot.add.portfolios = function(ia, portfolio.risk.fn = portfolio.risk, ...) {
+	portfolios = lst(...)
+	
+	col = plota.colors(portfolios)
+	
+	for(i in 1:len(portfolios))
+		points(100 * portfolio.risk.fn(portfolios[[i]],ia), 100 * portfolio.return(portfolios[[i]],ia), pch=15, col=col[i])
+	
+	plota.legend(names(portfolios), col, x='bottomright')
+}
+
+
 ###############################################################################
 # Plot Transition Map
 #' @export 

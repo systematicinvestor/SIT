@@ -901,9 +901,12 @@ plota.test <- function() {
 
 ###############################################################################
 # plota.colors - generate distinct colors, todo switch to ColorBrewer
+# col = rainbow(N, start=0, end=.9)
+#' @export
 ###############################################################################
-#col = rainbow(N, start=0, end=.9)
 plota.colors <- function(N) {
+	if( is.list(N) ) N = len(N)
+	
 	# default palette excluding black
 	col = rev(c('yellow','cyan','magenta','red','gray','green','blue'))
 
@@ -942,7 +945,15 @@ plota.colors <- function(N) {
 	}
 
 	#pie(rep(1,length(1:14)), col=plota.colors(14))
-	return(col)
+	col
+}
+
+#' @export
+plota.colors.experimental = function(N) {
+	if( is.list(N) ) N = len(N)
+		
+	library(RColorBrewer)	
+	colorRampPalette(spl('red,green'))(N)	
 }
 
 

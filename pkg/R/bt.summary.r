@@ -562,20 +562,6 @@ if(T) {
 	return(temp)
 }	
 	
-###############################################################################
-# Helper functions
-#' @export 
-###############################################################################
-#http://tolstoy.newcastle.edu.au/R/help/06/05/28060.html    
-variable.number.arguments <- function( ... ) 
-{
-	out = list( ... )
-	if( is.list(out[[1]][[1]]) ) return( out[[1]] )
-	
-	names( out ) = as.character(substitute(c(...))[-1])  	
-	return ( out )
-}	
-
 
 
 ###############################################################################

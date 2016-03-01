@@ -44,7 +44,7 @@ spl <- function
   delim = ',' # delimiter
 )
 { 
-  return(unlist(strsplit(s,delim))); 
+  unlist(strsplit(s,delim))
 }
 
 ###############################################################################
@@ -69,7 +69,7 @@ join <- function
   delim = ''  # delimiter
 )
 { 
-  return(paste(v,collapse=delim)); 
+  paste(v,collapse=delim) 
 }
 
 ###############################################################################
@@ -93,8 +93,7 @@ trim <- function
 )
 {
   s = sub(pattern = '^\\s+', replacement = '', x = s)
-  s = sub(pattern = '\\s+$', replacement = '', x = s)
-  return(s)
+  sub(pattern = '\\s+$', replacement = '', x = s)
 }  
 
 ###############################################################################
@@ -117,8 +116,58 @@ len <- function
   x # vector
 )
 {
-  return(length(x)) 
+  length(x)
 }
+
+###############################################################################
+#' Shortcut for list creation function
+#'
+#' This function is a shortcut for list creation function
+#'
+#' @param ... members of list
+#'
+#' @return list
+#'
+#' @examples
+#' \dontrun{ 
+#' a = 1
+#' lst(a,b=2)
+#' }
+#' @export 
+###############################################################################
+lst <- function(
+	... 
+) 
+{
+	values = list( ... )
+	if(len(values) == 0) return(values)
+
+	values.names = names(values)
+	names = as.character(substitute(c(...))[-1])		
+		
+	if( is.null(values.names) ) 
+		names(values) = names
+	else		
+		names(values) = iif(nchar(values.names) > 0, values.names, names)
+	values
+}	
+
+#' @export
+vars2list <- function(...) {
+	warning('vars2list is depricated as of Feb 29, 2016 please use lst function instead')
+	lst(...)
+}
+
+#' @export
+variable.number.arguments <- function(...) {
+	out = lst(...)
+	if( is.list(out[[1]]) && is.list(out[[1]][[1]]) ) 
+		out[[1]]
+	else	
+		out
+}	
+
+
 
 ###############################################################################
 #' Shortcut for new.env function
@@ -148,21 +197,14 @@ env <- function
 ) 
 {
 	temp = new.env(hash = hash, parent = parent, size = size)
-	values = list(...)
+	values = lst(...)
 	if(len(values) == 0) return(temp)
 	
 	# copy environment
-	if(len(values) == 1 && is.environment(values[[1]])) {
+	if(len(values) == 1 && is.environment(values[[1]]))
 		list2vars(values[[1]], temp)
-		return(temp)
-	}
-	
-	values.names = names(values)
-	names = as.character(substitute(c(...))[-1])
-		
-	names = iif(nchar(values.names) > 0, values.names, names)
-	for(i in 1:len(values))
-		temp[[ names[i] ]] = values[[i]]
+	else	
+		list2vars(values, temp)
 	temp
 }
 
@@ -171,6 +213,7 @@ env <- function
 #'
 #' @export
 #' @rdname EnvironmentFunctions
+###############################################################################
 env.del <- function(names, env) {
 	rm(list=names, envir=env)
 }
@@ -181,7 +224,7 @@ env.del <- function(names, env) {
 #
 # can be useful for debugging:
 #
-# gall <<- vars2list(lookbacks, n.lag, hist.returns, index, hist.all, n.lookback)					
+# gall <<- lst(lookbacks, n.lag, hist.returns, index, hist.all, n.lookback)					
 # list2vars(gall)
 #
 # options(warn=2)
@@ -195,19 +238,7 @@ env.del <- function(names, env) {
 # list2vars(test.env, environment()) 
 # similar to checkpoint package at CRAN
 #
-#' @export 
 ###############################################################################
-vars2list <- function(...) {
-	values = list( ... )
-	if(len(values) == 0) return(values)
-
-	values.names = names(values)
-	names = as.character(substitute(c(...))[-1])
-		
-	names(values) = iif(nchar(values.names) > 0, values.names, names)
-	values
-}
-
 # assign(n, data[[n]], env)
 #' @export 
 list2vars <- function(data, env = parent.frame()) {
@@ -314,15 +345,16 @@ iif <- function
       falsepart[cond] = truepart 
     else {
       cond = ifna(cond,F)
-      if(is.xts(truepart))
-        falsepart[cond] = coredata(truepart)[cond]
+	  
+      if(requireNamespace('xts', quietly = T) && xts::is.xts(truepart))
+			falsepart[cond] = coredata(truepart)[cond]
       else
         falsepart[cond] = truepart[cond]
     }
       
     #falsepart[!is.na(cond)] = temp
 
-    return(falsepart);
+    falsepart
   }
 } 
 

@@ -2059,7 +2059,7 @@ aa.test.create.ia.country <- function(dates = '1990::2010')
 	#--------------------------------------------------------------------------
 	# Create historical input assumptions
 	#--------------------------------------------------------------------------
-	ia = create.historical.ia(hist.returns, annual.factor, symbol.names, symbol.names)
+	ia = create.historical.ia(hist.returns, annual.factor)
 	
 	return(ia)	
 }
