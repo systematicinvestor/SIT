@@ -750,6 +750,54 @@ repmat <- function
 }
 
 ###############################################################################
+#' Convience shortcut for as.vector function
+#'
+#' @param x object
+#'
+#' @return new vector
+#' 
+#' @export 
+###############################################################################
+vec <- function
+(
+	x
+)
+{
+	if( !is.null(dim(x)) && len(dim(x)) != 1) 
+		dim(x) = len(x)
+	x
+}
+
+###############################################################################
+#' Convience shortcut for matrix function
+#'
+#' @param x object
+#' @param col flag to inidcate 1 column if x is a vector; otherwise 1 row
+#'
+#' @return new matrix
+#' 
+#' @export 
+###############################################################################
+mat <- function
+(
+	x,
+	col = T	
+)
+{
+	if( is.null(dim(x)) || len(dim(x)) != 2) {
+		n = names(x)
+		if( col ) {
+			dim(x) = c(len(x), 1)
+			if( !is.null(n) ) rownames(x) = n
+		} else {
+			dim(x) = c(1, len(x))
+			if( !is.null(n) ) colnames(x) = n
+		}
+	}	
+	x
+}
+
+###############################################################################
 #' Repeat Rows
 #'
 #' @param m vector (row)
