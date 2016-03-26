@@ -1208,6 +1208,9 @@ dev.off()
 }
 
 
+# When all asset Sharpe Ratios are equal, this MDP portfolio will 
+# have the highest possible Sharpe Ratio. 
+# https://www.putnam.com/literature/pdf/whitepaper_parity_strategies.pdf
 max.div.portfolio.test <- function() 
 {
 
