@@ -1239,7 +1239,8 @@ getSymbols.TB <- function(
   download = FALSE,
   type = c('Both', 'Futures', 'Forex'),
   rm.index =  'PB',   # remove Pork Bellies because not traded
-  clean = FALSE
+  clean = FALSE,
+  custom.adjustments = TRUE
 ) 
 {
   # download zip archive
@@ -1337,6 +1338,7 @@ cat('\t\t\t Missing data for ', symbol, '\n');
   # fix DX time series - fixed by the Trading Blox
   # if(!is.null(data$DX)) data$DX['::2007:04:04', 'Unadjusted'] = coredata(data$DX['::2007:04:04']$Unadjusted * 10)
   
+ if( custom.adjustments ) {
   #*****************************************************************
   # To compute returns and backtest, recreate each futures series:
   #
@@ -1364,7 +1366,7 @@ cat('\t\t\t Missing data for ', symbol, '\n');
     data[[i]]$Close = spot[n] * new.series / new.series[n]    
     data[[i]]$Adjusted  = data[[i]]$Close
   }
-  
+}  
   
   #*****************************************************************
   # Done 
