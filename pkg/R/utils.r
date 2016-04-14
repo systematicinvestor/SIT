@@ -215,7 +215,7 @@ env <- function
 #' @rdname EnvironmentFunctions
 ###############################################################################
 env.del <- function(names, env) {
-	rm(list=names, envir=env)
+	rm(list=intersect(ls(env), names), envir=env)
 }
 
 
@@ -1051,7 +1051,10 @@ make.xts <- function
     x = structure(.Data = x, 
       index = structure(index, tzone = tzone, tclass = orderBy), 
       class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
-  return( x )
+      
+    if (!is.null(attributes(x)$dimnames[[1]]))
+        dimnames(x) <- dimnames(x)              
+    x
 }
 
 

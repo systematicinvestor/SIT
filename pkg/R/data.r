@@ -1339,6 +1339,37 @@ cat('\t\t\t Missing data for ', symbol, '\n');
   # if(!is.null(data$DX)) data$DX['::2007:04:04', 'Unadjusted'] = coredata(data$DX['::2007:04:04']$Unadjusted * 10)
   
  if( custom.adjustments ) {
+	#*****************************************************************
+	# filename = 'temp\\Futures\\LH_0_I0B.TXT'
+	# fr <- read.csv(filename, header = FALSE) 
+	# fr <- make.xts(fr[,-1], as.Date(as.character(fr[,1]),'%Y%m%d'))     
+	# colnames(fr) <- spl('Open,High,Low,Close,Volume,OpenInterest,DeliveryMonth,Unadjusted')
+	# LH = fr
+	# LH$DiffClose = LH$Close - mlag(LH$Close)
+	# LH$DiffUnadjusted = LH$Unadjusted - mlag(LH$Unadjusted)
+	# LH = LH['2000:03:08::2000:03:15',spl('Close,DeliveryMonth,Unadjusted,DiffClose,DiffUnadjusted')]
+	# LH
+	# 
+	#              Close DeliveryMonth Unadjusted DiffClose DiffUnadjusted
+	# 2000-03-08 187.150        200004     59.450    -0.150         -0.150
+	# 2000-03-09 188.450        200004     60.750     1.300          1.300
+	# 2000-03-10 189.750        200004     62.050     1.300          1.300
+	# 2000-03-13 189.600        200006     71.175    -0.150          9.125
+	# 2000-03-14 189.575        200006     71.150    -0.025         -0.025
+	# 2000-03-15 189.325        200006     70.900    -0.250         -0.250
+	# 
+	# There is a roll 2000-03-10, we switch from contract expiring on 200004 to contract expiring on 200006
+	# The returns on 
+	# 2000-03-09: 1.300 / 59.450
+	# 2000-03-10: 1.300 / 60.750
+	# # for the first day after roll, let's use denominator as the price of new contract 
+	# # because numerator is the change in price of new contract
+	# # the 71.175 -  -0.150 is the price on new contract on 2000-03-10
+	# 2000-03-13: -0.150 / (71.175 -  -0.150)
+	# 2000-03-14: -0.025 / 71.175
+	# 2000-03-15: -0.025 / 71.150 
+	#*****************************************************************
+ 
   #*****************************************************************
   # To compute returns and backtest, recreate each futures series:
   #
@@ -1347,24 +1378,25 @@ cat('\t\t\t Missing data for ', symbol, '\n');
   #           unadjusted-futures[t-1] 
   #******************************************************************       
   for(i in data$symbolnames[data$symbol.groups != 'Forex']) {
-    # adjust spot for roll overs
+    # find rolls; alternatively can use DeliveryMonth field
     spot = as.vector(data[[i]]$Unadjusted)
       dspot = spot - mlag(spot)
     futures = as.vector(data[[i]]$Adjusted)
       dfutures = futures - mlag(futures)
     index = which(round(dspot - dfutures,4) != 0 )
   
-    spot.adjust.roll = spot
+    # for return calculations set spot on the roll to the new contract price
+	spot.adjust.roll = spot
       spot.adjust.roll[(index-1)] = spot.adjust.roll[index] - dfutures[index]
       
     # compute returns
-    reta = (mlag(spot.adjust.roll) + futures - mlag(futures)) / mlag(spot.adjust.roll)
-      reta[1] = 1
+    reta = dfutures / mlag(spot.adjust.roll)
+      reta[1] = 0
       n = len(spot)
     
-    new.series = cumprod(reta)
-    data[[i]]$Close = spot[n] * new.series / new.series[n]    
-    data[[i]]$Adjusted  = data[[i]]$Close
+    new.series = cumprod(1 + reta)
+	# make new series match the last spot price
+    data[[i]]$Adjusted = data[[i]]$Close = spot[n] * new.series / new.series[n]
   }
 }  
   
@@ -2197,4 +2229,60 @@ LONG.TR = [TLT] + VUSTX
 }
 
 
+#*****************************************************************
+# Load/download data from Excel file from AQR data set
+# [Betting Against Beta: Equity Factors, Monthly](https://www.aqr.com/library/data-sets/betting-against-beta-equity-factors-monthly)
+# http://www.aqr.com/library/data-sets/betting-against-beta-equity-factors-monthly/data
+# [Time Series Momentum: Factors, Monthly](https://www.aqr.com/library/data-sets/time-series-momentum-factors-monthly)
+# http://www.aqr.com/library/data-sets/time-series-momentum-factors-monthly/data
+#' @export 
+###############################################################################
+load.aqr.data = function
+(
+	data.set = 'betting-against-beta-equity-factors', #'time-series-momentum-factors'
+	frequency = c('monthly','daily'),
+	sheet = 1,
+	force.download = F,
+	last.col2extract = 'Global'
+)
+{
+	data.folder = paste(getwd(), 'aqr.data', sep='/')
+	url = paste0('http://www.aqr.com/library/data-sets/', data.set, '-', frequency[1], '/data')
+	filename = file.path(data.folder, paste0(data.set, '-', frequency[1],'.xlsx'))
+	
+	if( !file.exists(filename) || force.download) {
+		dir.create(data.folder, F)
+		download.file(url, filename,  mode = 'wb')
+	}
+
+	require(readxl)
+	data = read_excel(filename, sheet=sheet)
+	skip = which(data[,1]=='DATE')
+	data = read_excel(filename, sheet=sheet,skip=skip)
+	
+	if( is.character(last.col2extract) ) last.col2extract = which(colnames(data)==last.col2extract)-1	
+	data = data[!is.na(data[,1]), 1:last.col2extract]
+	data = data[rowSums(!is.na(data[,-1,drop=F])) > 0,]
+		
+	make.xts(data[,-1], as.Date(data[,1]))	
+}
+
+
+###############################################################################
+# Load/download CSI security master
+# http://www.csidata.com/factsheets.php?type=commodity&format=csv
+#' @export 
+###############################################################################
+load.csi.security.master = function(force.download = F) {
+	data.folder = paste(getwd(), 'csi.data', sep='/')
+	url = 'http://www.csidata.com/factsheets.php?type=commodity&format=csv'
+	filename = file.path(data.folder, 'commodityfactsheet.csv')
+
+	if( !file.exists(filename) || force.download) {
+		dir.create(data.folder, F)
+		download.file(url, filename,  mode = 'wb')
+	}
+	
+	read.csv(filename)
+}
 
