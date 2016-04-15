@@ -431,7 +431,8 @@ plotbt.transition.map <- function
 	weight,
 	name = '',
 	col = rainbow(ncol(weight), start=0, end=.9),
-	x.highlight = NULL		
+	x.highlight = NULL,
+	sort.asssets = T
 ) 
 {
 	par(mar=c(2, 4, 1, 1), cex = 0.8, cex.main=0.8,cex.sub=0.8,cex.axis=0.8,cex.lab=0.8)
@@ -440,7 +441,7 @@ plotbt.transition.map <- function
 	weight[is.na(weight)] = 0
 	
 	# arrange so that most consient holdings are at the bottom 
-	weight = weight[, sort.list(colSums(weight!=0), decreasing=T)]
+	if(sort.asssets) weight = weight[, sort.list(colSums(weight!=0), decreasing=T)]
 	
 	plota.stacked(index.xts(weight), weight, col = col, type='s', flip.legend=T, main = iif(nchar(name) > 0, paste('Transition Map for', name), ''), x.highlight = x.highlight)	
 }
