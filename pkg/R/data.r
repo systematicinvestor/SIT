@@ -2233,8 +2233,14 @@ LONG.TR = [TLT] + VUSTX
 # Load/download data from Excel file from AQR data set
 # [Betting Against Beta: Equity Factors, Monthly](https://www.aqr.com/library/data-sets/betting-against-beta-equity-factors-monthly)
 # http://www.aqr.com/library/data-sets/betting-against-beta-equity-factors-monthly/data
+#
 # [Time Series Momentum: Factors, Monthly](https://www.aqr.com/library/data-sets/time-series-momentum-factors-monthly)
 # http://www.aqr.com/library/data-sets/time-series-momentum-factors-monthly/data
+#
+# [Andrea Frazzini - AQR Capital Management, LLC](http://www.econ.yale.edu/~af227/data_library.htm)
+# http://www.aqr.com/library/data-sets/quality-minus-junk-factors-daily/data
+# http://www.aqr.com/library/data-sets/quality-minus-junk-factors-monthly/data
+#
 #' @export 
 ###############################################################################
 load.aqr.data = function
@@ -2286,3 +2292,69 @@ load.csi.security.master = function(force.download = F) {
 	read.csv(filename)
 }
 
+###############################################################################
+#' Get list of FX symbols from FRED
+#' [FRED H.10 Foreign Exchange Rates](https://research.stlouisfed.org/fred2/release?rid=17)
+#'
+#' @examples
+#' \dontrun{ 
+#' info = fred.fx.symbol()
+#' info$fx$symbol
+#' }
+#' @export
+###############################################################################
+fred.fx.symbol = function() {
+	url = 'https://research.stlouisfed.org/fred2/release/tables?rid=17&eid=23340'
+	txt = join(readLines(url))
+
+	# extract links: <a href="/fred2/series/DEXUSAL" target="_blank">AUSTRALIA</a>
+    temp = gsub(pattern = 'series', replacement = '<td>', txt, perl = TRUE)
+    temp = gsub(pattern = 'target', replacement = '</td><', temp, perl = TRUE) 
+    
+	# extract Symbols table from this page
+	temp = extract.table.from.webpage(temp, 'Country', has.header = F)
+  
+	# format
+	data = gsub('/','',gsub('"','',trim(temp[,c(2,3,7)])))
+		colnames(data) = spl('symbol,name,description')
+	data[,'description']
+  
+	# remove empty
+	keep.index = !is.na(data[,'description']) & nchar(data[,'description']) > 0
+		data = data.frame(data[keep.index,])
+	
+	# split FX and index
+	index = grep('index',data[,'description'],T)
+	list(fx = data[-index,], index = data[index,])
+}
+
+
+###############################################################################
+#' Get list of FX symbols from FXHISTORICALDATA.COM
+#' [FXHISTORICALDATA.COM](http://www.fxhistoricaldata.com/)
+#'
+#' @examples
+#' \dontrun{ 
+#' info = fxhistoricaldata.fx.symbol()
+#' info
+#' }
+#' @export
+###############################################################################
+fxhistoricaldata.fx.symbol = function() {
+	url = 'http://www.fxhistoricaldata.com/'
+	txt = join(readLines(url))
+
+	# extract list options
+	temp = gsub(pattern = '<ul>', replacement = '<table>', txt, perl = TRUE)
+	temp = gsub(pattern = '</ul>', replacement = '</table>', temp, perl = TRUE)
+    temp = gsub(pattern = '<li>', replacement = '<td>', temp, perl = TRUE)
+    temp = gsub(pattern = '</li>', replacement = '</td>', temp, perl = TRUE) 
+	# remove comments
+	temp = gsub(pattern = '<!--.*?-->', replacement = '', temp, perl = TRUE) 
+	
+	# extract info
+	temp = extract.table.from.webpage(temp, 'EURUSD', has.header = F)
+	
+	as.character(temp)
+}	
+	
