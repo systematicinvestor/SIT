@@ -1831,11 +1831,12 @@ get.FOMC.dates <- function
   }
   
   recent.days = as.Date(data[1,],'%Y %B %d')
+  	first.year = min(date.year(recent.days))
   status = as.vector(data[2,])
   
   # extract data from page
   data = c()
-  for(year in 1936:2008) {
+  for(year in 1936:(first.year-1)) {
     cat(year,'\n')
     url = paste0('http://www.federalreserve.gov/monetarypolicy/fomchistorical', year, '.htm')
     txt = join(readLines(url))
@@ -1843,20 +1844,41 @@ get.FOMC.dates <- function
     tokens = spl(txt,'<div id="historical">')
     days = c()
     for(token in tokens[-1])
-      days = c(days,colnames(extract.table.from.webpage(token, 'table'))[1])
+      days = c(days,colnames(extract.table.from.webpage(token, 'year'))[1])
     data = rbind(data, cbind(year, days))
   }
   
   day = tolower(data[,2])
-  day = gsub(',', '-', gsub('and', '', gsub('conference call', '', gsub('meeting','',day))))
-  # remove last token
-  day = unlist(lapply(day, function(x) join(rev(rev(spl(x,' '))[-1]),' ')))
   
-  temp = unlist(apply(cbind(day,data[,1]),1, function(x) paste(trim(spl(x[1],'-')),x[2]) )) 
-  temp = sapply(lapply(temp,spl,' '), function(x) iif(len(x)==3,x,c(NA,x)))
-    temp[1,] = ifna.prev(temp[1,])
-  days = as.Date(apply(temp,2,join,' '),'%B %d %Y ')
+  # remove year
+  day = substring(day,1,nchar(data[,2])-4)
+  # remove Conference Call, Conference Calls, Meeting, Meetings
+  day = gsub('conference call', '', gsub('conference calls','',day))
+  day = gsub('meeting', '', gsub('meetings','',day))
   
+  
+  day = gsub(',', '-', gsub('and', '',day))
+  
+#[870] "october 15 "
+#[871] "november 2-3 "
+#[872] "december 14 "
+#[615] "october 21- 22- 23- 26- 27- 28- 29-  30  "
+#[680] "june 30-july 1 "  
+
+	parse.token = function(year, token) {
+		parts = trim(spl(token,'-'))
+		if( len(parts) > 1 ) {
+			month = ifna.prev(iif(nchar(parts) > 3,
+				sapply(parts, function(x) spl(x, ' ')[1]), # first token
+				NA))
+			parts = iif(nchar(parts) > 3, parts, paste(month, parts))
+		}
+		as.Date(paste(year, parts),'%Y %B %d')
+	}
+
+	day = lapply(1:len(day), function(i) parse.token(data[i,1], day[i]))
+	days = as.Date(unlist(day))
+	
   FOMC = list(day = c(days, recent.days), status=c(rep('',len(days)), status))
   save(FOMC,file=fomc.filename)
   FOMC
