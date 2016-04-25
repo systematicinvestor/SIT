@@ -1798,6 +1798,7 @@ get.FOMC.dates <- function
   fomc.filename = 'FOMC.Rdata'
 )
 {
+  # todo: update mode
   if(!download && file.exists(fomc.filename)) {
     load(file=fomc.filename)
     return(FOMC)
@@ -1806,7 +1807,9 @@ get.FOMC.dates <- function
   # download data 
   url = 'http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'
   txt = join(readLines(url))
-
+	
+  library(stringr)
+  
   # extract data from page
   data = c()
   for(year in 2009:(1 + date.year(Sys.Date()))) {
@@ -1816,23 +1819,28 @@ get.FOMC.dates <- function
     temp = tolower(trim(temp[,1:2]))
       temp = temp[nchar(temp[,1]) > 0,]
     month = temp[,1]
-    day = gsub('\\(','',gsub('\\)','',temp[,2]))
-      day = trim(day)
-      status = rep('', len(day))
-    index = grep('\\*',day)
-      if(any(index)) status[index] = '*'    
-    index = grep(' ',day)
-      if(any(index)) for(j in index) status[j] = spl(day[j],' ')[2]
-    day = gsub('\\*','', sapply(day,function(x) spl(x,' ')[1]))
-
-    temp = apply(cbind(day, month, status), 1, function(x) paste(year, spl(x[2],'/'), spl(x[1],'-'), '|', x[3]) )
-        
-    data = cbind(data, trim(sapply(unlist(temp),spl,'\\|')))
+    day = temp[,2]
+    
+    status = paste0(
+    	ifna( str_match(day, '\\(.*\\)'), ''),
+    	ifna( str_match(day, '\\*'), '')
+    )
+    status = gsub('\\(','',gsub('\\)','',status))
+    
+    day = str_replace(day, '(\\(.*?\\))','')
+    day = str_replace(day, '\\*','')
+    
+    day = paste(year, 
+	    sapply( iif(grepl('/',month), month, paste0(month,'/',month)), spl, '/'),
+    	sapply( iif(grepl('-',day), day, paste0(day,'-',day)), spl, '-')
+    )
+    data = rbind(data, cbind(matrix(day, nc=2, byrow=T), status))        
   }
   
-  recent.days = as.Date(data[1,],'%Y %B %d')
-  	first.year = min(date.year(recent.days))
-  status = as.vector(data[2,])
+  
+  
+  first.year = min(as.numeric(substr(data[,1],1,4)))
+  recent.data = data
   
   # extract data from page
   data = c()
@@ -1848,15 +1856,20 @@ get.FOMC.dates <- function
     data = rbind(data, cbind(year, days))
   }
   
+  year = data[,1]
   day = tolower(data[,2])
   
   # remove year
   day = substring(day,1,nchar(data[,2])-4)
   # remove Conference Call, Conference Calls, Meeting, Meetings
+  status = paste0(
+    	iif(grepl('conference call',day), 'conference call', ''),
+    	iif(grepl('meeting',day), 'meeting', '')
+  )
+  
   day = gsub('conference call', '', gsub('conference calls','',day))
   day = gsub('meeting', '', gsub('meetings','',day))
-  
-  
+    
   day = gsub(',', '-', gsub('and', '',day))
   
 #[870] "october 15 "
@@ -1865,21 +1878,24 @@ get.FOMC.dates <- function
 #[615] "october 21- 22- 23- 26- 27- 28- 29-  30  "
 #[680] "june 30-july 1 "  
 
+
+	# helper fn
 	parse.token = function(year, token) {
 		parts = trim(spl(token,'-'))
-		if( len(parts) > 1 ) {
+		n = len(parts)
+		if( n > 1 ) {
 			month = ifna.prev(iif(nchar(parts) > 3,
 				sapply(parts, function(x) spl(x, ' ')[1]), # first token
 				NA))
 			parts = iif(nchar(parts) > 3, parts, paste(month, parts))
 		}
-		as.Date(paste(year, parts),'%Y %B %d')
+		paste(year, parts[c(1,n)])
 	}
 
-	day = lapply(1:len(day), function(i) parse.token(data[i,1], day[i]))
-	days = as.Date(unlist(day))
+	day = sapply(1:len(day), function(i) parse.token(year[i], day[i]))	
+	all.data = rbind(cbind(t(day), status), recent.data)
 	
-  FOMC = list(day = c(days, recent.days), status=c(rep('',len(days)), status))
+  FOMC = list(day = as.Date(all.data[,2],'%Y %B %d'), start.day = as.Date(all.data[,1],'%Y %B %d'), status=all.data[,3])
   save(FOMC,file=fomc.filename)
   FOMC
 } 
