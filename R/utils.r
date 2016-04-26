@@ -2086,3 +2086,97 @@ rev.map = function(map) {
 		names(value) = map
 	value
 }
+
+
+
+###############################################################################
+#' String Buffer class - fast storage for strigns
+#' 
+#' @examples
+#' \dontrun{ 
+#' sb = string.buffer()
+#' add(sb, 'asbcd')
+#' add(sb, '234543')
+#' string(sb)
+#' close(sb)
+#' sb=NULL
+#' }
+#' @rdname string.buffer
+#' @export
+###############################################################################
+string.buffer = function() structure(list(file = rawConnection(raw(0L), open='w')), class = 'StringBuffer')
+
+#' @rdname string.buffer
+#' @export
+add = function(x,...,sep,end.sep) UseMethod('add',x)
+
+#' @rdname string.buffer
+#' @export
+add.StringBuffer = function(x,...,sep=',',end.sep='\n') {
+	cat(..., file = x$file, sep = sep)	
+	if(nchar(end.sep) > 0) cat(end.sep, file = x$file)
+	}
+
+#' @rdname string.buffer
+#' @export
+string = function(x) UseMethod('string',x)
+
+#' @rdname string.buffer
+#' @export
+string.StringBuffer = function(x) rawToChar(rawConnectionValue(x$file))
+
+#' @rdname string.buffer
+#' @export
+close = function(x) UseMethod('close',x)
+
+#' @rdname string.buffer
+#' @export
+close.StringBuffer = function(x) {close(x$file); x$file = NULL}
+
+
+# test string.buffer functionality
+string.buffer.test = function() {
+	# base example
+	file = rawConnection(raw(0L), open="w")
+
+	write('asbcd', file)
+	write('234543', file)
+
+	res =rawToChar(rawConnectionValue(file))
+
+	close(file)
+	file = NULL;
+	
+	# string.buffer class usage
+	sb = string.buffer()
+	add(sb, 'asbcd')
+	add(sb, '234543')
+	string(sb)
+	close(sb)
+	sb=NULL
+		
+	#benchmark
+   	test.base = function() {
+   		s =''
+		for(i in 1:10000)
+			s = paste(s,'abcdef',sep='')
+		nchar(s)
+   	}
+   	test.string.buffer = function() {
+		sb = string.buffer()
+		for(i in 1:10000)
+			add(sb, 'abcdef', '')
+		s = string(sb)	
+		sb=NULL
+		nchar(s)
+   	}
+	
+  	library(rbenchmark)
+	benchmark(
+   		test.base(),
+   		test.string.buffer(),
+       columns = c("test", "replications", "elapsed", "relative"),
+       order = "relative",
+       replications = 1
+	)
+}

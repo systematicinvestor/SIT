@@ -1490,24 +1490,25 @@ dev.off()
 get.fama.french.data <- function(
   name = c('F-F_Research_Data_Factors', 'F-F_Research_Data_Factors'),
   periodicity = c('days','weeks', 'months'),
-  download = FALSE,
-  clean = FALSE
+  force.download = FALSE,
+  clean = FALSE,
+  file.suffix = '_TXT'
 ) 
 {
   # map periodicity
-  map = c('_daily', '_weekly', '')
-    names(map) = c('days','weeks', 'months')
+  map = c(days = '_daily', weeks = '_weekly', months = '')
   
   # url
   period = ifna(map[periodicity[1]], periodicity[1])
-  filename.zip = paste(name[1], period, '_TXT.zip', sep='')
+  filename.zip = paste(name[1], period, file.suffix, '.zip', sep='')
   filename.txt = paste(name[1], period, '.txt', sep='')
   url = paste('http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/', filename.zip, sep='')
         
   # download zip archive
-  if(download) {
+  if( !file.exists(filename.zip) || force.download) 
     download.file(url, filename.zip)
-  }
+
+## download using curl  !!!!
 
   # setup temp folder
   temp.folder = paste(getwd(), 'temp', sep='/')
@@ -1524,8 +1525,21 @@ get.fama.french.data <- function(
   # unpack
   files = unzip(filename.zip, exdir=temp.folder)  
 
-  # read data
-  filename = paste(temp.folder, '/', filename.txt, sep='')
+  if(len(files) == 1) {
+  	filename = paste(temp.folder, '/', filename.txt, sep='')
+  	return( get.fama.french.data.one.file(filename) )
+  }
+  
+  data = env()
+  library(stringr)
+  names = str_trim(str_match(files,'.*/(.*)\\..*')[,2])
+  for(i in 1:len(files))
+  	data[[ names[i] ]] = get.fama.french.data.one.file(files[i])
+  
+  data  
+}  
+  
+get.fama.french.data.one.file = function(filename) {  
   out = readLines(filename)
     index = which(nchar(out) == 0)
   
@@ -1583,12 +1597,19 @@ get.fama.french.data <- function(
     } else if( date.format.n == 4 ) {
       date.format.add = '0101'  
     } 
-    
+
+    find.name = function(name,data, i=0) if( is.null(data[[name]]) ) name else find.name(paste(name,i+1), data, i+1)    
+    name = find.name(name, data)
+    	
     data[[name]] = make.xts(temp[,-1], as.Date(paste(temp[,1], date.format.add, sep=''),date.format))
       colnames(data[[name]]) = colnames   
   }
   return( data )
 }
+
+
+    
+
 
 
 ###############################################################################
@@ -1786,24 +1807,50 @@ reconstruct.VXX.CBOE <- function(exact.match=T) {
 
 
 ###############################################################################
+# Load Country Codes from
+# http://www.nationsonline.org/oneworld/country_code_list.htm
+#' @export 
+###############################################################################
+country.code = function
+(
+  force.download = FALSE,
+  data.filename = 'country.code.Rdata'
+)
+{ 
+	if(!force.download && file.exists(data.filename)) {
+		load(file=data.filename)
+		return(temp)
+	}
+	
+	url = 'http://www.nationsonline.org/oneworld/country_code_list.htm'
+	
+	library(curl)
+	#curl_download(url, file,mode = 'wb',quiet=T)
+	#txt = join(readLines(url))
+	txt = rawToChar(curl_fetch_memory(url)$content)
+	
+	temp = extract.table.from.webpage(txt, 'Country or Area Name')
+		temp = trim(temp[,c(2:5)])
+		colnames(temp)=spl('name,code2,code3,code')
+	save(temp,file=data.filename)
+	temp
+}
+
+
+###############################################################################
 # Load FOMC dates
 # http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
 # http://www.federalreserve.gov/monetarypolicy/fomchistorical2008.htm
 # http://quant.stackexchange.com/questions/141/what-data-sources-are-available-online
+# http://www.returnandrisk.com/
 #' @export 
 ###############################################################################
 get.FOMC.dates <- function
 (
-  download = TRUE,
-  fomc.filename = 'FOMC.Rdata'
+  force.download = FALSE,
+  data.filename = 'fomc.Rdata'
 )
-{
-  # todo: update mode
-  if(!download && file.exists(fomc.filename)) {
-    load(file=fomc.filename)
-    return(FOMC)
-  }
-  
+{ 
   # download data 
   url = 'http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'
   txt = join(readLines(url))
@@ -1811,7 +1858,7 @@ get.FOMC.dates <- function
   library(stringr)
   
   # extract data from page
-  data = c()
+  sb = string.buffer()
   for(year in 2009:(1 + date.year(Sys.Date()))) {
     temp = extract.table.from.webpage(txt, paste(year,'FOMC Meetings'))
     if(nrow(temp) == 0) next
@@ -1834,33 +1881,45 @@ get.FOMC.dates <- function
 	    sapply( iif(grepl('/',month), month, paste0(month,'/',month)), spl, '/'),
     	sapply( iif(grepl('-',day), day, paste0(day,'-',day)), spl, '-')
     )
-    data = rbind(data, cbind(matrix(day, nc=2, byrow=T), status))        
+    day = matrix(day, nc=2, byrow=T)
+    
+    for(i in 1:len(status)) add(sb, day[i,1], day[i,2], status[i])
   }
-  
-  
-  
+  data = matrix(scan(what='',text= string(sb),sep=',', quiet=T),nc=3,byrow=T)
+  	close(sb)
+	sb=NULL
+	  
   first.year = min(as.numeric(substr(data[,1],1,4)))
   recent.data = data
+    
+  # check if update is needed
+  if(!force.download && file.exists(data.filename)) {
+    load(file=data.filename)
+    # check if data needs to be updates
+    if( last(FOMC$day) == as.Date(last(recent.data[,2]),'%Y %B %d') )   
+    	return(FOMC)
+  }
   
   # extract data from page
-  data = c()
+  sb = string.buffer()
   for(year in 1936:(first.year-1)) {
     cat(year,'\n')
     url = paste0('http://www.federalreserve.gov/monetarypolicy/fomchistorical', year, '.htm')
     txt = join(readLines(url))
       
     tokens = spl(txt,'<div id="historical">')
-    days = c()
+    
     for(token in tokens[-1])
-      days = c(days,colnames(extract.table.from.webpage(token, 'year'))[1])
-    data = rbind(data, cbind(year, days))
+    	add(sb, colnames(extract.table.from.webpage(token, 'year'))[1])
   }
   
-  year = data[,1]
-  day = tolower(data[,2])
+  data = scan(what='',text= string(sb),sep='\n', quiet=T)
+  	close(sb)
+	sb=NULL
   
   # remove year
-  day = substring(day,1,nchar(data[,2])-4)
+  year = substring(data,nchar(data)-3)
+  day = tolower(substring(data,1,nchar(data)-4))
   # remove Conference Call, Conference Calls, Meeting, Meetings
   status = paste0(
     	iif(grepl('conference call',day), 'conference call', ''),
@@ -1896,9 +1955,13 @@ get.FOMC.dates <- function
 	all.data = rbind(cbind(t(day), status), recent.data)
 	
   FOMC = list(day = as.Date(all.data[,2],'%Y %B %d'), start.day = as.Date(all.data[,1],'%Y %B %d'), status=all.data[,3])
-  save(FOMC,file=fomc.filename)
+  save(FOMC,file=data.filename)
   FOMC
 } 
+
+# todo comute a$start.day - mlag(a$day) in buisness days
+# parse Minutes: See end of minutes of October 29-30 meeting / (Released November 20, 2013)
+# Minutes: See end of minutes of December 11 meeting / Minutes (Released Jan 2, 2008)
 
 
 ###############################################################################
@@ -2293,7 +2356,7 @@ load.aqr.data = function
 	data.folder = paste(getwd(), 'aqr.data', sep='/')
 	url = paste0('http://www.aqr.com/library/data-sets/', data.set, '-', frequency[1], '/data')
 	filename = file.path(data.folder, paste0(data.set, '-', frequency[1],'.xlsx'))
-	
+		
 	if( !file.exists(filename) || force.download) {
 		dir.create(data.folder, F)
 		download.file(url, filename,  mode = 'wb')
