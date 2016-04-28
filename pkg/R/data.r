@@ -1850,6 +1850,17 @@ get.FOMC.dates <- function
   force.download = FALSE,
   data.filename = 'fomc.Rdata'
 )
+{
+	warning('get.FOMC.dates is depricated as of Apr 25, 2016 please use data.fomc function instead')
+	data.fomc(force.download, data.filename)
+}
+
+#' @export
+data.fomc <- function
+(
+  force.download = FALSE,
+  data.filename = 'fomc.Rdata'
+)
 { 
   # download data 
   url = 'http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'

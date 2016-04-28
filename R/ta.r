@@ -295,6 +295,7 @@ ntop <- function
 {
 	# work with matrix
 	temp = coredata(data)
+	if(is.logical(temp)) temp[] = iif(!temp,NA,temp)
 	
 	# equal weight all assets special case
 	if(topn == ncol(data)) {
@@ -402,6 +403,7 @@ ntop.keep <- function
 {
 	# work with matrix
 	temp = coredata(data)
+	if(is.logical(temp)) temp[] = iif(!temp,NA,temp)
 	index.n = rowSums(!is.na(temp))
 		
 	for( i in 1:nrow(temp) ) {
