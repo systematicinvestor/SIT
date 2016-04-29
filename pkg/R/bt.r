@@ -860,11 +860,115 @@ compute.max.deviation <- function
 	max(abs(weight - repmat(target.allocation, nrow(weight), 1)))
 }
 
+
 ###############################################################################
 # Backtest Trade summary
 #' @export 
 ###############################################################################
 bt.trade.summary <- function
+(
+	b, 		# enviroment with symbols time series
+	bt		# backtest object
+)
+{    
+	if( bt$type == 'weight') weight = bt$weight else weight = bt$share
+	
+	out = NULL
+	
+	# find trades
+	weight1 = mlag(weight, -1)
+	tstart = weight != weight1 & weight1 != 0
+	tend = weight != 0 & weight != weight1	
+		tstart[1, weight[1,] != 0] = T
+		n = nrow(weight)
+		tend[n, weight[n,] != 0] = T
+		#tend[1, ] = F
+		trade = ifna(tstart | tend, FALSE)
+	
+	# prices
+	prices = b$prices[bt$dates.index,,drop=F]
+	
+	# execution price logic
+	if( sum(trade) > 0 ) {
+		execution.price = coredata(b$execution.price[bt$dates.index,,drop=F])
+		prices1 = coredata(b$prices[bt$dates.index,,drop=F])
+		
+		prices1[trade] = iif( is.na(execution.price[trade]), prices1[trade], execution.price[trade] )
+		
+		# backfill pricess
+		prices1[is.na(prices1)] = ifna(mlag(prices1), NA)[is.na(prices1)]				
+		prices[] = prices1
+			
+		# get actual weights
+		weight = bt$weight
+	
+		# extract trades
+		symbolnames = b$symbolnames
+		nsymbols = len(symbolnames) 	
+		
+			ntrades = max(sum(tstart,na.rm=T), sum(tend,na.rm=T))
+		trades = matrix(NA,nr=ntrades,nc=7)
+			colnames(trades) = spl('date,symbol,weight,entry.date,exit.date,entry.price,exit.price')
+		itrade = 1
+		for( i in 1:nsymbols ) {	
+			tstarti = which(tstart[,i])
+			tendi = which(tend[,i])
+			
+#cat(colnames(data$prices)[i], len(tstarti), len(tendi), '\n')			
+			
+			if( len(tstarti) > 0 ) {
+				#if( len(tendi) < len(tstarti) ) tendi = c(tendi, nrow(weight))
+				if( len(tendi) > len(tstarti) ) tstarti = c(1, tstarti)
+				
+				ntrade = len(tstarti)
+				ntrade.index = itrade:(itrade+ntrade-1)
+				trades[ntrade.index,] = 
+					cbind((tstarti+1), i, coredata(weight[(tstarti+1), i]), 
+						tstarti, tendi, 
+						coredata(prices[tstarti, i]), coredata(prices[tendi,i])
+					)
+				itrade = itrade + ntrade 
+			}
+		}
+		
+		
+		# prepare output		
+		out = list()
+		out$stats = cbind(
+			bt.trade.summary.helper(trades),
+			bt.trade.summary.helper(trades[trades[, 'weight'] >= 0, ]),
+			bt.trade.summary.helper(trades[trades[, 'weight'] <0, ])
+		)
+		colnames(out$stats) = spl('All,Long,Short')
+		
+		dates = index(weight)
+		dates0 = format(dates, '%Y-%m-%d')
+		index = order(dates[trades[,'entry.date']])
+		
+		temp = matrix('',nr=nrow(trades),nc=8)
+			colnames(temp)=spl('symbol,weight,entry.date,exit.date,nhold,entry.price,exit.price,return')		
+		temp[,'symbol'] = symbolnames[trades[index,'symbol']]
+		temp[,'weight'] = round(100*trades[index,'weight'],1)
+		temp[,'entry.date'] = dates0[trades[index,'entry.date']]
+		temp[,'exit.date'] = dates0[trades[index,'exit.date']]
+		temp[,'nhold'] = as.numeric(dates[trades[index,'exit.date']] - dates[trades[index,'entry.date']])
+		temp[,'entry.price'] = round(trades[index,'entry.price'], 2)
+		temp[,'exit.price'] = round(trades[index,'exit.price'], 2)
+		temp[,'return'] = round(100*trades[index,'weight'] * (trades[index,'exit.price']/trades[index,'entry.price'] - 1),2)
+				
+		out$trades = temp				
+	}
+	
+	return(out)
+}
+
+
+
+###############################################################################
+# Backtest Trade summary
+#' @export 
+###############################################################################
+bt.trade.summary.old <- function
 (
 	b, 		# enviroment with symbols time series
 	bt		# backtest object
@@ -919,7 +1023,7 @@ bt.trade.summary <- function
 				trades = rbind(trades, 
 								cbind(i, weight[(tstarti+1), i], 
 								tstarti, tendi, tendi-tstarti,
-								as.vector(prices[tstarti, i]), as.vector(prices[tendi,i])
+								coredata(prices[tstarti, i]), coredata(prices[tendi,i])
 								)
 							)
 			}
