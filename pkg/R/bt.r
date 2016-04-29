@@ -287,7 +287,7 @@ bt.prep.remove.symbols <- function
 		b$weight = b$weight[, -index]
 		b$execution.price = b$execution.price[, -index]
 		
-		rm(list = b$symbolnames[index], envir = b)		
+		env.rm(b$symbolnames[index], b)
 		b$symbolnames = b$symbolnames[ -index]
 	}
 }

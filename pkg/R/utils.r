@@ -214,8 +214,17 @@ env <- function
 #' @export
 #' @rdname EnvironmentFunctions
 ###############################################################################
-env.del <- function(names, env) {
-	rm(list=intersect(ls(env), names), envir=env)
+env.del = function(names, env) {
+	warning('env.del is depricated as of Apr 25, 2016 please use env.rm function instead')
+	env.rm(names, env)
+}
+
+#' @export
+env.rm = function(names, env) {
+	missing = setdiff(names, ls(env))
+	if( len(missing) > 0)
+		warning('Following names are missing in environment:', missing, '\n, names available in environment:', ls(env))
+	rm(list=intersect(names, ls(env)), envir=env)
 }
 
 
