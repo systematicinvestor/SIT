@@ -154,7 +154,7 @@ lst <- function(
 
 #' @export
 vars2list <- function(...) {
-	warning('vars2list is depricated as of Feb 29, 2016 please use lst function instead')
+	warning('vars2list is depreciated as of Feb 29, 2016 please use lst function instead')
 	lst(...)
 }
 
@@ -215,7 +215,7 @@ env <- function
 #' @rdname EnvironmentFunctions
 ###############################################################################
 env.del = function(names, env) {
-	warning('env.del is depricated as of Apr 25, 2016 please use env.rm function instead')
+	warning('env.del is depreciated as of Apr 25, 2016 please use env.rm function instead')
 	env.rm(names, env)
 }
 
@@ -2096,6 +2096,20 @@ rev.map = function(map) {
 	value
 }
 
+
+###############################################################################
+#' Reverse mapping
+#'
+#' @rdname FileFunctions
+#' @export 
+###############################################################################
+write.file = function(..., file) cat(..., file=file)
+
+
+# [Import text file as single character string](http://stackoverflow.com/questions/9068397/import-text-file-as-single-character-string)
+#' @rdname FileFunctions
+#' @export 
+read.file = function(file) readChar(file, file.info(file)$size)
 
 
 ###############################################################################

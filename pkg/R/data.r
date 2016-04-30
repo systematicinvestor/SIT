@@ -152,8 +152,10 @@ extract.table.from.webpage <- function
     
     # find start/end of table
     pos0 = tail(gregexpr('<table', substr(txt, 1, pos1))[[1]], 1)
+	if(pos0 == -1) pos0 = tail(gregexpr('<tbody', substr(txt, 1, pos1))[[1]], 1)
     if(pos0 == -1) pos0 = pos1
     pos2 = head(gregexpr('</table', substr(txt, pos1, nchar(txt)))[[1]], 1)
+	if(pos2 == -1) pos2 = head(gregexpr('</tbody', substr(txt, pos1, nchar(txt)))[[1]], 1)
     if(pos2 == -1) pos2 = nchar(txt)+1
     temp =  substr(txt, pos0, pos1 + pos2 - 2)
   
@@ -1495,6 +1497,19 @@ get.fama.french.data <- function(
   file.suffix = '_TXT'
 ) 
 {
+	warning('get.fama.french.data is depreciated as of Apr 25, 2016 please use data.ff function instead')
+	data.ff(name, periodicity, force.download, clean, file.suffix)
+}
+
+#' @export 
+data.ff <- function(
+  name = c('F-F_Research_Data_Factors', 'F-F_Research_Data_Factors'),
+  periodicity = c('days','weeks', 'months'),
+  force.download = FALSE,
+  clean = FALSE,
+  file.suffix = '_TXT'
+) 
+{
   # map periodicity
   map = c(days = '_daily', weeks = '_weekly', months = '')
   
@@ -1527,19 +1542,21 @@ get.fama.french.data <- function(
 
   if(len(files) == 1) {
   	filename = paste(temp.folder, '/', filename.txt, sep='')
-  	return( get.fama.french.data.one.file(filename) )
+  	return( data.ff.internal.one.file(filename) )
   }
   
   data = env()
   library(stringr)
   names = str_trim(str_match(files,'.*/(.*)\\..*')[,2])
   for(i in 1:len(files))
-  	data[[ names[i] ]] = get.fama.french.data.one.file(files[i])
+  	data[[ names[i] ]] = data.ff.internal.one.file(files[i])
   
   data  
 }  
   
-get.fama.french.data.one.file = function(filename) {  
+
+# internal helper function
+data.ff.internal.one.file = function(filename) {  
   out = readLines(filename)
     index = which(nchar(out) == 0)
   
@@ -1838,6 +1855,155 @@ country.code = function
 
 
 ###############################################################################
+# Search/Lookup tickers at http://markets.ft.com
+#' 
+#' @examples
+#' \dontrun{ 
+#' data.ft.search.ticker('s&p 500')
+#' }
+#' @export
+#' @rdname DataFTFunctions
+###############################################################################
+data.ft.search.ticker = function
+(
+  search.field = 'tsx',
+  sec.type = 'IN'
+)
+{
+    #[search](http://markets.ft.com/Research/Markets/Company-Search?searchField=tsx&country=&secType=IN)
+    url = paste0('http://markets.ft.com/Research/Markets/Company-Search?searchField=', curl_escape(search.field), '&country=&secType=', sec.type)
+    
+    library(curl)
+	h = new_handle()	
+	req = curl_fetch_memory(url, h)
+	if(req$status_code != 200) 
+		warning('error getting data, status_code:', req$status_code, 'for url:', url, 'content:', rawToChar(req$content))
+	
+    txt = rawToChar(req$content)
+    
+    # cat(txt, file='dump.txt') # save to analyze
+    # gregexpr('TSEA:TOR',txt) # find location
+    # substr(txt, 20400,20800)
+    
+    # extract links
+    temp = gsub(pattern = '<a', replacement = '<td', txt, perl = TRUE)
+    temp = gsub(pattern = '</a>', replacement = '</td>', temp, perl = TRUE)
+
+    temp = extract.table.from.webpage(temp, 'Symbol,Exchange,Country')
+	
+	
+        colnames(temp)[1:4] = spl('Name,Symbol,Exchange,Country')
+    temp[,1:4]
+}
+
+
+###############################################################################
+# List Index Members at http://markets.ft.com
+#' [sp500](http://markets.ft.com/research/Markets/Tearsheets/Constituents?s=INX:IOM)
+#' [tsx](http://markets.ft.com/research/Markets/Tearsheets/Constituents?s=TSEA:TOR)
+#' [ftse](http://markets.ft.com/research/Markets/Tearsheets/Constituents?s=FTSE:FSI)
+#'
+#' [get industry/sector information from yahoo finance](https://ca.finance.yahoo.com/q/pr?s=RY.TO)
+#' 
+#' @examples
+#' \dontrun{ 
+#' data.ft.index.members('TSEA:TOR')
+#' }
+#' @export
+#' @rdname DataFTFunctions
+###############################################################################
+data.ft.index.members = function
+(
+  ft.symbol = 'INX:IOM',
+  force.download = FALSE  
+)
+{
+	data.filename =  paste0(gsub(':','_',ft.symbol),'.Rdata')
+
+	if(!force.download && file.exists(data.filename)) {
+		load(file=data.filename)
+		return(data)
+	}	
+	
+	#h = handle_setopt(h, useragent = "moo=moomooo", referer)
+    # 
+	# Main Page
+	#
+    #[sp500](http://markets.ft.com/research/Markets/Tearsheets/Constituents?s=INX:IOM)
+    url = paste0('http://markets.ft.com/research/Markets/Tearsheets/Constituents?s=', ft.symbol)
+    	    
+	#[The curl package: a modern R interface to libcurl](https://cran.r-project.org/web/packages/curl/vignettes/intro.html)
+	library(curl)
+	h = new_handle()
+    txt = rawToChar(curl_fetch_memory(url, h)$content)
+    	
+    # extract links
+    temp = gsub(pattern = '<a', replacement = '<td', txt, perl = TRUE)
+    temp = gsub(pattern = '</a>', replacement = '</td>', temp, perl = TRUE)
+
+    temp = extract.table.from.webpage(temp, 'Equities')
+		
+    # 
+	# Paging
+	#	
+	token = extract.token(txt,'<div class="wsod-paging-key">','</div>')
+	nstep = str_match(token,' data-ajax-paging-end-row="([0-9]+)">')[2]
+		nstep = as.numeric(nstep)
+	nfound = str_match(token,' data-ajax-paging-total-rows="([0-9]+)">')[2]
+		nfound = as.numeric(nfound)
+
+	data = matrix('',nr=nfound,nc=5)
+		colnames(data) = spl('Name,Symbol,LastPrice,TodayChange,YearChange')
+	data[1:nstep,] = temp[,1:5]
+		
+	#[PhantomJS](http://stackoverflow.com/questions/15739263/phantomjs-click-an-element)
+	#[Short R tutorial: Scraping Javascript Generated Data with R](https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r)	
+	#[webshot::install_phantomjs()](https://cran.r-project.org/web/packages/webshot/index.html)	
+    # 
+	# URL options
+	#	
+	#[Firefox - Web Developer Tools]
+	#	Log request and Response Bodies	
+	token = extract.token(txt,'<div class="wsodHidden">','</div>')
+		token = spl(token,'<input')
+	library(stringr)
+	names = str_match(token,'data-ajax-param="([^"]*)"')[-1,2]
+	values = str_match(token,'value="([^"]*)"')[-1,2]
+	settings = as.list(sapply(1:len(names), function(i) { t=c(values[i]); names(t)=names[i]; t}))
+		settings$ResetPaging = 'false'
+		
+	h = handle_setopt(h, referer=url)
+
+	for(istart in seq(nstep+1,nfound,by=nstep)) {
+		cat(istart, 'out of', nfound, '\n')
+
+		settings$startRow = paste(istart)
+		handle_setform(h,.list=settings)
+			
+		url = 'http://markets.ft.com/Research/Remote/UK/Tearsheets/IndexConstituentsPaging'
+		txt = rawToChar(curl_fetch_memory(url, h)$content)
+	
+		#cat(txt, file='dump1.htm') # save to analyze	 	
+		#txt0 = txt
+		#[iconv('pretty\u003D\u003Ebig', "UTF-8", "ASCII")](http://stackoverflow.com/questions/17761858/converting-a-u-escaped-unicode-string-to-ascii)	
+		#[Getting started with JSON and jsonlite](https://cran.r-project.org/web/packages/jsonlite/vignettes/json-aaquickstart.html)
+		library(jsonlite)
+		txt=fromJSON(txt)$html
+	
+		# extract links
+		temp = gsub(pattern = '<a', replacement = '<td', txt, perl = TRUE)
+		temp = gsub(pattern = '</a>', replacement = '</td>', temp, perl = TRUE)
+
+		temp = extract.table.from.webpage(temp, has.header=F)
+			
+		data[istart:min(istart+nstep-1,nfound),] = temp[,1:5]
+	}
+	
+	save(data,file=data.filename)
+	data
+}
+
+###############################################################################
 # Load FOMC dates
 # http://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
 # http://www.federalreserve.gov/monetarypolicy/fomchistorical2008.htm
@@ -1851,7 +2017,7 @@ get.FOMC.dates <- function
   data.filename = 'fomc.Rdata'
 )
 {
-	warning('get.FOMC.dates is depricated as of Apr 25, 2016 please use data.fomc function instead')
+	warning('get.FOMC.dates is depreciated as of Apr 25, 2016 please use data.fomc function instead')
 	data.fomc(force.download, data.filename)
 }
 
@@ -2356,6 +2522,20 @@ LONG.TR = [TLT] + VUSTX
 #' @export 
 ###############################################################################
 load.aqr.data = function
+(
+	data.set = 'betting-against-beta-equity-factors', #'time-series-momentum-factors'
+	frequency = c('monthly','daily'),
+	sheet = 1,
+	force.download = F,
+	last.col2extract = 'Global'
+)
+{
+	warning('load.aqr.data is depreciated as of Apr 25, 2016 please use data.aqr function instead')
+	data.aqr(data.set, frequency, sheet, force.download, last.col2extract)
+}
+
+#' @export 
+data.aqr = function
 (
 	data.set = 'betting-against-beta-equity-factors', #'time-series-momentum-factors'
 	frequency = c('monthly','daily'),

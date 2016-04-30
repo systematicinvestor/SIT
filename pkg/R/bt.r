@@ -514,6 +514,19 @@ bt.run.trim.helper = function(bt, dates.index) {
 	bt
 }
 
+
+###############################################################################
+#tic(11)		
+#for(j in 1:10)
+#	a = as.vector(prices)
+#toc(11)		
+#
+#tic(11)		
+#for(j in 1:10)
+#	a = coredata(prices)
+#toc(11)		
+# Interestingly coredata is a lot faster
+#
 ###############################################################################
 # Backtest summary
 #' @export 
