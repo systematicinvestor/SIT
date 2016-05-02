@@ -1915,12 +1915,16 @@ data.ft.search.ticker = function
 data.ft.index.members = function
 (
   ft.symbol = 'INX:IOM',
-  force.download = FALSE  
+  force.download = FALSE,
+  data.filename = paste0(gsub(':','_',ft.symbol),'.Rdata'),
+  data.keep.days = 30
 )
 {
-	data.filename =  paste0(gsub(':','_',ft.symbol),'.Rdata')
-
-	if(!force.download && file.exists(data.filename)) {
+	# if NOT forced to download and file exists and file is less than 30 days old
+	if( !force.download && 
+		file.exists(data.filename) &&
+		as.numeric(Sys.Date() - file.mtime(data.filename)) <= data.keep.days
+	) {
 		load(file=data.filename)
 		return(data)
 	}	
