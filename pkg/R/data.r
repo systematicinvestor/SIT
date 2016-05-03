@@ -1950,6 +1950,7 @@ data.ft.index.members = function
     # 
 	# Paging
 	#	
+	library(stringr)
 	token = extract.token(txt,'<div class="wsod-paging-key">','</div>')
 	nstep = str_match(token,' data-ajax-paging-end-row="([0-9]+)">')[2]
 		nstep = as.numeric(nstep)
@@ -1969,8 +1970,7 @@ data.ft.index.members = function
 	#[Firefox - Web Developer Tools]
 	#	Log request and Response Bodies	
 	token = extract.token(txt,'<div class="wsodHidden">','</div>')
-		token = spl(token,'<input')
-	library(stringr)
+		token = spl(token,'<input')	
 	names = str_match(token,'data-ajax-param="([^"]*)"')[-1,2]
 	values = str_match(token,'value="([^"]*)"')[-1,2]
 	settings = as.list(sapply(1:len(names), function(i) { t=c(values[i]); names(t)=names[i]; t}))
@@ -2002,10 +2002,58 @@ data.ft.index.members = function
 			
 		data[istart:min(istart+nstep-1,nfound),] = temp[,1:5]
 	}
+
+	# only compare Name,Symbol
+	if( !force.download && file.exists(data.filename) && requireNamespace('flock', quietly = T) ) {
+		data.copy = data
+		load(file=data.filename)
+		
+		comp.index = spl('Name,Symbol')
+		if( all.equal(data.copy[,comp.index],data[,comp.index]) ) {
+			flock::touch(data.filename)
+			return(data) 
+		}
+	}		
 	
 	save(data,file=data.filename)
 	data
 }
+
+#
+# data function template:
+#
+# introduce following parameters:
+# force.download = FALSE - flag to indicate that data need to be updated
+# data.filename = 'data.Rdata' - location to save data
+# data.keep.days = 30 - number of days that data does not need to be refreshed
+#
+#	# if NOT forced to download and file exists and file is less than 30 days old
+#	if( !force.download && 
+#		file.exists(data.filename) &&
+#		as.numeric(Sys.Date() - file.mtime(data.filename)) <= data.keep.days
+#	) {
+#		load(file=data.filename)
+#		return(data)
+#	}	
+#
+# Once data is downloaded check if needs to be saved
+#
+#	# only compare Name,Symbol
+#	if( !force.download && file.exists(data.filename) && requireNamespace('flock', quietly = T) ) {
+#		data.copy = data
+#		load(file=data.filename)
+#		
+#		comp.index = spl('Name,Symbol')
+#		if( all.equal(data.copy[,comp.index],data[,comp.index]) ) {
+#			flock::touch(data.filename)
+#			return(data) 
+#		}
+#	}		
+#	
+#	save(data,file=data.filename)
+#	data
+#}
+#
 
 ###############################################################################
 # Load FOMC dates
