@@ -129,6 +129,23 @@ bt.run.share.ex <- function
 ) 
 {
 	#---------------------------------------------------------
+	# check inputs
+	#---------------------------------------------------------
+	default.dividend.control = list(
+		foreign.withholding.tax = NULL,
+		# http://canadiancouchpotato.com/2012/09/17/foreign-withholding-tax-explained/
+		
+		invest = spl('cash,rebalance,update')
+		# invest can take following values:
+		# cash - put dividend to cash
+		# rebalance - force full rebalance
+		# update - minimally update portfolio to allocate dividend
+		#   only add new positions, such that abs(shares) only increases
+	)
+	
+	dividend.control = verify.control('dividend.control', default.dividend.control, dividend.control)	
+
+	#---------------------------------------------------------
 	# defs
 	#---------------------------------------------------------
 	invest.type.def = list(none=0, cash=1, rebalance=2, update=3)
@@ -211,7 +228,7 @@ bt.run.share.ex <- function
 	if( !is.list(commission) )
 		commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
 		
-	lot.size = map2vector(lot.size, colnames(prices), 1)
+	lot.size = map2vector(lot.size, colnames(prices), 0)
 	
 	dividend.control$foreign.withholding.tax = map2vector(dividend.control$foreign.withholding.tax, colnames(prices), 0)
 	dividend.control$invest = ifnull(dividend.control$invest, 'cash')
@@ -260,9 +277,32 @@ bt.run.share.ex <- function
 
 	bt
 }
-
+	
+	
 ###############################################################################
-#' default.round.lot.control	
+#' verify.control	
+#' @export 
+###############################################################################
+verify.control = function(name, control, inputs) {
+	default.names = ls(control, all.names=T)
+	input.names = ls(inputs, all.names=T)		
+	
+	missing = setdiff(input.names, default.names)		
+	if(len(missing) > 0) 
+		warning(paste(name, 
+		'\n\nOnly following variables are supported:\n', join(default.names,'\n '), 
+		'\n\nFollowing variables were provided:\n', join(missing,'\n '), '\nbut not supported.'), str(control))
+		
+	common = intersect(input.names, default.names)
+	for(n in common)
+		control[[n]] = inputs[[n]]
+	
+	control	
+}
+
+	
+###############################################################################
+#' default.tax.control	
 #' @export 
 ###############################################################################
 default.tax.control = function(nonqualified = c()) {
@@ -270,12 +310,13 @@ default.tax.control = function(nonqualified = c()) {
 		capital.gain = list(
 			short.term.tax = 35/100,
 			long.term.tax = 15/100,
-			wash.sale.min.holding.period = 30, # 30 days
+			#wash.sale.min.holding.period = 30, # 30 days
+			wash.sale.min.holding.period = NA, # skip wash sale logic
 			long.term.min.holding.period = 365 # one year
 		),
 		
 		dividend = list(			
-			qualified.tax = 20/100,
+			qualified.tax = 15/100,
 			qualified.min.holding.period = 60, # 60 days
 			nonqualified.tax = 35/100,
 			nonqualified = nonqualified # tickers of stocks that do not qualify for preferential tax rate
@@ -425,7 +466,7 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 				}
 			}
 			
-			# check what happends if dividend and split are on the same day
+			# check what happens if dividend and split are on the same day
 			if( trade.split[i] ) {
 				for(a in which(info$share[i,] !=0 & splits[i,] > 0))
 					info$share[i,a] = share.wt[i,a] = info$share[i,a] / splits[i,a]
@@ -449,7 +490,7 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 		
 		# need to be completed / tested
 		if( trade.cashflow[i] ) {
-				
+						
 			for(c in (1:cashflows$n)[cashflows$cash[i,] != 0]) {				
 				if( !is.null(cashflows$fn[[c]]) ) {
 					cashflows$cash[i,c] = cashflows$fn[[c]](info, i, cashflows$last.index[c])
@@ -491,6 +532,8 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 			# update - minimally update portfolio to allocate cash
 			#   only add new positions, such that abs(shares) only increases
 			if(trade.invest.type == invest.type.def$update) {
+			
+			
 				out = bt.run.share.ex.invest(weight.new = weight1[i,], weight.prev = weight.last,
 					weight.change.index = weight.change.index,
 					price = prices[i,], share = info$share[i,], cash = info$cash[i], 
@@ -593,9 +636,31 @@ bt.run.share.ex.n.days = function(index.today, index.hist, dates) {
 # update dividends and compute taxes
 tax.update.dividends = function(tax.control, dividend.control, holdings, tax, share, dividend, index, dates) 
 {
+	# NOTES:
+	#
+	# dividend.control$foreign.withholding.tax are taken out from dividend cash when dividend is paid. i.e.
+	# asset.cashflow = sum(info$share[i,] * dividends[i,] * 
+	#			iif(info$share[i,] < 0, 1, 1 - dividend.control$foreign.withholding.tax)
+	#		)
+	#
+	# these amount can be claimed back; so we assume that it used to pay taxes. i.e.
+	# let's assume $100 dividend is due and there is 20% foreign.withholding.tax
+	# so only $80 dividend is paid
+	#
+	# let's also assume that there is a 20% tax on dividends; in that case taxes already paid and dividend is not considered fo tax calculations. i.e. 
+	# qualified.div = dividend  * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$qualified.tax)
+	# qualified.div = dividend  * (1 - 20% / 20%) = dividend * 0 = 100 * 0 = 0
+	#
+	# another example: assume 20% foreign.withholding.tax and 40% tax on dividends; in this case another $20 in taxes are due
+	# at 40% tax on dividends that corresponds to $50 dividend	
+	# qualified.div = dividend  * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$qualified.tax)
+	# qualified.div = dividend  * (1 - 20% / 40%) = dividend * 0.5 = 100 * 0.5 = 50
+	#
+	
+	
 	# offset by foreign.withholding.tax
-	qualified.div = dividend  * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$qualified.tax)
-	non.qualified.div = dividend * (1 - dividend.control$foreign.withholding.tax / tax.control$dividend$nonqualified.tax)
+	qualified.div = dividend  * (1 - dividend.control$foreign.withholding.tax / iif(tax.control$dividend$qualified.tax == 0, 1, tax.control$dividend$qualified.tax))
+	non.qualified.div = dividend * (1 - dividend.control$foreign.withholding.tax / iif(tax.control$dividend$nonqualified.tax == 0, 1, tax.control$dividend$nonqualified.tax))
 	qualified.div.adj = non.qualified.div.adj = 0
 					
 	# long position, separate between qualified and non.qualified
@@ -630,7 +695,9 @@ tax.update.dividends = function(tax.control, dividend.control, holdings, tax, sh
 		
 
 # record wash sale, called every time there is a loosing trade
-record.wash.sale = function(a, n.trades, pnl, price, trigger, holdings, wash.sale) {
+record.wash.sale = function(a, n.trades, pnl, price, trigger, holdings, wash.sale, tax.control) {
+	if( is.na(tax.control$capital.gain$wash.sale.min.holding.period) ) return()
+	
 	wash.sale.index = pnl[n.trades] < 0
 	n.wash.sale.index = sum(wash.sale.index)
 	
@@ -656,7 +723,7 @@ record.wash.sale = function(a, n.trades, pnl, price, trigger, holdings, wash.sal
 # check if wash sale took place, only called on new trade enrty
 check.wash.sale = function(a, dates, tax, tax.control, holdings, wash.sale) {
 	# no losses recorded
-	if(wash.sale$n.trades[a] == 0) return()
+	if( is.na(tax.control$capital.gain$wash.sale.min.holding.period) || wash.sale$n.trades[a] == 0) return()
 		
 	i = holdings$n.trades[a]
 	index = holdings$date[i,a]
@@ -746,6 +813,16 @@ check.wash.sale = function(a, dates, tax, tax.control, holdings, wash.sale) {
 tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, share1, price, index, dates) 
 {				
 	n = len(price)
+
+
+	# NOTES:
+	#
+	# n.trades = 1:holdings$n.trades[a]
+	# share0 = sum(holdings$share[n.trades,a]) 
+	#
+	# capital gains/loses
+	# sum(iif(share0 > share1, (share0 - share1)*(price-holdings$price[1,]), 0))
+	# tax$short.term.cap[index] + tax$long.term.cap[index]
 	
 	if( any(share0 != sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	
 		cat('Mismatch holding shares', index, '\n')
@@ -754,7 +831,7 @@ tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, sh
 		n.trades = 1:holdings$n.trades[a]
 		
 		# flip
-		if( sign(share0[a] * share1[a]) <= 0) {
+		if( (share0[a] * share1[a]) <= 0) {
 			# liquidate all
 			if(share0[a] != 0) {
 				pnl = holdings$share[n.trades,a] * (price[a] - holdings$price[n.trades,a])
@@ -764,7 +841,7 @@ tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, sh
 				tax$short.term.cap[index] = tax$short.term.cap[index] + sum(iif(trigger, 0, pnl))
 				
 				# record losses for wash sale checking
-				record.wash.sale(a, n.trades, pnl, price, trigger, holdings, wash.sale)
+				record.wash.sale(a, n.trades, pnl, price, trigger, holdings, wash.sale, tax.control)
 				
 				holdings$n.trades[a] = 0
 			}
@@ -815,19 +892,22 @@ check.wash.sale(a, dates, tax, tax.control, holdings, wash.sale)
 				if( run.share[n1] == remove.share ) {
 					tax$long.term.cap[index] = tax$long.term.cap[index] + sum(iif(trigger, pnl, 0)[1:n1])
 					tax$short.term.cap[index] = tax$short.term.cap[index] + sum(iif(trigger, 0, pnl)[1:n1])
-					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale)
+					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale, tax.control)
 					n1 = n1 + 1	
 				} else {
 				# split trade
 					share.left = run.share[n1] - remove.share
-					pnl[n1] = pnl[n1] - (holdings$share[n1,a] - share.left) *
-						(price[a] - holdings$price[n1,a])
 
+					#pnl[n1] = pnl[n1] - (holdings$share[n1,a] - share.left) *
+					#	(price[a] - holdings$price[n1,a])					
+					pnl[n1] = pnl[n1] - share.left *
+						(price[a] - holdings$price[n1,a])					
+					
 					tax$long.term.cap[index] = tax$long.term.cap[index] + sum(iif(trigger, pnl, 0)[1:n1])
 					tax$short.term.cap[index] = tax$short.term.cap[index] + sum(iif(trigger, 0, pnl)[1:n1])
 
 					holdings$share[n1,a] = holdings$share[n1,a] - share.left
-					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale)
+					record.wash.sale(a, 1:n1, pnl, price, trigger, holdings, wash.sale, tax.control)
 					
 					holdings$share[n1,a] = share.left
 				}
@@ -895,7 +975,7 @@ bt.run.share.ex.invest = function
 ) {
 # Basic cases, try to satisfy with cash
 	if(cashflow >= 0) {
-		# do nothing
+		# do nothing - need to be corrected!!!
 		return(list(share = share, cash = cash, com = 0))
 	} else {
 		# current cash
@@ -909,7 +989,7 @@ bt.run.share.ex.invest = function
 	
 if(F) {	
 # Case A, simple: allocate abs(cashflow) proportionate to weight and to existing share / cash
-# does not work for negative cashflow because we need cash to pay commisions
+# does not work for negative cashflows because we need cash to pay commissions
 	n = len(share)
 	out = bt.run.share.ex.allocate(weight.new = weight.new, weight.prev = rep(0, n),
 		weight.change.index = rep(T, n),
@@ -1042,7 +1122,8 @@ allocate = function(value, share) {
 
 
 allocate.lot = function(value, share, lot.size) {
-	if(len(lot.size) == 0) return(allocate(value, share))
+	if( len(lot.size) == 0 || all(lot.size == 0) )
+		return(rep.row(allocate(value, share), 3))
 	
 	new.total.weight = sum(abs(weight.new[weight.change.index]))
 	if(new.total.weight == 0) {
@@ -1069,7 +1150,7 @@ allocate.lot = function(value, share, lot.size) {
 	
 	# compute commisions
 	com = compute.commission(share, new.share, price, commission)
-
+	
 	# if commisions are due, allocate second time
 	# asuming commisions are paid out from total value upfront
 	if( com > 0 || len(lot.size) > 0 ) {
@@ -2574,6 +2655,7 @@ tax.summary = function(m, by.fn=date.year) {
 ###############################################################################
 tax.cashflows = function(info, index, last.index) {
 
+
 #gall <<- environment() 
 #list2vars(gall)
 #if(index == 1511)
@@ -2587,7 +2669,7 @@ tax.cashflows = function(info, index, last.index) {
 	# check if there is any data
 	if(sum(ii) == 0) return(0)
 	
-	# work with copy of tax enviroment
+	# work with copy of tax environment
 	if( is.null(info$tax.copy) ) {
 		info$tax.copy = env(
 			long.term.cap = info$tax$long.term.cap,
@@ -2602,7 +2684,7 @@ tax.cashflows = function(info, index, last.index) {
 	# find end of last year
 	i = max(which(ii))
 	
-	# get all capital gains / losses, asssume we can caryy indefinately
+	# get all capital gains / losses, assume we can carry indefinitely
 	long.term.cap = sum(info$tax.copy$long.term.cap[1:i])
 	short.term.cap = sum(info$tax.copy$short.term.cap[1:i])
 

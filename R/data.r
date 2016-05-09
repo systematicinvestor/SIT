@@ -1923,7 +1923,7 @@ data.ft.index.members = function
 	# if NOT forced to download and file exists and file is less than 30 days old
 	if( !force.download && 
 		file.exists(data.filename) &&
-		as.numeric(Sys.Date() - file.mtime(data.filename)) <= data.keep.days
+		as.numeric(Sys.Date() - as.Date(file.mtime(data.filename))) <= data.keep.days
 	) {
 		load(file=data.filename)
 		return(data)
@@ -1957,9 +1957,9 @@ data.ft.index.members = function
 	nfound = str_match(token,' data-ajax-paging-total-rows="([0-9]+)">')[2]
 		nfound = as.numeric(nfound)
 
-	data = matrix('',nr=nfound,nc=5)
-		colnames(data) = spl('Name,Symbol,LastPrice,TodayChange,YearChange')
-	data[1:nstep,] = temp[,1:5]
+	data = matrix('',nr=nfound,nc=2)
+		colnames(data) = spl('Name,Symbol') #spl('Name,Symbol,LastPrice,TodayChange,YearChange')
+	data[1:nstep,] = temp[,1:2]
 		
 	#[PhantomJS](http://stackoverflow.com/questions/15739263/phantomjs-click-an-element)
 	#[Short R tutorial: Scraping Javascript Generated Data with R](https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r)	
@@ -2000,17 +2000,15 @@ data.ft.index.members = function
 
 		temp = extract.table.from.webpage(temp, has.header=F)
 			
-		data[istart:min(istart+nstep-1,nfound),] = temp[,1:5]
+		data[istart:min(istart+nstep-1,nfound),] = temp[,1:2]
 	}
 
-	# only compare Name,Symbol
-	if( !force.download && file.exists(data.filename) && requireNamespace('flock', quietly = T) ) {
+	if( file.exists(data.filename) && requireNamespace('ftouch', quietly = T) ) {
 		data.copy = data
 		load(file=data.filename)
 		
-		comp.index = spl('Name,Symbol')
-		if( all.equal(data.copy[,comp.index],data[,comp.index]) ) {
-			flock::touch(data.filename)
+		if( all.equal(data.copy, data) ) {
+			ftouch::touch(data.filename)
 			return(data) 
 		}
 	}		
@@ -2030,7 +2028,7 @@ data.ft.index.members = function
 #	# if NOT forced to download and file exists and file is less than 30 days old
 #	if( !force.download && 
 #		file.exists(data.filename) &&
-#		as.numeric(Sys.Date() - file.mtime(data.filename)) <= data.keep.days
+#		as.numeric(Sys.Date() - as.Date(file.mtime(data.filename))) <= data.keep.days
 #	) {
 #		load(file=data.filename)
 #		return(data)
@@ -2038,14 +2036,12 @@ data.ft.index.members = function
 #
 # Once data is downloaded check if needs to be saved
 #
-#	# only compare Name,Symbol
-#	if( !force.download && file.exists(data.filename) && requireNamespace('flock', quietly = T) ) {
+#	if( file.exists(data.filename) && requireNamespace('ftouch', quietly = T) ) {
 #		data.copy = data
 #		load(file=data.filename)
 #		
-#		comp.index = spl('Name,Symbol')
-#		if( all.equal(data.copy[,comp.index],data[,comp.index]) ) {
-#			flock::touch(data.filename)
+#		if( all.equal(data.copy,data) ) {
+#			ftouch::touch(data.filename)
 #			return(data) 
 #		}
 #	}		
@@ -2054,6 +2050,124 @@ data.ft.index.members = function
 #	data
 #}
 #
+
+
+###############################################################################
+# Data from https://www.ishares.com/us/products/etf-product-list
+#' 
+#' [Download File in R with POST while sending data](https://stackoverflow.com/questions/34864162/download-file-in-r-with-post-while-sending-data)
+#' 
+#' @examples
+#' \dontrun{ 
+#' data.ishares.universe()
+#' }
+#' @export
+#' @rdname DataFTFunctions
+###############################################################################
+data.ishares.universe = function
+(
+  portfolios="239726-239623-239458-239566-239706-239763-239708-239637-239710-239467-239774-239565-239665-239826-239707-239500-239725-239695-239718-239644-244049-239451-244050-239452-239728-239456-239454-239465-239561-239719-239626-239766-239699-239572-239463-239717-239714-239855-239712-239709-239455-239600-239627-239563-239762-239650-239764-239723-239536-239520-239482-239724-239466-259622-239775-239681-239659-239641-239612-239534-239773-239605-239615-239499-239628-239736-256101-239686-239522-239622-239601-239854-239464-239468-239674-268708-244048-239690-239619-239594-239511-239657-239607-239737-239744-239670-239512-239507-251614-239508-239685-239741-239524-239768-239772-239506-264617-239516-239423-239683-239513-239505-239746-258100-239713-239757-239460-239769-239453-239580-239664-239543-239514-239761-239715-239750-239510-239830-239756-251616-239758-239716-239540-272532-239502-239771-239450-264619-239740-239523-239457-259623-239519-239579-239720-259624-239678-244051-239501-239509-239731-239582-239503-239661-239667-264615-239765-239545-239680-239649-264623-239517-239751-239521-239729-239689-239705-239648-239588-239618-239528-239462-239688-239692-239669-239684-239730-239677-239581-270319-239675-239668-239739-239733-239696-239459-239518-239645-271054-239585-239767-239742-239671-239606-251465-239583-268704-239676-239586-239584-239753-239748-239430-251474-239745-239752-279626-239666-239550-239614-239424-239662-239722-239655-239734-268752-239526-258098-239610-271056-239831-239429-272342-239654-272341-239663-239629-254263-264507-239759-239587-239829-239461-239621-239551-258510-254551-239504-239672-239721-239642-239515-254553-272343-269394-272824-239609-239738-239529-239539-239544-239431-239527-254555-272340-260973-239660-264503-239537-271544-251476-239770-272822-239693-239443-272344-239735-272346-264273-264613-239656-273753-251477-272345-275382-239445-239653-276546-264542-264275-272112-264544-239613-264611-273746-276544-239570-239652-239651-239530-239525-239647-239620-260652-260975-239673-272819-254562-271540-258806-239552-283378-239691-271538-264127-239444-273743-273775-239638-275389-280052-273771-272825-275397-264606-253433-280049-272823-275384-271542-272821-273750-272820-273763-279286-270316-280048-280051-280050-275399-280769-273748-280771-273766-280774-273759-273768",
+  # above list must be updated manually :(
+  force.download = FALSE,
+  data.filename = 'ishares.universe.Rdata',
+  data.folder = paste(getwd(), 'data.ishares', sep='/'),
+  data.keep.days = 30
+)
+{
+	data.filename = file.path(data.folder, data.filename)
+	
+	# if NOT forced to download and file exists and file is less than 30 days old
+	if( !force.download && 
+		file.exists(data.filename) &&
+		as.numeric(Sys.Date() - as.Date(file.mtime(data.filename))) <= data.keep.days
+	) {
+		load(file=data.filename)
+		return(data)
+	}
+	
+	# make sure folder exists
+	dir.create(data.folder, F)
+	
+	# get data
+	url = 'https://www.ishares.com/us/product-screener-download.dl'
+		
+    library(curl)
+	h = new_handle()
+	handle_setopt(h, useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0', referer='https://www.ishares.com/us/products/etf-product-list')
+	handle_setopt(h, customrequest = 'POST')
+	handle_setopt(h, postfields=paste0('productView=ishares&portfolios=', portfolios))
+
+	req = curl_fetch_memory(url, h)
+	if(req$status_code != 200) 
+		warning('error getting data, status_code:', req$status_code, 'for url:', url, 'content:', rawToChar(req$content))
+	
+    txt = rawToChar(req$content)
+	
+	# nchar(txt)
+	# write.file(txt,file='text.txt')
+	
+	# export data	
+	temp = gsub('<table>', '<table>', txt, perl = T, ignore.case = T)
+	temp = gsub('</table>', '</table>', temp, perl = T, ignore.case = T)
+	temp = gsub('<row>', '<tr>', temp, perl = T, ignore.case = T)
+	temp = gsub('</row>', '</tr>', temp, perl = T, ignore.case = T)
+	temp = gsub('<cell', '<td', temp, perl = T, ignore.case = T)
+	temp = gsub('</cell', '</td', temp, perl = T, ignore.case = T)
+	
+	temp = gsub('ss:MergeAcross="([0-9]+)"','>REP_\\1_<a', temp, perl=T)
+	temp = gsub('ss:Index="([0-9]+)"','>IDX_\\1_<a', temp, perl=T)
+	
+	data = extract.table.from.webpage(temp, 'Ticker', has.header=F)
+	
+	# process headers, ugly
+	library(stringr)
+	header = data[1,]	
+	index = str_match(header,'REP_([0-9]+)')[,2]
+		index = as.numeric(index)
+	header = gsub('REP_([0-9]+)_','', header, perl=T)
+		
+	temp = header
+	j = 1
+	for(i in 1:len(header))
+		if( !is.na(index[i]) ) {
+			temp[j:(j+index[i])] = header[i]
+			j = j + index[i] + 1
+		
+		} else j = j + 1
+	
+	data[1,] = temp
+	
+	header = data[2,]	
+	index = str_match(header,'IDX_([0-9]+)')[,2]
+		index = as.numeric(index)
+	header = gsub('IDX_([0-9]+)_','', header, perl=T)
+		
+	temp = rep('', len(header))
+	for(i in 1:len(header))
+		if( !is.na(index[i]) ) {
+			temp[index[i]] = header[i]
+		}
+		
+	data[2,] = temp
+	
+	# save data
+	colnames(data) = trim(apply(data[1:2,],2,join, ' '))
+		data = data[-c(1:2),]
+		
+	if( file.exists(data.filename) && requireNamespace('ftouch', quietly = T) ) {
+		data.copy = data
+		load(file=data.filename)
+		
+		if( all.equal(data.copy, data) ) {
+			ftouch::touch(data.filename)
+			return(data) 
+		}
+	}		
+	
+	save(data,file=data.filename)
+	data
+}
+
 
 ###############################################################################
 # Load FOMC dates
@@ -2284,6 +2398,13 @@ quantumonline.info <- function
 
 ###############################################################################	
 #' URL for various data providers
+#'
+#' hist = read.xts(hist.quotes.url('IBM', '1992-11-01', '2016-05-05', 'quotemedia'))
+#' hist = read.xts(hist.quotes.url('HOU:CA', '1992-11-01', '2016-05-05', 'quotemedia'))
+#'
+#' http://web.tmxmoney.com/pricehistory.php?qm_page=90043&qm_symbol=HOD
+#' http://www.quotemedia.com/portal/history?qm_symbol=HOD:CA
+#'
 #' @export 
 ###############################################################################
 hist.quotes.url <- function

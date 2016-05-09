@@ -255,6 +255,10 @@ list2vars <- function(data, env = parent.frame()) {
 		env[[n]] = data[[n]]
 }
 
+# usage
+# debug.save()
+# stop()
+# debug.load()
 #' @export 
 debug.save = function() {		
 	gall <<- parent.frame()
