@@ -466,6 +466,25 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 				}
 			}
 			
+			
+			#
+			# [Numerical Error]
+			# http://www.burns-stat.com/documents/tutorials/impatient-r/more-r-key-objects/more-r-numbers/
+			# seq(0, 1, by=.1)[4] == .3
+			#  
+			# [Rmpfr package](https://cran.r-project.org/web/packages/Rmpfr/vignettes/Rmpfr-pkg.pdf)
+			# sum(mpfr(c(1100,  300, 1100,  500 , 500, 2000,  500), 80)/ 0.78) == (mpfr(6000,80)/ 0.78)
+			# 
+			# a =  c(1100,  300, 1100,  500 , 500, 2000,  500) / 0.78
+			# b = 6000/ 0.78
+			# sum(a) == b
+			# a[1]=a[1]-  (sum(a) - b)
+			# sum(a) == b
+			# 
+			# print(sum(a)-b,digits=20)
+			# 
+			adjust.division.split = function(share,split) (sum(share) / split) - sum(share / split)
+			
 			# check what happens if dividend and split are on the same day
 			if( trade.split[i] ) {
 				for(a in which(info$share[i,] !=0 & splits[i,] > 0))
@@ -475,13 +494,19 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 				if( !is.null(tax.control) ) {
 					for(a in which(info$share[i,] !=0 & splits[i,] > 0)) {
 						n.trades = 1:holdings$n.trades[a]
+						offset = adjust.division.split(holdings$share[n.trades,a] , splits[i,a])
 						holdings$share[n.trades,a] = holdings$share[n.trades,a] / splits[i,a]
+							holdings$share[1,a] = holdings$share[1,a] + offset
 						holdings$price[n.trades,a] = holdings$price[n.trades,a] * splits[i,a]
+						
+						sum(holdings$share[n.trades,a]) / splits[i,a] - sum(holdings$share[n.trades,a] / splits[i,a])
 					}
 					
 					for(a in which(wash.sale$n.trades > 0 & splits[i,] > 0)) {
 						n.trades = 1:wash.sale$n.trades[a]
+						offset = adjust.division.split(wash.sale$share[n.trades,a] , splits[i,a])						
 						wash.sale$share[n.trades,a] = wash.sale$share[n.trades,a] / splits[i,a]
+							wash.sale$share[1,a] = wash.sale$share[1,a] + offset
 						wash.sale$loss.per.share[n.trades,a] = wash.sale$loss.per.share[n.trades,a] * splits[i,a]
 					}				
 				}
@@ -544,8 +569,9 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 			if( !is.null(tax.control) && sum(info$share[i,] != out$share) > 0 ) {
 			
 	if( any(info$share[i,] != sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	
+	{
 		cat('Wrong Holdings', info$share[i,][5], '\n')
-			
+	}		
 				tax.update.holdings(tax.control, holdings, tax, wash.sale, 
 					info$share[i,], out$share, prices[i,], i, b$dates)
 			}

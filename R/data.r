@@ -801,16 +801,63 @@ getSymbol.intraday.google <- function
 }
 
 
+
 ###############################################################################
 # getSymbols interface to Yahoo today's delayed qoutes
 # based on getQuote.yahoo from quantmod package
+#
+# http://www.financialwisdomforum.org/gummy-stuff/Yahoo-data.htm
+# https://github.com/joshuaulrich/quantmod/blob/master/R/getQuote.R
+#
+# getQuote.yahoo.info('DJP,IEF,KIE,RHS')
+#
 #' @export 
-###############################################################################            
-getQuote.yahoo.today <- function(Symbols) {
+###############################################################################   
+getQuote.yahoo.info <- function(Symbols, fields = c(
+	Name='Name',
+	Symbol='Symbol',
+	Time='Last Trade Time',
+	Date='Last Trade Date',
+	Close='Last Trade (Price Only)',
+	Volume='Volume',
+	AvgVolume='Average Daily Volume',
+	Yesterday='Previous Close'
+	),
+	load.hist = T
+) {
+	Symbols = spl(Symbols)
+	out = getQuote.yahoo.today(Symbols, fields)
+		out = as.data.frame.matrix(out)
+		rownames(out) = out$Symbol
+
+	if(!load.hist) return(out)
+	
+	data = env()
+	getSymbols(Symbols, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)	
+
+	out$Start = bt.start.dates(data)[out$Symbol,]	
+	out
+}
+
+
+#' @export 
+getQuote.yahoo.today <- function(Symbols, fields = c(
+	Name='Name',
+	Symbol='Symbol',
+	Time='Last Trade Time',
+	Date='Last Trade Date',
+	Open='Open',
+	High='Days High',
+	Low='Days Low',
+	Close='Last Trade (Price Only)',
+	Volume='Volume',
+	Yesterday='Previous Close'
+	)
+) {
   require('data.table')
-    what = yahooQF(names = spl('Name,Symbol,Last Trade Time,Last Trade Date,Open,Days High,Days Low,Last Trade (Price Only),Volume,Previous Close'))
-    names = spl('Name,Symbol,Time,Date,Open,High,Low,Close,Volume,Yesterday')
-    
+    what = yahooQF(names = fields)
+    names = names(fields)
+    Symbols = spl(Symbols)
     all.symbols = lapply(seq(1, len(Symbols), 100), function(x) na.omit(Symbols[x:(x + 99)]))
     out = c()
     
@@ -2168,6 +2215,55 @@ data.ishares.universe = function
 	data
 }
 
+
+###############################################################################
+# download Profile page from Yahoo Finance
+# 
+# [get industry/sector information from yahoo finance](https://ca.finance.yahoo.com/q/pr?s=RY.TO)
+# data.yahoo.profile('RY.TO')
+# 
+#' @export 
+###############################################################################
+data.yahoo.profile = function(symbol) {	
+	url = paste0('http://finance.yahoo.com/q/pr?s=', symbol)
+	txt = get.url(url)
+	
+	temp = extract.table.from.webpage(txt, 'Sector', has.header = F)
+		temp = gsub(':','',temp )
+		out = temp[,2]
+		names(out) = tolower(temp[,1])
+	out
+}
+
+
+
+###############################################################################
+# download URL with curl
+# 
+# get.url('http://money.cnn.com/data/dow30/')
+# 
+#' @export 
+###############################################################################
+get.url = function
+(
+	url,
+	useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0',
+	referer = NULL
+)
+{
+    library(curl)
+	h = new_handle()
+	if( !is.null(useragent) ) handle_setopt(h, useragent = useragent)
+	if( !is.null(referer) ) handle_setopt(h, referer=referer)
+
+	req = curl_fetch_memory(url, h)
+	if(req$status_code != 200) 
+		warning('error getting data, status_code:', req$status_code, 'for url:', url, 'content:', rawToChar(req$content))
+	
+    txt = rawToChar(req$content)
+	txt
+}	
+	
 
 ###############################################################################
 # Load FOMC dates
