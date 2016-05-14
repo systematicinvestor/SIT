@@ -1192,7 +1192,11 @@ load.packages('data.table')
 if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
   data = x
   dates = as.matrix(data[,date.column,drop=F])
-  data  = data[,-date.column,drop=F]
+  
+  index = which(sapply(data,class) != 'character')
+    index = index[ index > date.column ]  
+  data  = data[,index,drop=F]
+  #data  = data[,-date.column,drop=F]
 } else {
   filename = x  
 if(!is.data.table(x)) {

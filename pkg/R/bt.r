@@ -137,12 +137,22 @@ bt.prep <- function
 				}
 				
 				#for(j in colnames(b[[ symbolnames[i] ]])) {
-				for(field in spl('Open,High,Low,Adjusted')) {
+				for(field in spl('Open,High,Low')) {
 				j = map.col[[field]]
 				if(!is.null(j)) {
 					index1 = is.na(b[[ symbolnames[i] ]][,j]) & index
 					b[[ symbolnames[i] ]][index1, j] = close[index1]
-				}}						
+				}}
+
+				j = map.col$Adjusted
+				if(!is.null(j)) {
+					b[[ symbolnames[i] ]][index, j] = ifna.prev(b[[ symbolnames[i] ]][index, j])
+				}
+				
+				
+				#for(j in setdiff(1:ncol( b[[ symbolnames[i] ]] ), unlist(map.col))) {
+				#	b[[ symbolnames[i] ]][index, j] = ifna.prev(b[[ symbolnames[i] ]][index, j])				
+				#}				
 			}
 		}	
 	} else {
@@ -810,7 +820,9 @@ bt.run.weight.fast <- function
 compute.turnover <- function
 (	
 	bt,		# backtest object
-	b 		# enviroment with symbols time series
+	b, 		# environment with symbols time series
+	exclude.first.trade = T # first trade is the reason for 100% turnover
+							# i.e. going from cash to fully invested
 ) 
 { 
 	year.ends =  unique(c(endpoints(bt$weight, 'years'), nrow(bt$weight)))	
@@ -818,6 +830,11 @@ compute.turnover <- function
 		nr = len(year.ends)
 	period.index = c(1, year.ends)
 
+	# find first investment date
+	first = which.max(!is.na(bt$equity) & bt$equity != 1)
+	if(first > 1 && !is.na(bt$equity[(first-1)]))
+		first = first - 1
+	
 	
 	if( bt$type == 'weight') {    	    	
 		portfolio.value = rowSums(abs(bt$weight), na.rm=T)
@@ -849,14 +866,37 @@ compute.turnover <- function
 		portfolio.turnover[ rowSums( !is.na(bt$share) & !is.na(mlag(bt$share)) & !is.na(prices) ) == 0 ] = NA
 	}
 	
+	if(exclude.first.trade) portfolio.turnover[first] = 0
+	
 	portfolio.turnover[1:2] = 0
 	temp = NA * period.index			
 	for(iyear in 2:len(period.index)) {
-		temp[iyear] = sum( portfolio.turnover[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T) / 
-						mean( portfolio.value[ period.index[(iyear-1)] : period.index[iyear] ], na.rm=T)			
+		temp[iyear] = sum( portfolio.turnover[ (1+period.index[iyear-1]) : period.index[iyear] ], na.rm=T) / 
+						mean( portfolio.value[ (1+period.index[iyear-1]) : period.index[iyear] ], na.rm=T)			
 	}
-	return( ifna(mean(temp, na.rm=T),0) )			
+	
+	if(exclude.first.trade)
+		turnover = mean(temp[period.index > first], na.rm=T)
+	else
+		turnover = mean(temp[period.index >= first], na.rm=T)
+	
+	ifna(turnover,0)
 }
+
+
+
+# debug	
+# write.xts(make.xts(bt$cash, index(bt$weight)), 'cash.csv')
+# write.xts(make.xts(bt$share, index(bt$weight)), 'share.csv')
+# write.xts(prices, 'price.csv')
+#
+# portfolio.value = make.xts(portfolio.value,index(prices))
+# portfolio.turnover = make.xts(portfolio.turnover,index(prices))
+# iyear='1998'
+# mean(portfolio.value[iyear])
+# sum(portfolio.turnover[iyear])
+# sum(portfolio.turnover[iyear]) / mean(portfolio.value[iyear])
+	
 
 
 ###############################################################################

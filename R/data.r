@@ -2495,8 +2495,15 @@ quantumonline.info <- function
 ###############################################################################	
 #' URL for various data providers
 #'
+#' [lookup ticker](http://www.quotemedia.com/portal/quote?qm_symbol=pot:ca)
+#' [check sector / industry info for any company](http://www.quotemedia.com/portal/profile?qm_symbol=m)
+#' 
 #' hist = read.xts(hist.quotes.url('IBM', '1992-11-01', '2016-05-05', 'quotemedia'))
 #' hist = read.xts(hist.quotes.url('HOU:CA', '1992-11-01', '2016-05-05', 'quotemedia'))
+#' hist = read.xts(get.url(hist.quotes.url('HOD:CA', '1992-11-01', '2016-05-05', 'quotemedia')))
+#'
+#' library(readr)
+#' hist = read.xts(read_csv(get.url(hist.quotes.url('HOU:CA', '1992-11-01', '2016-05-05', 'quotemedia')),,na=c('','NA','N/A')))
 #'
 #' http://web.tmxmoney.com/pricehistory.php?qm_page=90043&qm_symbol=HOD
 #' http://www.quotemedia.com/portal/history?qm_symbol=HOD:CA
@@ -2838,19 +2845,42 @@ data.aqr = function
 ###############################################################################
 # Load/download CSI security master
 # http://www.csidata.com/factsheets.php?type=commodity&format=csv
+# (Stock Factsheet - TSX - Toronto Stock Exchange)[http://www.csidata.com/factsheets.php?type=stock&format=htmltable&exchangeid=82]
 #' @export 
 ###############################################################################
-load.csi.security.master = function(force.download = F) {
-	data.folder = paste(getwd(), 'csi.data', sep='/')
-	url = 'http://www.csidata.com/factsheets.php?type=commodity&format=csv'
-	filename = file.path(data.folder, 'commodityfactsheet.csv')
-
-	if( !file.exists(filename) || force.download) {
-		dir.create(data.folder, F)
-		download.file(url, filename,  mode = 'wb')
-	}
+data.csi.security.master = function
+(
+	type=c('commodity', 'stock'),
+	exchangeid=c(NA, 82),
+	force.download = FALSE,
+	data.filename = paste0(type[1],'.csv'),
+	data.keep.days = 30,
+	data.folder = 'data.csi'
+) 
+{
+	data.folder = paste(getwd(), data.folder, sep='/')
+	data.filename = file.path(data.folder, data.filename)
+		
+	# if NOT forced to download and file exists and file is less than 30 days old
+	if( !force.download && 
+		file.exists(data.filename) &&
+		as.numeric(Sys.Date() - as.Date(file.mtime(data.filename))) <= data.keep.days
+	) {
+		return(read.csv(data.filename))
+	}	
 	
-	read.csv(filename)
+	type = type[1]
+	exchangeid = exchangeid[1]
+	
+	if( is.na(exchangeid[1]) )	
+		url = paste0('http://www.csidata.com/factsheets.php?type=', type[1], '&format=csv')
+	else
+		url = paste0('http://www.csidata.com/factsheets.php?type=', type[1], '&format=csv&exchangeid=', exchangeid[1])
+	
+	dir.create(data.folder, F)
+	txt = get.url(url)
+	write(txt, file=data.filename)
+	read.csv(data.filename)
 }
 
 ###############################################################################

@@ -55,7 +55,7 @@ bt.run.share.ex <- function
 	weight = b$weight,
 	dates = 1:nrow(b$prices),
 	
-	lot.size = c(),
+	lot.size = 0.01,
 	control = list(
 		round.lot = default.round.lot.control()
 	),
@@ -208,6 +208,16 @@ bt.run.share.ex <- function
 	#---------------------------------------------------------
 	# process prices
 	#---------------------------------------------------------
+	check.non.positive.prices = function(p, name) {
+		if(any(p<=0, na.rm=T)) {
+			index = lookup.index(open,  which(p <= 0))
+			stop('bt.run.share.ex detected non positive ', name, ' for ' , join(colnames(p)[index$icol], ' , '))
+		}
+	}
+
+	
+	check.non.positive.prices(prices,'prices')
+	
 	prices = coredata(prices)
 		n = ncol(prices)
 	
@@ -217,6 +227,8 @@ bt.run.share.ex <- function
 		execution.price = coredata(b$execution.price)
 		prices[trade] = iif( is.na(execution.price[trade]), prices[trade], execution.price[trade] )
 	}
+	
+	check.non.positive.prices(prices,'execution.prices')
 
 	# make sure that prices are available, assume that
 	# weights account for missing prices i.e. no price means no allocation
@@ -228,7 +240,12 @@ bt.run.share.ex <- function
 	if( !is.list(commission) )
 		commission = list(cps = commission, fixed = 0.0, percentage = 0.0)	
 		
-	lot.size = map2vector(lot.size, colnames(prices), 0)
+	lot.size = map2vector(lot.size, colnames(prices), 0.01)
+		
+
+	
+	
+	
 	
 	dividend.control$foreign.withholding.tax = map2vector(dividend.control$foreign.withholding.tax, colnames(prices), 0)
 	dividend.control$invest = ifnull(dividend.control$invest, 'cash')
@@ -356,7 +373,10 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 	#---------------------------------------------------------
 	if(!adjusted) {
 		dividends = coredata(bt.apply(b, function(x) x[,'Dividend']))
+			dividends[is.na(dividends)] = 0
 		splits = coredata(bt.apply(b, function(x) x[,'Split']))		
+			splits[is.na(splits)] = 0
+			
 			trade.dividend = rowSums(mlag(weight1) != 0 & dividends > 0, na.rm=T) > 0
 			trade.split = rowSums(mlag(weight1) != 0 & splits > 0, na.rm=T) > 0
 			
@@ -426,10 +446,17 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 		
 	last.trade = 0
 	weight.last = weight1[1,]
+	
+	# need to speed up code for dividends invested in cash
+	# i.e. just put dividends to cash and go forward
 		
 	for(i in event.index) {		
 		trade.invest.type = iif(trade.index[i], invest.type.def$rebalance, invest.type.def$none)
 		trade.today = trade.index[i]
+	
+	
+			
+	
 	
 		if(last.trade > 0) {
 			# copy from last trade
@@ -442,6 +469,8 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 			
 			weight.last = weight1[i-1,]
 		}
+		
+		
 		
 		# unadjusted logic
 		if(!adjusted) {
@@ -467,23 +496,6 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 			}
 			
 			
-			#
-			# [Numerical Error]
-			# http://www.burns-stat.com/documents/tutorials/impatient-r/more-r-key-objects/more-r-numbers/
-			# seq(0, 1, by=.1)[4] == .3
-			#  
-			# [Rmpfr package](https://cran.r-project.org/web/packages/Rmpfr/vignettes/Rmpfr-pkg.pdf)
-			# sum(mpfr(c(1100,  300, 1100,  500 , 500, 2000,  500), 80)/ 0.78) == (mpfr(6000,80)/ 0.78)
-			# 
-			# a =  c(1100,  300, 1100,  500 , 500, 2000,  500) / 0.78
-			# b = 6000/ 0.78
-			# sum(a) == b
-			# a[1]=a[1]-  (sum(a) - b)
-			# sum(a) == b
-			# 
-			# print(sum(a)-b,digits=20)
-			# 
-			adjust.division.split = function(share,split) (sum(share) / split) - sum(share / split)
 			
 			# check what happens if dividend and split are on the same day
 			if( trade.split[i] ) {
@@ -493,20 +505,16 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 				
 				if( !is.null(tax.control) ) {
 					for(a in which(info$share[i,] !=0 & splits[i,] > 0)) {
-						n.trades = 1:holdings$n.trades[a]
-						offset = adjust.division.split(holdings$share[n.trades,a] , splits[i,a])
-						holdings$share[n.trades,a] = holdings$share[n.trades,a] / splits[i,a]
-							holdings$share[1,a] = holdings$share[1,a] + offset
-						holdings$price[n.trades,a] = holdings$price[n.trades,a] * splits[i,a]
+						holdings.split(holdings, a, splits[i,a])
 						
-						sum(holdings$share[n.trades,a]) / splits[i,a] - sum(holdings$share[n.trades,a] / splits[i,a])
+						n.trades = 1:holdings$n.trades[a]							
+						holdings$price[n.trades,a] = holdings$price[n.trades,a] * splits[i,a]						
 					}
 					
 					for(a in which(wash.sale$n.trades > 0 & splits[i,] > 0)) {
+						holdings.split(wash.sale, a, splits[i,a])
+						
 						n.trades = 1:wash.sale$n.trades[a]
-						offset = adjust.division.split(wash.sale$share[n.trades,a] , splits[i,a])						
-						wash.sale$share[n.trades,a] = wash.sale$share[n.trades,a] / splits[i,a]
-							wash.sale$share[1,a] = wash.sale$share[1,a] + offset
 						wash.sale$loss.per.share[n.trades,a] = wash.sale$loss.per.share[n.trades,a] * splits[i,a]
 					}				
 				}
@@ -568,9 +576,11 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 
 			if( !is.null(tax.control) && sum(info$share[i,] != out$share) > 0 ) {
 			
-	if( any(info$share[i,] != sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	
+	if( any(!equal.check(info$share[i,], sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	)
 	{
 		cat('Wrong Holdings', info$share[i,][5], '\n')
+		
+
 	}		
 				tax.update.holdings(tax.control, holdings, tax, wash.sale, 
 					info$share[i,], out$share, prices[i,], i, b$dates)
@@ -647,6 +657,35 @@ bt.run.share.ex.internal <- function(b, prices, capital, commission, weight,
 	}
 	 
 	bt
+}
+
+
+#
+# [Numerical Error]
+# http://www.burns-stat.com/documents/tutorials/impatient-r/more-r-key-objects/more-r-numbers/
+# seq(0, 1, by=.1)[4] == .3
+#  
+# [Rmpfr package](https://cran.r-project.org/web/packages/Rmpfr/vignettes/Rmpfr-pkg.pdf)
+# sum(mpfr(c(1100,  300, 1100,  500 , 500, 2000,  500), 80)/ 0.78) == (mpfr(6000,80)/ 0.78)
+# 
+# a =  c(1100,  300, 1100,  500 , 500, 2000,  500) / 0.78
+# b = 6000/ 0.78
+# sum(a) == b
+# a[1]=a[1]-  (sum(a) - b)
+# sum(a) == b
+# 
+# print(sum(a)-b,digits=20)
+# 
+holdings.split = function(holdings, a, split) {
+	n.trades = 1:holdings$n.trades[a]
+	
+	sum.before.split = sum(holdings$share[n.trades,a]) / split
+	
+	holdings$share[n.trades,a] = holdings$share[n.trades,a] / split
+	
+	sum.after.split = sum(holdings$share[n.trades,a])
+	
+	holdings$share[1,a] = holdings$share[1,a] + sum.before.split - sum.after.split
 }
 
 
@@ -839,8 +878,7 @@ check.wash.sale = function(a, dates, tax, tax.control, holdings, wash.sale) {
 tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, share1, price, index, dates) 
 {				
 	n = len(price)
-
-
+		
 	# NOTES:
 	#
 	# n.trades = 1:holdings$n.trades[a]
@@ -850,8 +888,9 @@ tax.update.holdings = function(tax.control, holdings, tax, wash.sale, share0, sh
 	# sum(iif(share0 > share1, (share0 - share1)*(price-holdings$price[1,]), 0))
 	# tax$short.term.cap[index] + tax$long.term.cap[index]
 	
-	if( any(share0 != sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	
+	if( any(!equal.check(share0, sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	)
 		cat('Mismatch holding shares', index, '\n')
+	
 	
 	for(a in (1:n)[share0 != share1]) {				
 		n.trades = 1:holdings$n.trades[a]
@@ -951,16 +990,18 @@ check.wash.sale(a, dates, tax, tax.control, holdings, wash.sale)
 		}
 		
 		
-		if( share1[a] != sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0)))
+		if( !equal.check(share1[a], sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))))
 			cat('a', a, index, '\n')
 	}
 	
-	if( any(share1 != sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	
+	if( any(!equal.check(share1, sapply(1:n, function(a) sum(iif(holdings$n.trades[a] > 0, holdings$share[1:holdings$n.trades[a],a], 0))  )) )	)
 		cat('Mismatch holding shares', index, '\n')
 
 	
 	
 }	
+
+equal.check = function(a,b,eps=1e-10) abs(a - b) < eps
 		
 
 ###############################################################################
@@ -1088,6 +1129,18 @@ bt.run.share.ex.allocate = function
 	# total value, as if everything is liquidated
 	value = sum(price * share) + cash
 
+
+	
+	
+	# make lot size fractional over-vise run into rounding problem# i.e.
+	# print(762.18,digits=20)
+	# 762.17999999999995
+	# print(76218/100,digits=20)
+	# 762.17999999999995
+	# print(76218*0.01,digits=20)
+	# 762.18000000000006
+	#if( len(lot.size) > 0 && all(lot.size != 0) )
+	#	lot.size1 = sapply(lot.size, function(x) MASS:::.rat(x)$rat)
 	
 # helper functions	
 compute.commission = function(share.prev, share.new, price, commission) {	
@@ -1162,7 +1215,7 @@ allocate.lot = function(value, share, lot.size) {
 		p = price[weight.change.index]
 		
 		shares = rep.row(share, 3)
-		shares[2, weight.change.index] = round.lot.basic(w, p, allocate.value, lot.size)			
+		shares[2, weight.change.index] = round.lot.basic(w, p, allocate.value, lot.size)
 		shares[3, weight.change.index] = round.lot.basic.base(w, p, allocate.value, lot.size)
 	}
 	shares	
