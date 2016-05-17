@@ -154,7 +154,7 @@ bt.run.share.ex <- function
 	#---------------------------------------------------------
 	# process cashflows
 	#---------------------------------------------------------
-	dummy = NA * prices[,1]
+	dummy = NA * prices[,1,drop=F]
 	cashflows = list(
 		n = len(cashflow.control),
 		cash = dummy
