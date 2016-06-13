@@ -39,7 +39,7 @@ shinyUI(pageWithSidebar(
 				
 				p('The idea is to first focus on returns in the month of January 
 				that are greater than given treshold and next study the returns for the whole year. This study is based on the',		
-				a('S&amp;P Annual Performance After a Big January', href="http://www.avondaleam.com/2013/02/s-annual-performance-after-big-january.html", target="_blank"),
+				a('S&P Annual Performance After a Big January', href="http://www.avondaleam.com/2013/02/s-annual-performance-after-big-january.html", target="_blank"),
 				'post by', a('Avondale Asset Management', href="http://www.avondaleam.com", target="_blank")),
 				
 				br(),

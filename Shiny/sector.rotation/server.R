@@ -10,7 +10,7 @@ shinyServer(function(input, output) {
   	# http://rstudio.github.com/shiny/tutorial/#inputs-and-outputs
     #******************************************************************    	
     # Get stock data
-  	getData <- reactive(function() {  	
+  	getData <- reactive({  	
   		cat('getData was called\n')
   	
   		data <- new.env()
@@ -21,15 +21,15 @@ shinyServer(function(input, output) {
 			}, error = function(e) { stop(paste('Problem getting prices for',symbol)) })
   			data[[symbol]] = adjustOHLC(symbol_env[[symbol]], use.Adjusted=T)  			
   		}
-  			  				
+  		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
   		bt.prep(data, align='keep.all', dates='2000::')
 		data		
 	})
   	
 	# Helper fns
-	getStocks <- reactive(function() { spl(toupper(gsub('\n',',',input$symbols))) })
+	getStocks <- reactive({ spl(toupper(gsub('\n',',',input$symbols))) })
 
-	getBackTest <- reactive(function() { 
+	getBackTest <- reactive({ 
 		#*****************************************************************
 		# Load historical data
 		#******************************************************************  
@@ -85,7 +85,7 @@ shinyServer(function(input, output) {
 	
 		
 	# Make table
-	makeSidebysideTable <- reactive(function() {
+	makeSidebysideTable <- reactive({
 		models = getBackTest()
 		plotbt.strategy.sidebyside(models, return.table=T, make.plot=F)
 	})
@@ -115,32 +115,32 @@ shinyServer(function(input, output) {
     # Update plot(s) and table(s)
     #******************************************************************    	
 	# Generate a plot
-	output$strategyPlot <- reactivePlot(function() {
+	output$strategyPlot <- renderPlot({
 		models = getBackTest()		
 		plotbt.custom.report.part1(models)  					
 			plota.add.copyright()
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$sidebysideTable <- reactive(function() {
+  	output$sidebysideTable <- reactive({
 		temp = makeSidebysideTable()	
 		tableColor(as.matrix(temp))		
 	})
 	
 	# Generate a table
-  	output$annualTable <- reactive(function() {
+  	output$annualTable <- reactive({
 		tableColor(as.matrix(makeAnnualTable(1)))
 	})
 
 	# Generate a plot
-	output$transitionPlot <- reactivePlot(function() {
+	output$transitionPlot <- renderPlot({
 		models = getBackTest()
 		plotbt.transition.map(models[[1]]$weight)
 			plota.add.copyright()
 	}, height = 400, width = 600)
 		
 	# Generate a table
-  	output$tradesTable <- reactive(function() {
+  	output$tradesTable <- reactive({
   		tableColor(as.matrix(makeTradesTable(1)), include.rownames=FALSE)
 	})
 	
@@ -202,7 +202,7 @@ shinyServer(function(input, output) {
     #*****************************************************************
     # Update status message 
     #******************************************************************    
-	output$status <- reactiveUI(function() {
+	output$status <- renderUI({
 		out = tryCatch( getData(), error=function( err ) paste(err))	    				
 		if( is.character( out ) ) 
 			HTML(paste("<b>Status</b>: <b><font color='red'>Error:</font></b>",out))

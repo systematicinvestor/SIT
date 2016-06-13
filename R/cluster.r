@@ -71,4 +71,33 @@ setup.cluster <- function(expr = NULL, varlist = NULL, envir = .GlobalEnv, cores
 	cl
 }
 
-		
+
+###############################################################################
+#' Parallel Helper Log functions
+#'
+#' @export 
+###############################################################################
+clusterApplyLB.log <- function (cl = NULL, log = log.fn(), x, fun, ...) {
+    argfun <- function(i) c(list(x[[i]]), list(...))
+    dynamicClusterApply.log(cl, log, fun, length(x), argfun)
+}
+
+dynamicClusterApply.log <- function (cl = NULL, log = log.fn(), fun, n, argfun) {
+    cl <- parallel:::defaultCluster(cl)
+    p <- length(cl)
+    if (n > 0L && p) {
+        submit <- function(node, job) parallel:::sendCall(cl[[node]], fun,
+            argfun(job), tag = job)
+        for (i in 1:min(n, p)) submit(i, i)
+        val <- vector("list", n)
+        for (i in 1:n) {
+log(i, percent = i / n)
+            d <- parallel:::recvOneResult(cl)
+            j <- i + min(n, p)
+            if (j <= n)
+                submit(d$node, j)
+            val[d$tag] <- list(d$value)
+        }
+        parallel:::checkForRemoteErrors(val)
+    }
+}		

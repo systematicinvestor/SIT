@@ -10,7 +10,7 @@ shinyServer(function(input, output) {
   	# http://rstudio.github.com/shiny/tutorial/#inputs-and-outputs
     #******************************************************************    	
     # Get stock data
-  	getData <- reactive(function() {  	
+  	getData <- reactive({  	
   		cat('getData was called\n')
   	  		
 	  		symbol = toupper(input$symbol)
@@ -22,7 +22,7 @@ shinyServer(function(input, output) {
 	})
 
 	# Find Januaries with return greater than threshhold
-  	get.january.seasonality <- reactive(function() {  	
+  	get.january.seasonality <- reactive({  	
   		price = getData()
 	  
 		# convert to monthly
@@ -43,7 +43,7 @@ shinyServer(function(input, output) {
 	})
 
 	# Make table
-	makeSeasonalityTable <- reactive(function() {  			
+	makeSeasonalityTable <- reactive({  			
   		temp = get.january.seasonality()
   			years = date.year(index(temp))
   	  	temp = as.matrix(temp)
@@ -52,7 +52,7 @@ shinyServer(function(input, output) {
   	})
   				
 	# Make table
-	makeStatsTable <- reactive(function() {  	
+	makeStatsTable <- reactive({  	
 		out = get.january.seasonality()
 		as.matrix(compute.stats( as.list(out),
 			list(Min=function(x) min(x,na.rm=T),
@@ -87,12 +87,12 @@ shinyServer(function(input, output) {
     # Update plot(s) and table(s)
     #******************************************************************    	
 	# Generate a plot
-	output$seasonalityPlot <- reactivePlot(function() {
+	output$seasonalityPlot <- renderPlot({
 		makePlot()
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$seasonalityTable <- reactive(function() {
+  	output$seasonalityTable <- reactive({
   		temp = cbind(	
 	  		tableColor(makeSeasonalityTable(), digits=1),
 			tableColor(makeStatsTable(), digits=1)
@@ -140,7 +140,7 @@ shinyServer(function(input, output) {
     #*****************************************************************
     # Update status message 
     #******************************************************************    
-	output$status <- reactiveUI(function() {
+	output$status <- renderUI({
 		out = tryCatch( getData(), error=function( err ) paste(err))	    				
 		if( is.character( out ) ) 
 			HTML(paste("<b>Status</b>: <b><font color='red'>Error:</font></b>",out))

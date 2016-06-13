@@ -10,7 +10,7 @@ shinyServer(function(input, output) {
   	# http://rstudio.github.com/shiny/tutorial/#inputs-and-outputs
     #******************************************************************    	
     # Get stock data
-  	getData <- reactive(function() {  	
+  	getData <- reactive({  	
   		cat('getData was called\n')
   	
   		data <- new.env()
@@ -21,19 +21,19 @@ shinyServer(function(input, output) {
 			}, error = function(e) { stop(paste('Problem getting prices for',symbol)) })
   			data[[symbol]] = symbol_env[[symbol]]
   		}
-  			  				
+		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)  			  				
   		bt.prep(data, align='keep.all')
 		data		
 	})
   	
 	# Determine dates range
-	getDateRange <- reactive(function() {  	
+	getDateRange <- reactive({  	
 		data = getData()
 		max(1,nrow(data$prices) - input$dateRange) : nrow(data$prices)
 	})
 		
 	# Make table
-	makeCorTable <- reactive(function() {  	
+	makeCorTable <- reactive({  	
 		out = getData()
 		
 		prices = out$prices[getDateRange(),]
@@ -63,12 +63,12 @@ shinyServer(function(input, output) {
     # Update plot(s) and table(s)
     #******************************************************************    	
 	# Generate a plot
-	output$stockPlot <- reactivePlot(function() {
+	output$stockPlot <- renderPlot({
 		makeStockPlot()
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$corTable <- reactive(function() {
+  	output$corTable <- reactive({
 		temp = makeCorTable()	
 		tableColor(as.matrix(temp),digits=1)		
 	})
@@ -101,7 +101,7 @@ shinyServer(function(input, output) {
     #*****************************************************************
     # Update status message 
     #******************************************************************    
-	output$status <- reactiveUI(function() {
+	output$status <- renderUI({
 		out = tryCatch( getData(), error=function( err ) paste(err))	    				
 		if( is.character( out ) ) 
 			HTML(paste("<b>Status</b>: <b><font color='red'>Error:</font></b>",out))

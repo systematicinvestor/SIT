@@ -2901,7 +2901,7 @@ bt.run.share.fast <- function
 	clean.signal = T,	# flag to remove excessive signal	
 	do.lag = 1, 		# lag signal
 	capital = 100000,
-	lot.size = c()
+	lot.size = 0.01
 ) 
 {
 	#---------------------------------------------------------
@@ -2930,7 +2930,7 @@ if(F) {
 	#---------------------------------------------------------
 	# process prices
 	#---------------------------------------------------------
-	prices = coredata(prices)
+	prices = coredata(b$prices)
 		n = ncol(prices)
 		nperiods = nrow(prices)
 		

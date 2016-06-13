@@ -10,7 +10,7 @@ shinyServer(function(input, output) {
   	# http://rstudio.github.com/shiny/tutorial/#inputs-and-outputs
     #******************************************************************    	
     # Get stock data
-  	getData <- reactive(function() {  	
+  	getData <- reactive({  	
   		cat('getData was called\n')
   	
   		data <- new.env()
@@ -21,16 +21,16 @@ shinyServer(function(input, output) {
 			}, error = function(e) { stop(paste('Problem getting prices for',symbol)) })
   			data[[symbol]] = symbol_env[[symbol]]
   		}
-  			  				
+  		for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T)
   		bt.prep(data, align='remove.na')
 		data		
 	})
   	
 	# Helper fns
-	getStock <- reactive(function() { toupper(input$symbol) })
-	getCash <- reactive(function() { toupper(input$cash) })
+	getStock <- reactive({ toupper(input$symbol) })
+	getCash <- reactive({ toupper(input$cash) })
 
-	getBackTest <- reactive(function() { 
+	getBackTest <- reactive({ 
 		#*****************************************************************
 		# Load historical data
 		#******************************************************************  
@@ -80,19 +80,19 @@ shinyServer(function(input, output) {
 	
 		
 	# Make table
-	makeSidebysideTable <- reactive(function() {
+	makeSidebysideTable <- reactive({
 		models = getBackTest()
 		plotbt.strategy.sidebyside(models, return.table=T, make.plot=F)
 	})
 
 	# Make table
-	makeAnnualTable <- reactive(function() {
+	makeAnnualTable <- reactive({
 		models = getBackTest()
 		plotbt.monthly.table(models[[1]]$equity, make.plot = F)
 	})
 	
 	# Make table
-	makeTradesTable <- reactive(function() {
+	makeTradesTable <- reactive({
 		models = getBackTest()
 		model = models[[1]]
 		
@@ -111,33 +111,33 @@ shinyServer(function(input, output) {
     # Update plot(s) and table(s)
     #******************************************************************    	
 	# Generate a plot
-	output$strategyPlot <- reactivePlot(function() {
+	output$strategyPlot <- renderPlot({
 		models = getBackTest()
 		
-		plota.control$col.x.highlight = col.add.alpha('green',50)
+		plota.theme(col.x.highlight = col.add.alpha('green',50))
 		plotbt.custom.report.part1(models, x.highlight = models$market.filter$highlight)  					
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$sidebysideTable <- reactive(function() {
+  	output$sidebysideTable <- reactive({
 		temp = makeSidebysideTable()	
 		tableColor(as.matrix(temp))		
 	})
 	
 	# Generate a table
-  	output$annualTable <- reactive(function() {
+  	output$annualTable <- reactive({
 		temp = makeAnnualTable()	
 		tableColor(as.matrix(temp))		
 	})
 
 	# Generate a plot
-	output$transitionPlot <- reactivePlot(function() {
+	output$transitionPlot <- renderPlot({
 		models = getBackTest()
 		plotbt.transition.map(models[[1]]$weight)	
 	}, height = 400, width = 600)
 		
 	# Generate a table
-  	output$tradesTable <- reactive(function() {
+  	output$tradesTable <- reactive({
 		temp = makeTradesTable()	
 		tableColor(as.matrix(temp))		
 	})
@@ -155,7 +155,7 @@ shinyServer(function(input, output) {
       			
     		models = getBackTest()
     		
-    		plota.control$col.x.highlight = col.add.alpha('green',50)
+			plota.theme(col.x.highlight = col.add.alpha('green',50))
     		plotbt.custom.report(models, trade.summary = T, x.highlight = models$market.filter$highlight)
 				plota.add.copyright()
       		
@@ -181,7 +181,7 @@ shinyServer(function(input, output) {
     #*****************************************************************
     # Update status message 
     #******************************************************************    
-	output$status <- reactiveUI(function() {
+	output$status <- renderUI({
 		out = tryCatch( getData(), error=function( err ) paste(err))	    				
 		if( is.character( out ) ) 
 			HTML(paste("<b>Status</b>: <b><font color='red'>Error:</font></b>",out))

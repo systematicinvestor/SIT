@@ -10,7 +10,7 @@ shinyServer(function(input, output) {
   	# http://rstudio.github.com/shiny/tutorial/#inputs-and-outputs
     #******************************************************************    	
     # Get stock data
-  	getData <- reactive(function() {  	
+  	getData <- reactive({  	
   		cat('getData was called\n')
   	  		
 	  		symbol = toupper(input$symbol)
@@ -22,20 +22,20 @@ shinyServer(function(input, output) {
 	})
   	
 	# Determine dates range
-	getDateRange <- reactive(function() {  	
+	getDateRange <- reactive({  	
 		data = getData()
 		max(1,nrow(data) - input$dateRange) : nrow(data)
 	})
 		
 	# Make table
-	makeStatsTable <- reactive(function() {  	
+	makeStatsTable <- reactive({  	
 	tryCatch({
 		# download Key Statistics from yahoo
 		url = paste('http://finance.yahoo.com/q/ks?s=', input$symbol, sep = '')
 		txt = join(readLines(url))
 		
 		# extract Valuation Measures table from this page
-		temp = extract.table.from.webpage(txt, 'Market Cap', hasHeader = F)
+		temp = extract.table.from.webpage(txt, 'Market Cap', has.header = F)
 			colnames(temp) = c('Key Statistics', input$symbol)
 		temp
 	}, error = function(e) { stop(paste('Problem getting Key Statistics for',input$symbol)) })
@@ -80,12 +80,12 @@ shinyServer(function(input, output) {
     # Update plot(s) and table(s)
     #******************************************************************    	
 	# Generate a plot
-	output$stockPlot <- reactivePlot(function() {
+	output$stockPlot <- renderPlot({
 		makeStockPlot()
 	}, height = 400, width = 600)
 
 	# Generate a table
-  	output$statsTable <- reactive(function() {
+  	output$statsTable <- reactive({
 		temp = makeStatsTable()	
 		tableColor(as.matrix(temp),include.rownames=FALSE)		
 	})
@@ -118,7 +118,7 @@ shinyServer(function(input, output) {
     #*****************************************************************
     # Update status message 
     #******************************************************************    
-	output$status <- reactiveUI(function() {
+	output$status <- renderUI({
 		out = tryCatch( getData(), error=function( err ) paste(err))	    				
 		if( is.character( out ) ) 
 			HTML(paste("<b>Status</b>: <b><font color='red'>Error:</font></b>",out))
