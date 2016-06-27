@@ -223,6 +223,7 @@ normal.transform <- function(data)
 	return(x[rk])
 }
 
+#' @export
 normalize.normal <- function
 (
 	data	# factors
