@@ -1,0 +1,49 @@
+Package: SIT
+Type: Package
+Title: Systematic Investor Toolbox
+Description: Systematic Investor Toolbox is a collection of tools that
+    I use in my investment research.
+Version: 2016.06.12
+Date: 2016-06-12
+License: GPL-3
+LazyLoad: yes
+Author: Michael Kapler <TheSystematicInvestor@gmail.com>
+Maintainer: Michael Kapler <TheSystematicInvestor@gmail.com>
+Depends:
+    SIT.date
+Collate:
+    'aa.bl.r'
+    'aa.gmpl.r'
+    'aa.omega.r'
+    'aa.r'
+    'aa.test.r'
+    'branchbound.r'
+    'bt.r'
+    'bt.share.r'
+    'bt.share.test.r'
+    'bt.stop.r'
+    'bt.stop.test.r'
+    'bt.summary.r'
+    'bt.test.r'
+    'cluster.r'
+    'data.proxy.r'
+    'data.r'
+    'factor.model.r'
+    'factor.model.test.r'
+    'fundamental.data.r'
+    'fundamental.test.r'
+    'interactive.r'
+    'min.corr.paper.r'
+    'optimization.r'
+    'plot.table.r'
+    'plota.r'
+    'random.r'
+    'rfinance2012.r'
+    'rfinance2013.r'
+    'rfinance2014.r'
+    'shiny.r'
+    'SIT-package.R'
+    'strategy.r'
+    'ta.r'
+    'utils.r'
+    'zzz.r'
