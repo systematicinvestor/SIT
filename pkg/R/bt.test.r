@@ -1,23 +1,23 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
-# Evaluting Sample Trading Strategies using Backtesting library in 
-# the Systematic Investor Toolbox
-# Copyright (C) 2011  Michael Kapler
+# Evaluating Sample Trading Strategies using Backtesting library
 #
-# For more information please visit my blog at www.SystematicInvestor.wordpress.com
-# or drop me a line at TheSystematicInvestor at gmail
+# For more information please email at TheSystematicInvestor at gmail
 ###############################################################################
 
 bt.empty.test <- function() 
@@ -9212,7 +9212,7 @@ dev.off()
 ###############################################################################
 # Strategy Testing Intraday data from http://thebonnotgang.com/tbg/historical-data/
 ###############################################################################
-bt.strategy.intraday.thebonnotgang.test <- function() 
+bt.strategy.intraday.thebonnotgang.test <- function(spath = 'c:/Desktop/') 
 {
 	#*****************************************************************
 	# Load historical data
@@ -9220,10 +9220,7 @@ bt.strategy.intraday.thebonnotgang.test <- function()
 	load.packages('quantmod')	
 
 	# data from http://thebonnotgang.com/tbg/historical-data/
-	# please save SPY and GLD 1 min data at the given path
-	spath = 'c:/Desktop/'
-spath = 'c:/Documents and Settings/mkapler/Desktop/'
-spath = 'c:/Desktop/1car/1shaun/'
+	# please save SPY and GLD 1 min data at the given path	
 	data = bt.load.thebonnotgang.data('SPY,GLD', spath)
 	
 	data1 <- new.env()		
@@ -9310,7 +9307,7 @@ dev.off()
 }
 	
 	
-bt.pair.strategy.intraday.thebonnotgang.test <- function() 
+bt.pair.strategy.intraday.thebonnotgang.test <- function(spath = 'c:/Desktop/') 
 {
 	#*****************************************************************
 	# Load historical data
@@ -9319,8 +9316,6 @@ bt.pair.strategy.intraday.thebonnotgang.test <- function()
 
 	# data from http://thebonnotgang.com/tbg/historical-data/
 	# please save SPY and GLD 1 min data at the given path
-	spath = 'c:/Desktop/'
-spath = 'c:/Documents and Settings/mkapler/Desktop/'	
 	data = bt.load.thebonnotgang.data('USO,GLD', spath)
 	bt.prep(data, align='keep.all', fill.gaps = T)
 

@@ -1,22 +1,23 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
 # Collection of routines to work with data
-# Copyright (C) 2011  Michael Kapler
 #
-# For more information please visit my blog at www.SystematicInvestor.wordpress.com
-# or drop me a line at TheSystematicInvestor at gmail
+# For more information please email at TheSystematicInvestor at gmail
 ###############################################################################
 
 #' @export 
@@ -260,6 +261,13 @@ PricingZeroCouponBond <- function
 # Convert Historical TBills rates to Total Returns
 # http://timelyportfolio.blogspot.com/2011/04/historical-sources-of-bond-returns_17.html
 # http://timelyportfolio.blogspot.ca/2012/11/cashopportunity-lost-or-opportunity.html
+#
+# [S&P500 and 10yr TReasurey returns since 1928](http://people.stern.nyu.edu/adamodar/pc/datasets/histret.xls)
+# http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html
+# Another example to compute Return on bond =  
+# * Yield at start of the year plus
+# * 10YR bond price change given the change in Yield
+# http://people.stern.nyu.edu/adamodar/pc/datasets/
 #' @export 
 ###############################################################################
 processTBill <- function 
@@ -751,6 +759,10 @@ getQuote.google.xml <- function(tickers) {
   
 ###############################################################################
 # Download historical intraday prices from Google Finance
+#
+# [Best Example](http://stackoverflow.com/questions/15609334/how-to-download-intraday-stock-market-data-with-r)
+# as.POSIXct(1357828200-300*60, origin = '1970-01-01')
+#
 # http://www.mathworks.com/matlabcentral/fileexchange/32745-get-intraday-stock-price
 # http://www.mathworks.com/matlabcentral/fileexchange/36115-volume-weighted-average-price-from-intra-daily-data
 # http://www.codeproject.com/KB/IP/google_finance_downloader.aspx
@@ -774,15 +786,36 @@ getSymbol.intraday.google <- function
       '&p=', period,
       '&f=', 'd,o,h,l,c,v', sep='')
 
-  load.packages('data.table')
-  out = fread(url, stringsAsFactors=F)
+  txt = get.url(url)
+  #write(txt, file='1.txt')
+  #txt = read.file('google-spy-getprices.txt')
   
-  if(ncol(out) < 5) {
+  lines = spl(txt,'\n')
+  if(len(lines) < 7) {
     cat('Error getting data from', url, '\n')
     return(NULL)
   }
   
-    setnames(out, spl('Date,Open,High,Low,Close,Volume'))
+  marker = 'COLUMNS='
+  map = c(DATE='Date', CLOSE='Close', HIGH='High', LOW='Low', OPEN='Open', VOLUME='Volume')	
+  cols = map[ spl(gsub(marker, '', lines[ grep(marker,lines)[1] ])) ]
+    
+  marker = 'TIMEZONE_OFFSET='
+  index = grep(marker,lines)
+
+  load.packages('data.table')
+  out = c()  
+  for(i in 1:len(index)) {
+    end = iif( i == len(index), -1,  index[(i+1)] - index[i] - 1)
+    timezone.offset = as.double(gsub( marker, '', lines[index[i]] ))
+    out = rbind(out, getSymbol.intraday.google.parse(txt, interval, index[i], end, timezone.offset, cols) )
+  }
+  out
+}
+
+getSymbol.intraday.google.parse = function(txt, interval, start, end, timezone.offset, cols) {
+  out = fread(txt, stringsAsFactors = F, skip = start, nrows = end)
+    setnames(out, cols)  
   
   # date logic
   date = out$Date
@@ -793,14 +826,47 @@ getSymbol.intraday.google <- function
     temp = ifna.prev(temp)
   date = temp + date * interval
     date[date.index] = temp[date.index] 
-  class(date) = c("POSIXt", "POSIXct")
-  
-  date = date - (as.double(format(date[1],'%H')) - 9)*60*60
+  #class(date) = c("POSIXt", "POSIXct")
+  #date = date - (as.double(format(date[1],'%H')) - 9)*60*60
+  date = as.POSIXct(date + timezone.offset*interval, origin = '1970-01-01')
   
   make.xts(out[,-1,with=F], date)
 }
 
+getSymbol.intraday.google.test = function() {
+	# plot intraday spy over last 20 days
+	data=getSymbol.intraday.google('SPY','NYSEARCA',period = '20d')
 
+	col.names = spl('black,blue')
+	cols = c(col.add.alpha(col.names[1],100), col.add.alpha(col.names[2],250))
+
+	ret = Cl(data) / mlag(Cl(data)) - 1
+		group = as.numeric(format(index(data),'%H%M'))
+		stat = tapply(ret,group,mean, na.rm=T)	
+			stat[1] = 0 # omit overnight return
+			
+		label = names(stat)
+			label = iif(nchar(label)<4, paste0('0',label), label)
+		dates = strptime(paste0('20170101 ', label, '01'), format='%Y%m%d %H%M%S')
+		equity = 100*(cumprod(1+stat)-1)
+			equity = xts(equity, dates)	
+		plota(equity, type='l', col = cols[1], lwd=5, LeftMargin=3)
+		
+	# 2nd axis
+	date = as.Date(index(ret))	
+		stat = ret[date == last(date)]
+		stat[1] = 0
+		dates = strptime(paste0('20170101 ', format(index(stat),'%H%M'), '01'), format='%Y%m%d %H%M%S')
+		equity = 100*(cumprod(1+stat)-1)
+			equity = xts(coredata(equity), dates)	
+			
+		plota2Y(equity, las=1, col=cols[2], col.axis = cols[2])
+			plota.lines(equity, type='l', col = cols[2])		
+		plota.legend('20D Avg(rhs),Today(lhs)', col.names)
+		
+		  
+#!!! add chart for trutrn intrday vs overnight!!!
+}
 
 ###############################################################################
 # getSymbols interface to Yahoo today's delayed qoutes
@@ -2449,17 +2515,35 @@ edgar.info <- function(ticker)
 zacks.info <- function(ticker = 'IBM')
 {
   url = paste0('http://www.zacks.com/stock/research/', ticker, '/earnings-announcements')
-  txt = join(readLines(url))
- 
-  out = list()
-  require(jsonlite)
-  
-  for(i in spl('earnings,webcasts,revisions,splits,dividends,guidance')) {  
-  	data = extract.token(txt,paste0('<script>,window.app_data_', i, ',=,"data"'),'</script>')
-  	data = fromJSON(paste('{"data"', data))
-  	out[[i]] = data$data
-  }
-  out
+  txt = get.url(url)
+  #write(txt, file='1.txt')    
+    
+	require(jsonlite)
+	
+	# extract data
+	temp = extract.token(txt,'document.obj_data = ','};')
+	temp = fromJSON(paste(temp, '}'))
+	names(temp) = gsub('_table','',gsub('earnings_announcements_','',names(temp)))
+	data = temp
+
+	# extract headers
+	url = 'http://staticx.zacks.com/js/zacks/inline/company_event_detail.js'
+	info = get.url(url)
+	temp = extract.token(info,'var aryColTableChecked = ','};')	
+	temp = gsub('title','"title"',temp)
+	temp = gsub('class','"class"',temp)
+	temp = fromJSON(paste(temp, '}'))
+	names(temp) = gsub('_table','',gsub('earnings_announcements_','',names(temp)))
+	header = temp
+	
+	# set headers
+	for(i in names(data))
+		if( len(data[[ i ]]) > 0) {
+		temp = rep('',  ncol(data[[ i ]]))
+		temp[1:nrow(header[[ i ]])] = header[[ i ]][,1]
+		colnames(data[[ i ]]) = temp
+	}
+	data
 }
 
 

@@ -1,22 +1,23 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
 # Optimization Functions
-# Copyright (C) 2011  Michael Kapler
 #
-# For more information please visit my blog at www.SystematicInvestor.wordpress.com
-# or drop me a line at TheSystematicInvestor at gmail
+# For more information please email at TheSystematicInvestor at gmail
 ###############################################################################
 
 
@@ -694,16 +695,41 @@ lm.constraint <- function
 		fit = lm.fit(x, y)
 		return( ols.summary(x, y, fit$coefficients) )
 	} else {
-    	temp = cov(cbind(y, x))
-		Dmat = temp[-1,-1] 
-		dvec = temp[-1,1]
-	
+		#[Are “constrained linear least squares” and “quadratic programming” the same thing?](https://math.stackexchange.com/questions/869204/are-constrained-linear-least-squares-and-quadratic-programming-the-same-thin)
+		#[constrained OLS in R](https://stats.stackexchange.com/questions/57172/prediction-constrained-ols-in-r)
+    	#temp = cov(cbind(y, x))
+		#Dmat = temp[-1,-1] 
+		#dvec = temp[-1,1]
+		Dmat = t(x) %*% x
+		dvec = t(y) %*% x		
+
 		sol = solve.QP.bounds(Dmat = Dmat, dvec = dvec , 
 				Amat=constraints$A, bvec=constraints$b, constraints$meq,
 				lb = constraints$lb, ub = constraints$ub)
 		return( ols.summary(x, y, sol$solution) )
 	}
 }
+
+
+###############################################################################
+# Run (Total least squares regression)[https://en.wikipedia.org/wiki/Total_least_squares]
+# (How to perform orthogonal regression ,total least squares, via PCA?)[http://stats.stackexchange.com/questions/13152/how-to-perform-orthogonal-regression-total-least-squares-via-pca]
+#' @export 
+###############################################################################
+tls <- function
+(
+	x,
+	y
+)
+{
+	n = ncol(x)
+	C = cbind(x, y)
+
+	V = svd(C)$v
+	VXY = V[1:n, (n+1):ncol(V)]
+	VYY = V[(n+1):nrow(V), (n+1):ncol(V)]
+	-VXY/VYY
+}	
 
 
 ###############################################################################

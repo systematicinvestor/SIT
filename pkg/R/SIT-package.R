@@ -22,7 +22,7 @@
 #' load.packages('quantmod')
 #' tickers = spl('SPY,TLT,GLD,SHY')
 #' 
-#' data <- new.env()
+#' data = new.env()
 #' getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T) 
 #'     # adjust for dividends
 #'     for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T) 

@@ -29,6 +29,6 @@ print(bt.apply.min.weight(weight, 0.1))
 }
 }
 \author{
-  Ivan Popivanov and Michael Kapler
+  Ivan Popivanov
 }
 

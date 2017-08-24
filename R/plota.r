@@ -1,23 +1,24 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
 # Create Technical Analysis Plots
 # plota = plot + ta
-# Copyright (C) 2011  Michael Kapler
 #
-# For more information please visit my blog at www.SystematicInvestor.wordpress.com
-# or drop me a line at TheSystematicInvestor at gmail
+# For more information please email at TheSystematicInvestor at gmail
 ###############################################################################
 
 
@@ -1116,7 +1117,6 @@ plota.matplot <- function
 }
 
 
-
 ###############################################################################
 #' Add Copyright message to the plot
 #'
@@ -1164,3 +1164,58 @@ plota.recession <- function
 	plota.x.highlight(highlight, highlight != 0, col)
 }
 
+
+###############################################################################
+#' Create Ascii(txt) plot
+#' 
+#' Based on the folloiwng idea: [ASCII Plotting Functions for R](http://stackoverflow.com/questions/14736556/ascii-plotting-functions-for-r)
+#'
+#' Plot multiple series by stacking data and using corresponding lables (pch)
+#' also works with NA's so we can potentially plot many partial series
+#' 
+#' @param y matrix or vector of y values
+#' @param x optional vector of x values, \strong{defaults to 1:nr, where nr is the number of rows in y}
+#' @param pch optional vector of markers for time series, \strong{defaults to 1:nc, where nc is the number of columns in y}
+#' @param width optional location of the plot legend, \strong{defaults to 80% of the screen width}
+#'
+#' @return nothing
+#'
+#' @examples
+#' \dontrun{ 
+#' txtplot(1:10, c(1,2,3,4,5,NA,7,8,NA,10))
+#'
+#' x = 1:10;y = 1:10;y1 = 30:21
+#' txtplot(rbind(x,x), rbind(y,y1), pch=c('+','*'))
+#'
+#' plot.txt(cbind(y,y1),x)
+#' plot.txt(cbind(y,y1),x,pch=c('+','*'))
+#' }
+#' @export 
+############################################################################### 
+plot.txt = function
+(
+	y,
+	x=NULL, 
+	pch=1:ncol(y), 
+	width = round(options()$width * 0.8)
+) 
+{
+	# load.packages('txtplot')
+	require(txtplot)
+	if(is.null(x)) x = 1:nrow(y)
+	#txtplot(rep.row(x, ncol(y)), t(y), pch=letters[1:ncol(y)])
+	txtplot(rep.row(x, ncol(y)), t(y), pch=pch)
+	txtplot:::drawLegend(colnames(y), width)
+}
+
+plot.txt.test = function() {
+	require(txtplot)
+	
+	data = cbind(q1=models$high52w.1$equity['2009::2010'],q10=models$high52w.10$equity['2009::2010'])
+	plot.txt(data)
+
+	data = matrix(rnorm(50), nc=2)
+	plot.txt(data, pch=c('.','*'))
+
+	txtplot(models$high52w.10$equity['2009::2010'])
+}

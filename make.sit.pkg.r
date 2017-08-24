@@ -40,11 +40,11 @@ write.dcf(list(
 	Description = 'Systematic Investor Toolbox is a collection of tools that\n I use in my investment research.', 
     Version = format(Sys.Date(),'%Y.%m.%d'), 
     Date = Sys.Date(),
-    License = 'GPL-3', 
+	License = 'Zlib', 
     LazyLoad = 'yes',
     Author = 'Michael Kapler <TheSystematicInvestor@gmail.com>', 
     Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>',
-    Depends = 'SIT.date'
+	Imports = 'SIT.date'
     ), 
     file = file.path('pkg', "DESCRIPTION")
 )
@@ -73,7 +73,7 @@ cat("
 #' load.packages('quantmod')
 #' tickers = spl('SPY,TLT,GLD,SHY')
 #' 
-#' data <- new.env()
+#' data = new.env()
 #' getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T) 
 #'     # adjust for dividends
 #'     for(i in ls(data)) data[[i]] = adjustOHLC(data[[i]], use.Adjusted=T) 

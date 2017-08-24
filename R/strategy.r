@@ -1,22 +1,23 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
 # Repository of Benchmark Strategies
-# Copyright (C) 2012  Michael Kapler
 #
-# For more information please visit my blog at www.SystematicInvestor.wordpress.com
-# or drop me a line at TheSystematicInvestor at gmail
+# For more information please email at TheSystematicInvestor at gmail
 ###############################################################################
 
 
@@ -787,7 +788,23 @@ risk.parity.portfolio <- function(
 		set.risky.asset(sol$solution, risk.index)
 	}	
 
-	
+	# ============================================================
+	#
+	# [Risk Parity Strategies For Equity Portfolio Management Can an asset-class strategy translate to equities? By Frank Siu](http://www.axioma.com/media/uploads/research-papers/risk_parity_strategies_for_equity_portfolio_managenemt_frank_siu1.pdf)
+	# page 8
+	#
+	# Maximum diversification and risk parity are both driven by 
+	# the concept of diversification. Risk parity spreads out risk 
+	# across its various sources; maximum diversification aims to 
+	# reduce the share of portfolio risk coming from correlations.
+	#
+	# Mathematically, Equation 9, maximum diversification, is also analogous 
+	# to maximizing the Sharpe ratio, 
+	# where each stock’s expected return is equal to its volatility.
+	#
+	# Please see Max Sharpe ratio for implementation including linear constraints
+	#
+	# ============================================================
 	# Toward Maximum Diversification by Y. Choueifaty, Y. Coignard
 	# The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51
 	#' @export 	
@@ -1095,6 +1112,19 @@ random.hist.weight = function(
 #
 # Interesting info
 # http://r.789695.n4.nabble.com/The-best-solver-for-non-smooth-functions-td4636934.html
+#
+# 
+# [Maximize the Sharpe Ratio in Axioma Portfolio](http://www.updatefrom.com/axioma/0703/focus.html)
+#
+# min w*E*w
+# s.t. 
+#   mu * w = mean(mu)
+#   e * w - 1000000 * t = 0
+#   s * w - up * t < 0
+#   s * w - dn * t > 0
+#   w, t >= 0
+#
+# final solution is w / t
 ###############################################################################	
 	# only works for constraints that are homogeneous of degree 0
 	# i.e. if we multiply solution weight by a number, the constraint is unchanged
@@ -1144,6 +1174,55 @@ random.hist.weight = function(
 	}
 	
 	
+###############################################################################	
+# [Maximize the Sharpe Ratio in Axioma Portfolio](http://www.updatefrom.com/axioma/0703/focus.html)
+#
+# min w*E*w
+# s.t. 
+#   mu * w = mean(mu)
+#   e * w - 1000000 * t = 0
+#   s * w - up * t < 0
+#   s * w - dn * t > 0
+#   w, t >= 0
+#
+# final solution is w / t
+###############################################################################		
+	#' @export 	
+	max.sharpe.portfolio.axioma <- function
+	(
+		ia,				# input assumptions
+		constraints,
+		rf = 0,
+		excess.return = ia$expected.return - rf
+	)
+	{
+		# * add non-negative variable t
+		n = len(constraints$lb)
+		n1 = n+1
+		constraints = add.variables(1, constraints, 0)			
+			constraints = add.constraints(c(rep(0,n),1), type='>=', b=0, constraints)
+
+		# * adjust input assumptions
+		ia1 = ia
+		ia1$n = n1
+		ia1$cov = matrix(0, n1, n1)
+			ia1$cov[1:n, 1:n] = ia$cov
+		ia1$risk = c(ia$risk,1)
+					
+		# * reformulate all constraints: multiply right side by t and moving it to the left
+		constraints$A[n1,] = -constraints$b
+		constraints$b[] = 0
+		
+		# * add return target constraint: mu * w = mean(mu)
+		constraints = add.constraints(c(excess.return,0), mean(excess.return) , type = '=', constraints)		
+		
+		# * optimal solution is w/t		
+		weight = min.var.portfolio(ia1,constraints)
+	
+		weight[1:n]/weight[n1]
+	}
+	
+	
 max.sharpe.portfolio.test <- function() 
 {
 	#*****************************************************************
@@ -1181,9 +1260,31 @@ png(filename = 'plot1.png', width = 500, height = 500, units = 'px', pointsize =
 	points(100 * portfolio.risk(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='orange')
 	portfolio.return(weight,ia) /  portfolio.risk(weight,ia)
 		
+	w1 = max.sharpe.portfolio.axioma(ia,constraints)	 
+	round(weight - w1,2)
+	weight = w1
+	points(100 * portfolio.risk(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='cyan')
+	portfolio.return(weight,ia) /  portfolio.risk(weight,ia)
+	
+	# Maximum diversification portfolio is a max Sharpe portfolio, 
+	# but we substitute *Expected Return* with *Risk* in the objective function
+	weight = max.div.portfolio(ia, constraints)
+	w1 = max.sharpe.portfolio.axioma(ia,constraints, excess.return=ia$risk)	 
+	round(weight - w1,2)
+	weight = w1	
+	points(100 * portfolio.risk(weight,ia), 100 * portfolio.return(weight,ia), pch=15, col='blue')
+	portfolio.return(weight,ia) /  portfolio.risk(weight,ia)
+	
+	
+
+	
+		
 	plota.legend('Minimum Variance,Maximum Sharpe','red,orange', x='topright')
 	
 dev.off()	
+	
+	
+	
 	
 	#*****************************************************************
 	# Examples of Maximum Sharpe or Tangency portfolios construction
@@ -1932,7 +2033,6 @@ min.var2 <- function(power.function = 1)
 	#
 	# Shrinks towards constant correlation matrix, Ledoit and Wolf (2004)
 	#
-	# x = as.matrix(read.csv('c:/Michael_Kapler/Soft/R/ira/test.csv', header =F))
 	# x=matrix(rnorm(3*200),200,3)
 	# covCor(x)
 	#
@@ -2172,7 +2272,6 @@ static.group <- function(group)
 # Idea by David Varadi	
 # http://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/
 # Original code by Pierre Chretien
-# Small updates by Michael Kapler 	
 #' @export
 cluster.group.FTCA <- function
 (
