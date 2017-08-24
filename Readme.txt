@@ -1,19 +1,20 @@
 ###############################################################################
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+# 
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+# 
+# 1. The origin of this software must not be misrepresented; you must not
+#    claim that you wrote the original software. If you use this software
+#    in a product, an acknowledgment in the product documentation would be
+#    appreciated but is not required.
+# 2. Altered source versions must be plainly marked as such, and must not be
+#    misrepresented as being the original software.
+# 3. This notice may not be removed or altered from any source distribution.
 ###############################################################################
-# Systematic Investor Toolbox (SIT)
-# Copyright (C) 2012  Michael Kapler
 #
 # For more information please visit my blog at www.SystematicInvestor.wordpress.com
 # or drop me a line at TheSystematicInvestor at gmail
@@ -23,54 +24,34 @@
 # Systematic Investor Toolbox is a collection of tools that I use
 # in my investment research. I will demonstrate and document 
 # various uses of toolbox in the Systematic Investor blog at
-#	www.SystematicInvestor.wordpress.com
+#	www.SystematicInvestor.wordpress.com and systematicinvestor.github.io
 #
 #
 ###############################################################################
 # Example Usage:
 ###############################################################################
 #
-#
+# install.packages('curl', repos = 'http://cran.r-project.org')
+# 
 ###############################################################################
-# Load Systematic Investor Toolbox (SIT)
-# http://systematicinvestor.wordpress.com/systematic-investor-toolbox/
+# Install Systematic Investor Toolbox (SIT) package
+# github.com/systematicinvestor/SIT
 ###############################################################################
-#con = gzcon(url('http://www.systematicportfolio.com/sit.gz', 'rb'))
-#    source(con)
-#close(con)
+#
+# please first install SIT.date
+# devtools::install_github('systematicinvestor/SIT.date')
+# 
+# library(curl)
+# curl_download('https://github.com/systematicinvestor/SIT/raw/master/SIT.tar.gz', 'sit',mode = 'wb',quiet=T)
+# install.packages('sit', repos = NULL, type='source')
 #
 #
-###############################################################################
-# Load Systematic Investor Toolbox (SIT): Windows only
-############################################################################### 
-# Load Systematic Investor Toolbox (SIT)
-#setInternet2(TRUE)
-#con = gzcon(url('https://github.com/systematicinvestor/SIT/raw/master/sit.gz', 'rb'))
-#	source(con)
-#close(con)
-#
-#
-###############################################################################
-# Load Systematic Investor Toolbox (SIT): from file, if for example you saved sit.gz to c:/temp/sit.gz
-############################################################################### 
-#con = gzcon(file('c:/temp/sit.gz', 'rb'))
-#	source(con)
-#close(con)
-#
-#
-###############################################################################
-# Load Systematic Investor Toolbox (SIT): Requires RCurl package
-############################################################################### 
-#require(RCurl)
-#sit = getURLContent('https://github.com/systematicinvestor/SIT/raw/master/sit.gz', binary=TRUE, followlocation = TRUE, ssl.verifypeer = FALSE)
-#	con = gzcon(rawConnection(sit, 'rb'))
-#	source(con)
-#close(con)
 #
 #
 ###############################################################################
 # Example Usage:
 ############################################################################### 
+# library(SIT)
 # Run plota test
 #plota.test()
 #
@@ -78,10 +59,3 @@
 #
 #
 #
-#
-#More to come,
-#
-#Michael Kapler
-#TheSystematicInvestor at gmail
-#
-
