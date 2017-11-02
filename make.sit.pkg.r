@@ -44,7 +44,7 @@ write.dcf(list(
     LazyLoad = 'yes',
     Author = 'Michael Kapler <TheSystematicInvestor@gmail.com>', 
     Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>',
-	Imports = 'SIT.date'
+	Depends = 'SIT.date'
     ), 
     file = file.path('pkg', "DESCRIPTION")
 )

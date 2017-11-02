@@ -135,7 +135,15 @@ extract.table.from.webpage <- function
 (
   txt,    # source text of webpage
   marker=NA,  # key-phrase(s) located in the table to extract
+  
   has.header=T,# flag if table has a header
+  has.rownames=F,# flag if table has row names
+	
+  remove.empty.cols=F,# flag to remove columns with empty name
+  remove.empty.rows=F,# flag to remove rows with empty name
+	
+  convert2num = F,# flag to convert matrix to numeric only
+    
   end.marker=NA # additional end of token marker(s)
 )
 {
@@ -186,18 +194,87 @@ extract.table.from.webpage <- function
     temp = lapply( strsplit(temp, ';row;'), strsplit, ';col;')  
     n = max( sapply(temp[[1]], function(x) len(x)) )
     temp = t( sapply(temp[[1]], function(x) x[1:n]) )
-    
-    if(has.header) {
-      colnames(temp) = trim(temp[(has.header + 0), ])
-      temp = temp[-c(1:(has.header + 0)), ,drop=F]
-    }
-
+	
+	temp = extract.table(temp, has.header, has.rownames, remove.empty.cols, remove.empty.rows, convert2num)
   }, error = function(ex) {
     temp <<- txt
   }, finally = {
     return(temp)
   })
 }
+  
+  
+###############################################################################
+# mat2num
+# convert given matrix to numeric only
+# keep the column and row names of the original matrix
+#' @export 
+###############################################################################
+mat2num = function
+(
+	data
+) 
+{
+	temp = as.matrix(data)
+	temp = gsub(pattern = '$', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = ',', replacement = '', temp, perl = TRUE) 
+	temp = gsub(pattern = '%', replacement = '', temp, perl = TRUE) 
+ 
+	temp = as.numeric(temp) 
+		dim(temp) = dim(data)
+		colnames(temp) = colnames(data)
+		rownames(temp) = rownames(data)
+	temp
+}
+
+
+###############################################################################
+# extract.table
+# convert given matrix to numeric only
+# keep the column and row names of the original matrix
+#' @export 
+###############################################################################
+extract.table = function
+(
+	temp,
+	
+	has.header=T,# flag if table has a header
+	has.rownames=T,# flag if table has row names
+	
+	remove.empty.cols=T,# flag to remove columns with empty name
+	remove.empty.rows=T,# flag to remove rows with empty name
+	
+	convert2num = T# flag to convert matrix to numeric only
+)
+{
+	# the has.header & has.rownames can be specified as the number
+	if (has.header && has.rownames) {
+		colnames(temp) = trim(temp[(has.header + 0), ])
+		rownames(temp) = trim(temp[, (has.rownames + 0)])
+		temp = temp[-c(1:(has.header + 0)), -c(1:(has.rownames + 0)), drop = F]
+	} else if (has.rownames) {
+		rownames(temp) = trim(temp[, (has.rownames + 0)])
+		temp = temp[, -c(1:(has.rownames + 0)), drop = F]
+	} else if(has.header) {
+		colnames(temp) = trim(temp[(has.header + 0), ])
+		temp = temp[-c(1:(has.header + 0)), ,drop=F]
+	}	
+
+	# flags to remove entries for empty columns / rows names
+	if (remove.empty.cols && remove.empty.rows)
+		temp = temp[nchar(rownames(temp))>0, nchar(colnames(temp))>0]
+	else if (remove.empty.cols)
+		temp = temp[, nchar(colnames(temp))>0]
+	else if (remove.empty.rows)
+		temp = temp[nchar(rownames(temp))>0, ]
+
+	# convert to numbers
+	if (has.rownames)
+		temp = mat2num(temp)	   
+
+	temp	   
+}	
+
   
 ###############################################################################
 # Test for extract.table.from.webpage function
@@ -239,6 +316,47 @@ extract.table.from.webpage.test <- function()
   plot.table(temp)  
   
   dev.off()   
+}
+
+
+###############################################################################
+# Test [SMF add](http://ogres-crypt.com/SMF/)
+###############################################################################
+extract.table.from.webpage.test.SMF <- function()
+{
+	ticker = 'SPY'
+	url = 'http://performance.morningstar.com/Performance/cef/trailing-total-returns.action?t='
+	url = paste0(url, ticker)
+
+	txt = get.url(url)
+
+	temp = extract.table.from.webpage(txt, 'Total Return', has.header=F)
+		temp = extract.table(temp)
+
+	temp[,'1-Day']
+	temp['Rank in Category(NAV)',]
+
+  
+	# [smf-elements-22](http://ogres-crypt.com/SMF/Elements/smf-elements-22.txt)
+	# Barchart Momentum
+	url = 'https://core-api.barchart.com/v1/momentum/get?raw=1&fields=exchange,high52w,low52w,newHighs,newLows,advancingVolume,unchangedVolume,decliningVolume,advancingIssues,percentAdvancingIssues,unchangedIssues,percentUnchangedIssues,decliningIssues,percentDecliningIssues&exchanges=NASDAQ,NYSE,OTC,AMEX'
+	txt = get.url(url)
+
+	require(jsonlite)
+	data = fromJSON(txt)
+		temp = data$data
+		extract.table(temp[, colnames(temp)!='raw'], has.header=F)
+	
+	# Yahoo Portfolio View
+	url = 'https://query1.finance.yahoo.com/v7/finance/quote?fields=symbol,longName,shortName,regularMarketPrice,regularMarketTime,regularMarketChange,regularMarketDayHigh,regularMarketDayLow,regularMarketPrice,regularMarketOpen,regularMarketVolume,averageDailyVolume3Month,marketCap,bid,ask,dividendYield,dividendsPerShare,exDividendDate,trailingPE,priceToSales,targetPriceMean&formatted=false&symbols=~~~~~'
+	ticker = 'IBM,DIS'
+	url = sub('~~~~~', ticker, url)
+
+	txt = get.url(url)
+
+	data = fromJSON(txt)
+		temp = data$quoteResponse$result
+		t(temp)
 }
 
 
@@ -1299,19 +1417,48 @@ DEXSZUS     Switzerland/U.S.
 
 ###############################################################################
 # Download Strategic Portfolios from wealthsimple.com
+# https://help.wealthsimple.com/hc/en-ca/sections/115000097507-Portfolio-Features-and-Performance
 # 
+#https://help.wealthsimple.com/hc/en-ca/articles/214187018-How-has-the-Growth-portfolio-performed-
+#https://help.wealthsimple.com/hc/en-ca/articles/214187188-How-has-the-Balanced-portfolio-performed-
+#https://help.wealthsimple.com/hc/en-ca/articles/214880087-How-has-the-Conservative-portfolio-performed-
+#https://help.wealthsimple.com/hc/en-ca/articles/220391888-How-has-the-Growth-SRI-portfolio-performed-
+#https://help.wealthsimple.com/hc/en-ca/articles/220741607-How-has-the-Balanced-SRI-portfolio-performed-
+#https://help.wealthsimple.com/hc/en-ca/articles/220391588-How-has-the-Conservative-SRI-portfolio-performed-
+#
+#
 #http://faq.wealthsimple.com/article/121-how-has-the-risk-level-1-portfolio-performed
 #http://faq.wealthsimple.com/article/130-how-has-the-risk-level-10-portfolio-performed
 #http://faq.wealthsimple.com/article/127-how-has-the-risk-level-7-portfolio-performed
 #' @export 
 ###############################################################################     
-wealthsimple.portfolio = function(portfolio.number = 10) {
+wealthsimple.portfolio = function(
+	portfolio = spl('Conservative,Balanced,Growth'),
+	type = spl(',SRI')
+) 
+{
+	portfolio = portfolio[1]
+	type = type[1]
+	
+	map = c(
+		Growth = 'https://help.wealthsimple.com/hc/en-ca/articles/214187018-How-has-the-Growth-portfolio-performed-'
+		,Balanced = 'https://help.wealthsimple.com/hc/en-ca/articles/214187188-How-has-the-Balanced-portfolio-performed-'
+		,Conservative = 'https://help.wealthsimple.com/hc/en-ca/articles/214880087-How-has-the-Conservative-portfolio-performed-'
+		,GrowthSRI = 'https://help.wealthsimple.com/hc/en-ca/articles/220391888-How-has-the-Growth-SRI-portfolio-performed-'
+		,BalancedSRI = 'https://help.wealthsimple.com/hc/en-ca/articles/220741607-How-has-the-Balanced-SRI-portfolio-performed-'
+		,ConservativeSRI='https://help.wealthsimple.com/hc/en-ca/articles/220391588-How-has-the-Conservative-SRI-portfolio-performed-'
+	)
+	
 	# download
-	url = paste0('http://faq.wealthsimple.com/article/', 120+portfolio.number, '-how-has-the-risk-level-',portfolio.number,'-portfolio-performed')
-	txt = join(readLines(url))
-  
+	url = map[ paste0(portfolio,type) ]
+	txt = get.url(url)
+
 	# extract
-	temp = extract.table.from.webpage(txt, 'Breakdown', has.header = F)
+	# [Removing non-ASCII characters from data files](https://stackoverflow.com/questions/9934856/removing-non-ascii-characters-from-data-files)
+	temp = iconv(txt, 'latin1', 'ASCII', sub='')
+	temp = extract.table.from.webpage(temp, 'Breakdown,tbody', has.header = F)
+		colnames(temp) = spl('name,ticker,description,weight')
+		info = temp
 
 	# parse
 	temp = gsub(pattern = '%', replacement = '', temp)
@@ -1319,22 +1466,25 @@ wealthsimple.portfolio = function(portfolio.number = 10) {
 	temp  = temp[!is.na(temp[,1]),]
 
 	# create output
-	value = as.numeric(temp[,2])
-	names(value) = temp[,1]
-	value
+	weight = as.numeric(temp[,2])
+		names(weight) = temp[,1]
+	lst(weight, info)	
 }
 
- 
+	
 wealthsimple.portfolio.test = function() {
 	# create list of all portolios
 	portfolios = list()
-	for(i in 1:10)
-		portfolios[[i]] = wealthsimple.portfolio(i)
+	for(i in spl('Conservative,Balanced,Growth'))
+		portfolios[[i]] = wealthsimple.portfolio(i)$weight
 		
-	portfolios = t(sapply(portfolios, identity))
-	
-	# look at evolution of mixes
-	plota.stacked(1:10, portfolios/100, flip.legend = T, type='s', xaxp=c(1,10,9), las=1,
+	tickers = lapply(portfolios, names)
+		tickers = unique( unlist( tickers ) )
+		
+	data = sapply(portfolios, function(w) ifna(w[tickers],0)/100)
+		rownames(data) = tickers
+		
+	plota.stacked(1:3, t(data), flip.legend = T, type='s', xaxp=c(1,3,2), las=1,
 		main='Wealthsimple Transition Matrix', xlab='Risk Portfolio')
 }	
 	
@@ -1753,7 +1903,7 @@ download.helper <- function(url,download) {
 
   filename = paste0(temp.folder, '/', basename(url))
   if(download || !file.exists(filename))
-    try(download.file(url, filename, mode='wb'), TRUE)
+    tryCatch({ download.file(url, filename, mode='wb') }, error = function(ex) cat('', file=filename))
   filename
 }
 
@@ -1829,6 +1979,7 @@ load.VXX.CBOE <- function() {
       temp = getSymbol.CBOE('VX', m, y)
       if(is.null(temp)) next    
       
+	  temp = temp[!is.na(index(temp))]
       temp = temp[temp$Settle > 0]
       if(nrow(temp)==0) next    
       if(len(temp[index,1])> 0)

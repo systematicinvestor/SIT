@@ -1202,7 +1202,10 @@ if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
   filename = x  
 if(!is.data.table(x)) {
   # set autostart
-  out = fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
+  out = tryCatch({ 
+	fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
+  }, error = function(ex) data.table(read.csv(filename,stringsAsFactors=F,sep=sep,skip=skip))
+  )
     setnames(out,gsub(' ', '_', trim(colnames(out)))) 
 } else out = x  
 
