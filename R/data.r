@@ -2061,9 +2061,15 @@ reconstruct.VXX.CBOE <- function(exact.match=T) {
   # on roll it is simply future2's return
   index = ifna(mlag(dr) == 0, F)
   ret[index] = (x[,1] / mlag(x[,2]) - 1)[index]
+      
+  # [Backtest of VXX Volatility ETN From 2004 Including Yearly Fees](https://sixfigureinvesting.com/2013/11/backtest-on-vxx/)
+  af = 0.89 / 100
+  dc = c(NA,diff(data$dates))
   
   Close = cumprod(1+ifna(ret,0))
-  VXX = make.xts(cbind(Close,x,dt,dr,ret), data$dates)
+  CloseAF = cumprod( (1+ifna(ret,0)) * (1-af/365)^ifna(dc,0) )
+  
+  VXX = make.xts(cbind(Close,CloseAF,x,dt,dr,ret), data$dates)
   
   # VXZ Mid-Term: 4,5,6,7 months
   x  = extract.VXX.CBOE(data, 'Settle', 4:7, exact.match)
@@ -2075,9 +2081,15 @@ reconstruct.VXX.CBOE <- function(exact.match=T) {
   
   index = ifna(mlag(dr) == 0, F)
   ret[index] = (rowSums(x[,-4]) / mlag(rowSums(x[,-1])) - 1)[index]
-    
+
+  # [Backtest of VXX Volatility ETN From 2004 Including Yearly Fees](https://sixfigureinvesting.com/2013/11/backtest-on-vxx/)
+  af = 0.89 / 100
+  dc = c(NA,diff(data$dates))
+  
   Close = cumprod(1+ifna(ret,0))  
-  VXZ = make.xts(cbind(Close,x,dt,dr,ret), data$dates)
+  CloseAF = cumprod( (1+ifna(ret,0)) * (1-af/365)^ifna(dc,0) )
+  
+  VXZ = make.xts(cbind(Close,CloseAF,x,dt,dr,ret), data$dates)
   
   # debug
   # plota(VXZ,type='l',lwd=2) 
