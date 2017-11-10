@@ -1206,6 +1206,11 @@ if(!is.data.table(x)) {
 	fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
   }, error = function(ex) data.table(read.csv(filename,stringsAsFactors=F,sep=sep,skip=skip))
   )
+# alternative  
+#temp = readLines(filename)
+#a=tstrsplit(temp[-c(1:2)], ',', type.convert=T)
+#names(a) = spl(temp[2],',')
+#setDT(a)
     setnames(out,gsub(' ', '_', trim(colnames(out)))) 
 } else out = x  
 

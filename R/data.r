@@ -875,6 +875,83 @@ getQuote.google.xml <- function(tickers) {
   out
 }
   
+  
+###############################################################################
+# Get the latest prices from the Bigcharts:
+# http://bigcharts.marketwatch.com/quotes/multi.asp?view=q&msymb=MSFT+AAPL+IBM
+#' @export 
+###############################################################################
+#get.bigcharts.quote('ibm')
+#get.bigcharts.quote('ibm,msft,c')
+get.bigcharts.quote = function(symbolnames = spl('ibm,msft')) {
+	# download
+	url = paste0('http://bigcharts.marketwatch.com/quotes/multi.asp?view=q&msymb=',join(spl(symbolnames),'+'))
+	txt = get.url(url)
+
+	# extract
+	data = extract.table.from.webpage(txt, 'Change')
+		colnames(data) = tolower(trim( colnames(data) ))
+		data = trim(data)
+		
+	keep.index = nchar(data[,'symbol']) > 0
+		data = data[keep.index,,drop=F]
+		datan = mat2num(data)
+	
+	# xts
+	temp = cbind(
+		Open = datan[,'last'] + datan[,'change'],
+		High = datan[,'high'],
+		Low = datan[,'low'],
+		Close = datan[,'last'],
+		Volume = datan[,'volume'],
+		Adjusted = datan[,'last']
+		)		
+	date = strptime( paste(format(Sys.Date(), '%Y-%m-%d'), data[,'time']), '%Y-%m-%d %I:%M %p')
+	temp = make.xts(temp, order.by = date)
+	
+	out = list()
+	for(i in 1:nrow(data))
+		out[[ data[i,'symbol'] ]] = temp[i,]
+
+	out
+}		
+		
+
+###############################################################################
+# Get the latest prices from the Barcharts:
+# https://www.barchart.com/stocks/quotes/MSFT
+#' @export 
+###############################################################################
+#get.barcharts.quote('ibm')
+get.barcharts.quote = function(ticker = 'ibm') {
+	# download
+	url = paste0('https://www.barchart.com/stocks/quotes/', ticker)
+	txt = get.url(url)
+
+	# extract
+	token = extract.token(txt, '<div class="bc-quote-overview row",data-ng-init,init\\(', "\\)'>")
+	require(jsonlite)
+	data = fromJSON(paste('[',token,']'))
+	
+	ticker = data[[1]]
+	temp = data[[4]]$raw
+	temp = cbind(
+		Open = temp$openPrice,
+		High = temp$highPrice,
+		Low = temp$lowPrice,
+		Close = temp$lastPrice,
+		Volume = temp$volume,
+		Adjusted = temp$lastPrice
+		)		
+	date = Sys.Date()
+	temp = make.xts(temp, order.by = date)
+
+	out = list()
+	out[[ ticker ]] = temp
+	out
+}		
+
+		
 ###############################################################################
 # Download historical intraday prices from Google Finance
 #
@@ -898,7 +975,7 @@ getSymbol.intraday.google <- function
 ) 
 {
   # download Key Statistics from yahoo  
-  url = paste('http://www.google.com/finance/getprices?q=', Symbol,
+  url = paste('https://finance.google.com/finance/getprices?q=', Symbol,
     '&x=', Exchange,
       '&i=', interval,
       '&p=', period,
