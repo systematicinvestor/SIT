@@ -2,7 +2,7 @@
 # Setup
 ###############################################################################
 library(devtools)
-library(roxygen)
+# library(roxygen)
 library(roxygen2)
 
 package.name = 'SIT'
@@ -122,13 +122,13 @@ NULL
 ###############################################################################
 # Create documentaion and build package
 ###############################################################################
-roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
+# roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
 
 pkg <- as.package('pkg')
 name = devtools:::build(pkg, 'pkg')
 
 file.rename(name, paste(package.name, '.tar.gz', sep=''))
-file.remove(name)
+# file.remove(name)
 
 ###############################################################################
 # Usage

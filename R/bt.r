@@ -1155,7 +1155,7 @@ test = list(
 #' @export 
 bt.trade.summary.helper <- function(trades) 
 {		
-	if(nrow(trades) <= 0) return(NA)
+	if(is.null(nrow(trades)) || nrow(trades) <= 0) return(NA)
 	
 	out = list()
 		tpnl = trades[, 'weight'] * (trades[, 'exit.price'] / trades[,'entry.price'] - 1)
