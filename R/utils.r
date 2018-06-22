@@ -992,7 +992,9 @@ to.cash = function(x, nround=2) to.nice(x,nround,'$')
 ###############################################################################
 
 # must set timezone before any calls to xts
-Sys.setenv(TZ = 'GMT')
+# [timezone warning message](https://github.com/joshuaulrich/xts/issues/113)
+if( nchar(Sys.getenv('TZ')) == 0 ) Sys.setenv(TZ=Sys.timezone())
+#Sys.setenv(TZ = 'GMT')
 #Sys.setenv(TZ = 'EST')
 
 ###############################################################################

@@ -883,7 +883,7 @@ getQuote.google.xml <- function(tickers) {
 ###############################################################################
 #get.bigcharts.quote('ibm')
 #get.bigcharts.quote('ibm,msft,c')
-get.bigcharts.quote = function(symbolnames = spl('ibm,msft')) {
+get.bigcharts.quote = function(symbolnames = spl('ibm,msft'), raw=F) {
 	# download
 	url = paste0('http://bigcharts.marketwatch.com/quotes/multi.asp?view=q&msymb=',join(spl(symbolnames),'+'))
 	txt = get.url(url)
@@ -913,6 +913,7 @@ get.bigcharts.quote = function(symbolnames = spl('ibm,msft')) {
 	for(i in 1:nrow(data))
 		out[[ data[i,'symbol'] ]] = temp[i,]
 
+	if(raw) out = lst(data=out, raw=data)
 	out
 }		
 		
@@ -923,7 +924,7 @@ get.bigcharts.quote = function(symbolnames = spl('ibm,msft')) {
 #' @export 
 ###############################################################################
 #get.barcharts.quote('ibm')
-get.barcharts.quote = function(ticker = 'ibm') {
+get.barcharts.quote = function(ticker = 'ibm', raw=F) {
 	# download
 	url = paste0('https://www.barchart.com/stocks/quotes/', ticker)
 	txt = get.url(url)
@@ -948,6 +949,7 @@ get.barcharts.quote = function(ticker = 'ibm') {
 
 	out = list()
 	out[[ ticker ]] = temp
+	if(raw) out = lst(data=out, raw=data[[4]]$raw)
 	out
 }		
 
