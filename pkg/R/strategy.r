@@ -1176,6 +1176,8 @@ random.hist.weight = function(
 	
 ###############################################################################	
 # [Maximize the Sharpe Ratio in Axioma Portfolio](http://www.updatefrom.com/axioma/0703/focus.html)
+# [Maximize the Sharpe Ratio in Axioma Portfolio](https://www.pdffiller.com/jsfiller-desk7/?projectId=228910415&expId=3950&expBranch=3#e9fcdab7859d4b2ea8aec54bc27c9e11)
+# Prefer to use max.sharpe.portfolio.axioma function because can specify lb/ub constraints
 #
 # min w*E*w
 # s.t. 
@@ -1186,6 +1188,13 @@ random.hist.weight = function(
 #   w, t >= 0
 #
 # final solution is w / t
+#
+# It is unclear what is the maximum Sharpe portfolio if expected returns are negative for all assets.
+# For example, C. Israelsen: "A refinement to the Sharpe ratio and information ratio." 
+# Journal of Asset Management 5.6 (2005): 423-427. suggested using r*sigma as proxy for the Sharpe ratio in this case
+# Source: [ALTERNATIVE VIEWPOINTS: USING THE MODIFIED SHARPE & INFORMATION RATIOS](http://www.allaboutalpha.com/blog/2009/09/02/alternative-viewpoints-using-the-modified-sharpe-information-ratios/)
+# Source: [Risk-adjusted returns ratio that does not reward high risk for negative returns](https://quant.stackexchange.com/questions/32434/risk-adjusted-returns-ratio-that-does-not-reward-high-risk-for-negative-returns)
+#
 ###############################################################################		
 	#' @export 	
 	max.sharpe.portfolio.axioma <- function
@@ -1193,9 +1202,14 @@ random.hist.weight = function(
 		ia,				# input assumptions
 		constraints,
 		rf = 0,
-		excess.return = ia$expected.return - rf
+		excess.return = ia$expected.return - rf,
+		# in case of expected returns are negative for all assets use
+		negative.all.excess.return.portfolio.fn = 'min.var.portfolio' # 'max.return.portfolio'
 	)
 	{
+		if( all(excess.return <= 0) )
+			return( match.fun(negative.all.excess.return.portfolio.fn)(ia,constraints) )
+				
 		# * add non-negative variable t
 		n = len(constraints$lb)
 		n1 = n+1
@@ -1215,6 +1229,9 @@ random.hist.weight = function(
 		
 		# * add return target constraint: mu * w = mean(mu)
 		constraints = add.constraints(c(excess.return,0), mean(excess.return) , type = '=', constraints)		
+		
+		# * add return target constraint: w * expected.return = 1
+		constraints = add.constraints(c(excess.return,0), 1 , type = '=', constraints)
 		
 		# * optimal solution is w/t		
 		weight = min.var.portfolio(ia1,constraints)

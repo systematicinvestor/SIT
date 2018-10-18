@@ -3765,7 +3765,7 @@ bt.fa.value.quantiles.test <- function()
 	periodicity = 'weeks'
 	
 	# load Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = F, clean = F)
 	
 	period.ends = endpoints(data$prices, periodicity)
 		period.ends = period.ends[period.ends > 0]
@@ -4158,7 +4158,7 @@ three.factor.rolling.regression <- function() {
 	#*****************************************************************
 	# Fama/French factors
 	#****************************************************************** 
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = T, clean = F)
 
 	# add factors and align
 	data <- new.env()
@@ -4189,9 +4189,9 @@ dev.off()
 	#*****************************************************************
 	# Fama/French factors + Momentum
 	#****************************************************************** 
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = F, clean = F)
 
-	factors.extra = get.fama.french.data('F-F_Momentum_Factor', periodicity = periodicity,download = T, clean = F)	
+	factors.extra = get.fama.french.data('F-F_Momentum_Factor', periodicity = periodicity,force.download = T, clean = F)	
 		factors$data = merge(factors$data, factors.extra$data) 
 	
 	# add factors and align
@@ -4281,7 +4281,7 @@ your.own.factor.rolling.regression <- function() {
 	#*****************************************************************
 	# Fama/French factors
 	#****************************************************************** 
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = F, clean = F)
 
 	factors.extra = 100 * read.xts('EEM_SPY.csv')
 		factors$data = merge(factors$data, factors.extra, join='inner')
@@ -4575,7 +4575,7 @@ bt.fa.one.month.test <- function()
 	# Load factors and align them with prices
 	#****************************************************************** 	
 	# load Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = F, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = F, clean = F)
 	
 	# align monthly dates
 	map = match(format(index(factors$data), '%Y%m'), format(index(prices), '%Y%m'))
@@ -4738,7 +4738,7 @@ bt.fa.sector.one.month.test <- function()
 	# Load factors and align them with prices
 	#****************************************************************** 	
 	# load Fama/French factors
-	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,download = T, clean = F)
+	factors = get.fama.french.data('F-F_Research_Data_Factors', periodicity = periodicity,force.download = T, clean = F)
 	
 	
 	# align monthly dates
@@ -5329,8 +5329,9 @@ bt.aaa.minrisk <- function
 	            ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 	       
 			# create constraints: 0<=x<=1, sum(x) = 1
-			constraints = new.constraints(n, lb = 0, ub = 1)
-			constraints = add.constraints(rep(1, n), 1, type = '=', constraints)       
+			#constraints = new.constraints(n, lb = 0, ub = 1)
+			#constraints = add.constraints(rep(1, n), 1, type = '=', constraints)       
+			constraints = create.basic.constraints(n, 0, 1, 1)
 			
 			# compute minimum variance weights				            
 	        weight[i,] = 0        
@@ -5491,6 +5492,7 @@ bt.aaa.test <- function()
 	# Load historical data
 	#****************************************************************** 
 	load.packages('quantmod')
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
 	
 	tickers = spl('SPY,EFA,EWJ,EEM,IYR,RWX,IEF,TLT,DBC,GLD')
 
@@ -5614,8 +5616,9 @@ bt.aaa.test <- function()
 	            ia$cov = cor(coredata(hist), use='complete.obs',method='pearson') * (s0 %*% t(s0))
 	       
 			# create constraints: 0<=x<=1, sum(x) = 1
-			constraints = new.constraints(n, lb = 0, ub = 1)
-			constraints = add.constraints(rep(1, n), 1, type = '=', constraints)       
+			#constraints = new.constraints(n, lb = 0, ub = 1)
+			#constraints = add.constraints(rep(1, n), 1, type = '=', constraints)       
+			constraints = create.basic.constraints(n, 0, 1, 1)
 			
 			# compute minimum variance weights				            
 	        weight[i,] = 0        
@@ -5662,6 +5665,7 @@ bt.aaa.test.new <- function()
 	# Load historical data
 	#****************************************************************** 
 	load.packages('quantmod')
+	load.packages('quadprog,corpcor,lpSolve,kernlab')
 	
 	tickers = spl('SPY,EFA,EWJ,EEM,IYR,RWX,IEF,TLT,DBC,GLD')
 
@@ -8490,13 +8494,13 @@ bt.mebanefaber.modified.mn.test <- function()
 	data = new.env()
 		
 	# load historical market returns
-	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',download = T, clean = T)
+	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',force.download = T, clean = T)
 		ret = temp[[1]]$Mkt.RF + temp[[1]]$RF
 		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
 	data$SPY = make.stock.xts( price )
 	
 	# load historical momentum returns
-	temp = get.fama.french.data('10_Portfolios_Prior_12_2', periodicity = '',download = T, clean = T)		
+	temp = get.fama.french.data('10_Portfolios_Prior_12_2', periodicity = '',force.download = T, clean = T)		
 		ret = temp[[1]]
 		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
 	data$HI.MO = make.stock.xts( price$High )
@@ -8575,14 +8579,14 @@ bt.mebanefaber.f.squared.test <- function()
 	download = T
 	
 	# load historical market returns
-	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',download = download, clean = T)
+	temp = get.fama.french.data('F-F_Research_Data_Factors', periodicity = '',force.download = download, clean = T)
 		ret = cbind(temp[[1]]$Mkt.RF + temp[[1]]$RF, temp[[1]]$RF)
 		price = bt.apply.matrix(ret / 100, function(x) cumprod(1 + x))
 	data$SPY = make.stock.xts( price$Mkt.RF )
 	data$SHY = make.stock.xts( price$RF )
 	
 	# load historical momentum returns
-	temp = get.fama.french.data('10_Industry_Portfolios', periodicity = '',download = download, clean = T)		
+	temp = get.fama.french.data('10_Industry_Portfolios', periodicity = '',force.download = download, clean = T)		
 		ret = temp[[1]]
 		price = bt.apply.matrix(ret[,1:9] / 100, function(x) cumprod(1 + x))
 	for(n in names(price)) data[[n]] = make.stock.xts( price[,n] )

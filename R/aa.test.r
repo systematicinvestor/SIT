@@ -2121,7 +2121,7 @@ aa.test.create.ia.rebal <- function()
 	#--------------------------------------------------------------------------
 	# Create historical input assumptions
 	#--------------------------------------------------------------------------
-	ia = create.historical.ia(hist.returns, 1, symbols)
+	ia = create.historical.ia(hist.returns, 1)
 	
 	return(ia)
 }
@@ -2193,7 +2193,7 @@ aa.test.create.ia.custom <- function(symbols, symbol.names = symbols, dates = NU
 	#--------------------------------------------------------------------------
 	# Create historical input assumptions
 	#--------------------------------------------------------------------------
-	ia = create.historical.ia(hist.returns, annual.factor, symbol.names, symbol.names)
+	ia = create.historical.ia(hist.returns, annual.factor)
 	
 	return(ia)	
 }
