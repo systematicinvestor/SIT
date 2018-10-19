@@ -15,7 +15,7 @@
   extremes y coordinates of the plotting region }}
 
   \item{...}{additional parameters for the
-  \code{\link{rect}} fucntion}
+  \code{\link{rect}} function}
 }
 \value{
   nothing

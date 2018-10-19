@@ -11,7 +11,7 @@
 	#Sys.setenv(TZ = 'EST')
 
 	###############################################################################
-	# The timezone is set to 'GMT' by defult
+	# The timezone is set to 'GMT' by default
 	#
 	# The reason for setting the default timezone is because the following code 
 	# produces different results if the timezone is NOT set and if timezone has a value.

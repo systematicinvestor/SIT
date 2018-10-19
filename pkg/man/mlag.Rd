@@ -13,8 +13,8 @@
   modified object
 }
 \description{
-  This function shifts elemnts in a vector or a mtrix by a
-  given lag. For example: mlag(x,1) - use yesterday's
+  This function shifts elements in a vector or a matrix by
+  a given lag. For example: mlag(x,1) - use yesterday's
   values and mlag(x,-1) - use tomorrow's values
 }
 \examples{

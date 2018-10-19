@@ -5,10 +5,10 @@
   proxy.prices(data, names = ls(data))
 }
 \arguments{
-  \item{data}{list or enviroment that holds proxy time
+  \item{data}{list or environment that holds proxy time
   series}
 
-  \item{names}{names or indexs of time series,
+  \item{names}{names or indexes of time series,
   \strong{defaults to all time series}}
 }
 \value{

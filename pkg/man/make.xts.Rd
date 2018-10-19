@@ -1,6 +1,6 @@
 \name{make.xts}
 \alias{make.xts}
-\title{Create \code{\link{xts}} object, faster version of \code{\link{xts}} fucntion}
+\title{Create \code{\link{xts}} object, faster version of \code{\link{xts}} function}
 \usage{
   make.xts(x, order.by)
 }
@@ -14,7 +14,7 @@
 }
 \description{
   Create \code{\link{xts}} object, faster version of
-  \code{\link{xts}} fucntion
+  \code{\link{xts}} function
 }
 \examples{
 \dontrun{

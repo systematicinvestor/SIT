@@ -408,8 +408,8 @@ dev.off()
 	# Price European Call Option
 	#******************************************************************  
 	load.packages('fOptions')
-
-	# Black–Scholes
+	
+	#Blackâ€“Scholes
 	GBSOption(TypeFlag = "c", S = S[1], X = X, Time = Time, r = r, b = r, sigma = sigma[1])
 	
 	# Monte Carlo simulation	

@@ -25,7 +25,7 @@
 
 
 ###############################################################################
-# Barron’s article sends Facebook stock back to the doghouse
+# Barronâ€™s article sends Facebook stock back to the doghouse
 # http://www.theglobeandmail.com/globe-investor/barrons-article-sends-facebook-stock-back-to-the-doghouse/article4565523/
 # Still Too Pricey
 # http://online.barrons.com/article/SB50001424053111904706204578002652028814658.html

@@ -32,7 +32,7 @@
   nothing
 }
 \description{
-  Set the color theme, the defaul theme is
+  Set the color theme, the default theme is
   plota.theme.green.orange()
 }
 \examples{

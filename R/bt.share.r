@@ -27,7 +27,7 @@
 #'
 #' Summary:
 #' * store actual positions and cash at the end of the day,
-#' hence if we are rebalacing on T, the positions will be shown on T
+#' hence if we are rebalancing on T, the positions will be shown on T
 #' * for weights, use weights from T-1, to properly reflect weights throughout day
 #'
 #' If UnAdjusted logic is enabled, each price history is expected to have Dividend and
@@ -43,7 +43,7 @@
 ###############################################################################
 bt.run.share.ex <- function
 (
-	b,					# enviroment with symbols time series
+	b,					# environment with symbols time series
 	prices = b$prices,	# prices
 	clean.signal = T,	# flag to remove excessive signal	
 	
@@ -2899,7 +2899,7 @@ tax.cashflows = function(info, index, last.index) {
 #' @export 	
 bt.run.share.fast <- function
 (
-	b,					# enviroment with symbols time series
+	b,					# environment with symbols time series
 	clean.signal = T,	# flag to remove excessive signal	
 	do.lag = 1, 		# lag signal
 	capital = 100000,

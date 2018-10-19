@@ -15,7 +15,7 @@
   \item{negative.col}{text color for negative values}
 
   \item{...}{additional parameters to the
-  \code{\link{reactiveTable}} fucntion}
+  \code{\link{reactiveTable}} function}
 }
 \value{
   HTML table

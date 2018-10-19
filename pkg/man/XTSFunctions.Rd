@@ -1,6 +1,6 @@
 \name{XTSFunctions}
 \alias{XTSFunctions}
-\title{The timezone is set to 'GMT' by defult}
+\title{The timezone is set to 'GMT' by default}
 \usage{
   XTSFunctions()
 }

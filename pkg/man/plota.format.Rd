@@ -18,7 +18,7 @@
   ''}}
 }
 \value{
-  formated numbers
+  formatted numbers
 }
 \description{
   Format numbers using 1000 separator

@@ -7,7 +7,7 @@
 \arguments{
   \item{x}{xts time series}
 
-  \item{dates}{string represnting subset of dates i.e.
+  \item{dates}{string representing subset of dates i.e.
   '2010::2012'}
 }
 \value{

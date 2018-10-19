@@ -74,9 +74,9 @@ join <- function
 }
 
 ###############################################################################
-#' Remnove any leading and trailing spaces
+#' Remove any leading and trailing spaces
 #'
-#' This function will remnove any leading and trailing spaces
+#' This function will remove any leading and trailing spaces
 #'
 #' @param s string
 #'
@@ -493,7 +493,7 @@ run.count <- function
 #' Map given time series to monthly
 #'
 #' If frequency of observations in the given time series is less than monthly,
-#' i.e. quaterly or annually, properly align this time series to monthly
+#' i.e. quarterly or annually, properly align this time series to monthly
 #'
 #' @param equity time series
 #'
@@ -566,7 +566,7 @@ create.monthly.table <- function(monthly.data)
 ###############################################################################
 #' Load Packages that are available and install ones that are not available
 #'
-#' This function a convience wrapper for install.packages() function
+#' This function a convenience wrapper for install.packages() function
 #'
 #' @param packages names of the packages separated by comma
 #' @param repos default repository
@@ -664,7 +664,7 @@ test.tic.toc <- function()
 ###############################################################################
 #' Lag matrix or vector
 #'
-#' This function shifts elemnts in a vector or a mtrix by a given lag.
+#' This function shifts elements in a vector or a matrix by a given lag.
 #' For example: mlag(x,1) - use yesterday's values and
 #'  mlag(x,-1) - use tomorrow's values
 #'
@@ -764,7 +764,7 @@ repmat <- function
 }
 
 ###############################################################################
-#' Convience shortcut for as.vector function
+#' convenience shortcut for as.vector function
 #'
 #' @param x object
 #'
@@ -783,10 +783,10 @@ vec <- function
 }
 
 ###############################################################################
-#' Convience shortcut for matrix function
+#' convenience shortcut for matrix function
 #'
 #' @param x object
-#' @param col flag to inidcate 1 column if x is a vector; otherwise 1 row
+#' @param col flag to indicate 1 column if x is a vector; otherwise 1 row
 #'
 #' @return new matrix
 #' 
@@ -933,7 +933,7 @@ lookup.index <- function
 }
 
 ###############################################################################
-#' Convert beta (slope of reggression line) to degrees
+#' Convert beta (slope of regression line) to degrees
 #'
 #' @param beta slope of regression line
 #'
@@ -998,7 +998,7 @@ if( nchar(Sys.getenv('TZ')) == 0 ) Sys.setenv(TZ=Sys.timezone())
 #Sys.setenv(TZ = 'EST')
 
 ###############################################################################
-#' The timezone is set to 'GMT' by defult
+#' The timezone is set to 'GMT' by default
 #'
 #' The reason for setting the default timezone is because the following code 
 #' produces different results if the timezone is NOT set and if timezone has a value.
@@ -1030,7 +1030,7 @@ if( nchar(Sys.getenv('TZ')) == 0 ) Sys.setenv(TZ=Sys.timezone())
 XTSFunctions <- function() {}
 
 ###############################################################################
-#' Create \code{\link{xts}} object, faster version of \code{\link{xts}} fucntion
+#' Create \code{\link{xts}} object, faster version of \code{\link{xts}} function
 #'
 #' @param x vector / matrix / data frame
 #' @param order.by dates that correspond to rows of x
@@ -1074,7 +1074,7 @@ make.xts <- function
 }
 
 
-# convience function: take list of xts objects with 1 column and combine them into
+# convenience function: take list of xts objects with 1 column and combine them into
 # one xts object with column names beign names in the input list
 #' @export 
 as.xts.list <- function(data) { for(n in names(data)) colnames(data[[n]])=n; do.call(cbind, data)}
@@ -1136,8 +1136,8 @@ flip.xts <- function(x)
 #'
 #' @param x \code{\link{xts}} object
 #' @param filename file name
-#' @param append flag to inidicate if file is overwritten or appended, \strong{defaults to FALSE}
-#' @param ... additional paramaeters to the \code{\link{format}} function
+#' @param append flag to indicate if file is overwritten or appended, \strong{defaults to FALSE}
+#' @param ... additional parameters to the \code{\link{format}} function
 #'
 #' @return nothing
 #' 
@@ -1168,7 +1168,7 @@ write.xts <- function
 #' @param filename file name
 #' @param date.fn function to preprocess string dates, \strong{defaults to \code{\link{paste}} - i.e. no preprocessing}
 #' @param index.class class of the date object, \strong{defaults to 'Date'}
-#' @param ... additional paramaeters to the \code{\link{as.POSIXct}} function
+#' @param ... additional parameters to the \code{\link{as.POSIXct}} function
 #'
 #' @return \code{\link{xts}} object
 #' 
@@ -1395,7 +1395,7 @@ index2date.time <- function(temp) {
 #' Determine the index of subset of dates in the time series
 #'
 #' @param x xts time series
-#' @param dates string represnting subset of dates i.e. '2010::2012'
+#' @param dates string representing subset of dates i.e. '2010::2012'
 #'
 #' @return index of subset of dates in the time series
 #'
@@ -1497,7 +1497,7 @@ make.stock.xts <- function(out, column=1) {
 
 
 ###############################################################################
-#' Normilize all timeseries to start at one
+#' Normalize all timeseries to start at one
 #'
 #' @param x \code{\link{xts}} time series 
 #'
@@ -1568,13 +1568,13 @@ get.filename <- function(x)
 #' Helper function to read historical stock prices saved by Seasonality tool
 #'
 #' @param Symbols vector of symbols
-#' @param env enviroment to store prices, \strong{defaults to .GlobalEnv}
+#' @param env environment to store prices, \strong{defaults to .GlobalEnv}
 #' @param auto.assign flag to auto assign symbols, \strong{defaults to TRUE}
 #' @param stock.folder stock folder, \strong{defaults to 'c:/temp/Seasonality/stocks'}
 #' @param stock.date.format stock date format, \strong{defaults to '\%Y-\%m-\%d'}
 #' @param ... other parameters for getSymbols function
 #'
-#' @return nothing is auto.assign = TRUE, prices are stored in the env enviroment
+#' @return nothing is auto.assign = TRUE, prices are stored in the env environment
 #' if auto.assign = FALSE, returns first symbol
 #' 
 #' @references 
@@ -2024,7 +2024,7 @@ random.string <- function(lenght = 12) { join(sample(c(0:9, letters, LETTERS),le
 
 
 ###############################################################################
-#' List function / variables in enviroment
+#' List function / variables in environment
 #'
 #' http://www.mail-archive.com/r-help@@stat.math.ethz.ch/msg22679.html
 #'
@@ -2047,7 +2047,7 @@ parse.number <- function(x) {
 }
 
 ###############################################################################
-#' Flexiable utility function to Map value(s) to vector
+#' Flexible utility function to Map value(s) to vector
 #'
 #' @param value value(s) to use for mapping
 #' @param labels names of vector columns
@@ -2057,7 +2057,7 @@ parse.number <- function(x) {
 #'
 #' Possible scenarios:
 #' one number, applied to all assets
-#' array, same number of entrys as assets
+#' array, same number of entries as assets
 #' named list, each name corresponds asset
 #'	plus have a fallback asset if nothing provided
 #'
@@ -2132,7 +2132,7 @@ read.file = function(file) readChar(file, file.info(file)$size)
 
 
 ###############################################################################
-#' String Buffer class - fast storage for strigns
+#' String Buffer class - fast storage for strings
 #' 
 #' @examples
 #' \dontrun{ 

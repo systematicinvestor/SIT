@@ -415,7 +415,7 @@ find.patterns <- function
 				# check that there is suffcient number of extrema to complete pattern
 				if( i + pattern$len - 1 <= n.index ) {
 				
-					# create enviroment to check pattern: E1,E2,...,En; t1,t2,...,tn
+					# create environment to check pattern: E1,E2,...,En; t1,t2,...,tn
 					envir.data = c(data[data.extrema.loc][i:(i + pattern$len - 1)], 
 									data.extrema.loc[i:(i + pattern$len - 1)])									
 						names(envir.data) = c(paste('E', 1:pattern$len, sep=''), 

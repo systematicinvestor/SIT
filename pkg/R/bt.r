@@ -27,7 +27,7 @@
 ###############################################################################
 bt.merge <- function
 (
-	b,				# enviroment with symbols time series
+	b,				# environment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
 	dates = NULL	# subset of dates
 ) 
@@ -89,7 +89,7 @@ bt.merge <- function
 
 
 ###############################################################################
-# Prepare backtest data enviroment
+# Prepare backtest data environment
 #
 # it usually contains:
 # * b$symbolnames
@@ -101,7 +101,7 @@ bt.merge <- function
 ###############################################################################
 bt.prep <- function
 (
-	b,				# enviroment with symbols time series
+	b,				# environment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
 	dates = NULL,	# subset of dates
 	fill.gaps = F,	# fill gaps introduced by merging
@@ -192,7 +192,7 @@ bt.prep <- function
 #' @export 
 bt.prep.matrix <- function
 (
-	b,				# enviroment with symbols time series
+	b,				# environment with symbols time series
 	align = c('keep.all', 'remove.na'),	# alignment type
 	dates = NULL,	# subset of dates
 	basic = F		# control if xts object are created	
@@ -271,12 +271,12 @@ bt.prep.matrix.test <- function() {
 }
 
 ###############################################################################
-# Remove symbols from enviroment
+# Remove symbols from environment
 #' @export 
 ###############################################################################
 bt.prep.remove.symbols.min.history <- function
 (
-	b, 					# enviroment with symbols time series
+	b, 					# environment with symbols time series
 	min.history = 1000	# minmum number of observations
 ) 
 {
@@ -287,7 +287,7 @@ bt.prep.remove.symbols.min.history <- function
 #' @export 
 bt.prep.remove.symbols <- function
 (
-	b, 					# enviroment with symbols time series
+	b, 					# environment with symbols time series
 	index				# index of symbols to remove
 ) 
 {
@@ -305,14 +305,14 @@ bt.prep.remove.symbols <- function
 
 
 ###############################################################################
-#' Trim data enviroment
+#' Trim data environment
 #'
 #' This function will remove weights that are smaller than given threshold
 #'
-#' @param b original enviroment with symbols time series
-#' @param dates dates to keep from original enviroment
+#' @param b original environment with symbols time series
+#' @param dates dates to keep from original environment
 #'
-#' @return updated enviroment with symbols time series
+#' @return updated environment with symbols time series
 #'
 #' @examples
 #' \dontrun{ 
@@ -322,7 +322,7 @@ bt.prep.remove.symbols <- function
 #' @export 
 bt.prep.trim <- function
 (
-	b, 				# enviroment with symbols time series
+	b, 				# environment with symbols time series
 	dates = NULL	# subset of dates
 ) 
 {	
@@ -350,7 +350,7 @@ bt.prep.trim <- function
 ###############################################################################
 bt.run.share <- function
 (
-	b,					# enviroment with symbols time series
+	b,					# environment with symbols time series
 	prices = b$prices,	# prices
 	clean.signal = T,	# flag to remove excessive signal
 	
@@ -419,7 +419,7 @@ bt.run.share <- function
 ###############################################################################
 bt.run <- function
 (
-	b,					# enviroment with symbols time series
+	b,					# environment with symbols time series
 	trade.summary = F, 	# flag to create trade summary
 	do.lag = 1, 		# lag signal
 	do.CarryLastObservationForwardIfNA = TRUE, 
@@ -786,7 +786,7 @@ bt.trim.test <- function() {
 #' @export 	
 bt.run.weight.fast <- function
 (
-	b,					# enviroment with symbols time series
+	b,					# environment with symbols time series
 	do.lag = 1, 		# lag signal
 	do.CarryLastObservationForwardIfNA = TRUE
 ) 
@@ -921,7 +921,7 @@ compute.max.deviation <- function
 ###############################################################################
 bt.trade.summary <- function
 (
-	b, 		# enviroment with symbols time series
+	b, 		# environment with symbols time series
 	bt		# backtest object
 )
 {    
@@ -1024,7 +1024,7 @@ bt.trade.summary <- function
 ###############################################################################
 bt.trade.summary.old <- function
 (
-	b, 		# enviroment with symbols time series
+	b, 		# environment with symbols time series
 	bt		# backtest object
 )
 {    
@@ -1183,7 +1183,7 @@ bt.trade.summary.helper <- function(trades)
 }		
 
 ###############################################################################
-# Change data periodicity in the given bt enviroment
+# Change data periodicity in the given bt environment
 #
 # example of mapping to first day of the month
 # date.map.fn = function(x) as.Date(format(x, '%Y-%m-1'),'%Y-%m-%d')
@@ -1192,7 +1192,7 @@ bt.trade.summary.helper <- function(trades)
 ###############################################################################
 bt.change.periodicity <- function
 (
-	b,			# enviroment with symbols time series
+	b,			# environment with symbols time series
 	
 	# convert data to given periodicity
 	periodicity = 'months',
@@ -1223,7 +1223,7 @@ bt.change.periodicity <- function
 }
 
 ###############################################################################
-# Apply given function to bt enviroment
+# Apply given function to bt environment
 # for example, to compute 10 month moving average each quater 
 # bt.apply.matrix(prices, function(x) mean(last(x,10)), periodicity='months', apply.periodicity='quarters') 
 #
@@ -1233,7 +1233,7 @@ bt.change.periodicity <- function
 #' @export 
 bt.apply <- function
 (
-	b,			# enviroment with symbols time series
+	b,			# environment with symbols time series
 	xfun=Cl,	# user specified function
 	...			# other parameters
 )
@@ -1288,7 +1288,7 @@ bt.apply.matrix <- function
 #' @export 
 bt.apply.ex <- function
 (
-	b,			# enviroment with symbols time series
+	b,			# environment with symbols time series
 	xfun=Cl,	# user specified function
 	...,		# other parameters
 	
@@ -1346,7 +1346,7 @@ if(is.null(apply.period.ends)) {
 					warning(i, msg, '\n')
 			}
 		}
-	else # i.e. run quaterly on the monthly data
+	else # i.e. run quarterly on the monthly data
 		for( i in 1:nsymbols ) {	
 			x = coredata(b[[ symbolnames[i] ]][period.ends,])
 			for( j in apply.period.ends ) {
@@ -1419,7 +1419,7 @@ if(is.null(apply.period.ends)) {
 					warning(i, msg, '\n')
 			}
 		}
-	else # i.e. run quaterly on the monthly data
+	else # i.e. run quarterly on the monthly data
 		for( i in 1:nsymbols ) {	
 			x = coredata(b[period.ends,i])			
 			for( j in apply.period.ends ) {
@@ -1466,7 +1466,7 @@ bt.apply.setup.helper <- function(m, xfun, periodicity, period.ends, apply.perio
 #' @export 
 bt.apply.ex2 <- function
 (
-	b,			# enviroment with symbols time series
+	b,			# environment with symbols time series
 	xfun=Cl,	# user specified function
 	...,		# other parameters
 	
@@ -1507,7 +1507,7 @@ bt.apply.ex2 <- function
 			for( j in apply.period.ends )
 				if(is.null(period.ends))
 					set.result.helper(x[1:j,,drop=F], j, xfun, out, i, ...)
-				else # i.e. run quaterly on the monthly data
+				else # i.e. run quarterly on the monthly data
 					set.result.helper(x[1:map[j],,drop=F], j, xfun, out, i, ...)
 		}
 	}
@@ -1563,7 +1563,7 @@ bt.apply.matrix.ex2 <- function
 			for( j in apply.period.ends )
 				if(is.null(period.ends)) {
 					set.result.helper(x[1:j], j, xfun, out, i, ...)		
-				} else # i.e. run quaterly on the monthly data
+				} else # i.e. run quarterly on the monthly data
 					set.result.helper(x[1:map[j]], j, xfun, out, i, ...)		
 		}
 	}
@@ -2131,7 +2131,7 @@ bt.apply.round.weight <- function
 ###############################################################################
 bt.start.dates <- function
 (
-	b 					# enviroment with symbols time series
+	b 					# environment with symbols time series
 ) 
 {
 	temp = lapply(b, function(x) index(x[1]) )
@@ -2150,7 +2150,7 @@ bt.start.dates <- function
 #' @export 
 bt.end.dates <- function
 (
-	b 					# enviroment with symbols time series
+	b 					# environment with symbols time series
 ) 
 {
 	temp = lapply(b, function(x) index(last(x)) )

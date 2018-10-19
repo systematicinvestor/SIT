@@ -1,7 +1,7 @@
 \name{ls.f}
 \alias{ls.f}
 \alias{ls.v}
-\title{List function / variables in enviroment}
+\title{List function / variables in environment}
 \usage{
   ls.f(env = sys.frame(-1))
 

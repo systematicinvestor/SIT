@@ -10,7 +10,7 @@
 \arguments{
   \item{Symbols}{vector of symbols}
 
-  \item{env}{enviroment to store prices, \strong{defaults
+  \item{env}{environment to store prices, \strong{defaults
   to .GlobalEnv}}
 
   \item{auto.assign}{flag to auto assign symbols,
@@ -26,7 +26,7 @@
 }
 \value{
   nothing is auto.assign = TRUE, prices are stored in the
-  env enviroment if auto.assign = FALSE, returns first
+  env environment if auto.assign = FALSE, returns first
   symbol
 }
 \description{

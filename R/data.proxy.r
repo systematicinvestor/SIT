@@ -44,8 +44,8 @@ compute.cor <- function
 ###############################################################################
 #' Plot proxies and create summary table over common period
 #'
-#' @param data.all list or enviroment that holds proxy time series 
-#' @param names names or indexs of time series, \strong{defaults to all time series} 
+#' @param data.all list or environment that holds proxy time series 
+#' @param names names or indexes of time series, \strong{defaults to all time series} 
 #' @param price.fn name of price function, \strong{defaults to Ad} 
 #'
 #' @return nothing
@@ -110,8 +110,8 @@ layout(1)
 ###############################################################################
 #' Plot 12 Month Spread for 2 symbols over common period
 #'
-#' @param data.all list or enviroment that holds proxy time series 
-#' @param names names or indexs of time series, \strong{defaults to all time series} 
+#' @param data.all list or environment that holds proxy time series 
+#' @param names names or indexes of time series, \strong{defaults to all time series} 
 #' @param price.fn name of price function, \strong{defaults to Ad} 
 #'
 #' @return nothing
@@ -155,8 +155,8 @@ plot12month.rolling.spread <- function(data.all, names = ls(data.all), price.fn=
 ###############################################################################
 #' Plot all proxies overlaying the longest one
 #'
-#' @param data.all list or enviroment that holds proxy time series 
-#' @param names names or indexs of time series, \strong{defaults to all time series} 
+#' @param data.all list or environment that holds proxy time series 
+#' @param names names or indexes of time series, \strong{defaults to all time series} 
 #' @param price.fn name of price function, \strong{defaults to Ad} 
 #'
 #' @return nothing
@@ -197,8 +197,8 @@ proxy.overlay.plot <- function(data.all, names = ls(data.all), price.fn=Ad)
 ###############################################################################
 #' Plot complete history for each index for Close and Adjusted, and create summary table
 #'
-#' @param data list or enviroment that holds proxy time series 
-#' @param names names or indexs of time series, \strong{defaults to all time series} 
+#' @param data list or environment that holds proxy time series 
+#' @param names names or indexes of time series, \strong{defaults to all time series} 
 #'
 #' @return nothing
 #'

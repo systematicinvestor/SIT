@@ -1,6 +1,6 @@
 \name{beta.degree}
 \alias{beta.degree}
-\title{Convert beta (slope of reggression line) to degrees}
+\title{Convert beta (slope of regression line) to degrees}
 \usage{
   beta.degree(beta)
 }
@@ -11,7 +11,7 @@
   angle
 }
 \description{
-  Convert beta (slope of reggression line) to degrees
+  Convert beta (slope of regression line) to degrees
 }
 \examples{
 \dontrun{

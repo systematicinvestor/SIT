@@ -16,7 +16,7 @@
   \item{index.class}{class of the date object,
   \strong{defaults to 'Date'}}
 
-  \item{...}{additional paramaeters to the
+  \item{...}{additional parameters to the
   \code{\link{as.POSIXct}} function}
 }
 \value{

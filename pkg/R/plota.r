@@ -28,7 +28,7 @@
 ###############################################################################
 #' Plota Control Parameters & Themes
 #'
-#' Set the color theme, the defaul theme is plota.theme.green.orange()
+#' Set the color theme, the default theme is plota.theme.green.orange()
 #'
 #' @param col.border border color
 #' @param col.up up color
@@ -376,7 +376,7 @@ plota.text <- function(
 #' @param sprefix start prefix string, \strong{defaults to ''}
 #' @param eprefix end postfix string, \strong{defaults to ''}
 #'
-#' @return formated numbers
+#' @return formatted numbers
 #'
 #' @export 
 ###############################################################################
@@ -959,7 +959,7 @@ plota.colors.experimental = function(N) {
 
 
 ###############################################################################
-#' Create Staccked plot
+#' Create Stacked plot
 #'
 #' @param x dates object
 #' @param y matrix with weights
@@ -1138,7 +1138,7 @@ plota.add.copyright <- function(copyright = 'Systematic Investor') {
 #'
 #' @param col highlight color for recession periods, \strong{defaults to \code{\link{col.add.alpha}}('gray', 50) - alpha = 50 so it's relatively transparent }
 #' @param ylim y-range to highlight recession periods, \strong{defaults to \code{\link{par}}('usr')[3:4] - extremes y coordinates of the plotting region }
-#' @param ... additional parameters for the \code{\link{rect}} fucntion
+#' @param ... additional parameters for the \code{\link{rect}} function
 #'
 #' @return nothing
 #'
@@ -1168,9 +1168,9 @@ plota.recession <- function
 ###############################################################################
 #' Create Ascii(txt) plot
 #' 
-#' Based on the folloiwng idea: [ASCII Plotting Functions for R](http://stackoverflow.com/questions/14736556/ascii-plotting-functions-for-r)
+#' Based on the following idea: [ASCII Plotting Functions for R](http://stackoverflow.com/questions/14736556/ascii-plotting-functions-for-r)
 #'
-#' Plot multiple series by stacking data and using corresponding lables (pch)
+#' Plot multiple series by stacking data and using corresponding labels (pch)
 #' also works with NA's so we can potentially plot many partial series
 #' 
 #' @param y matrix or vector of y values

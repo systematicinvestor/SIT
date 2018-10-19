@@ -20,8 +20,8 @@
   nothing
 }
 \description{
-  This function a convience wrapper for install.packages()
-  function
+  This function a convenience wrapper for
+  install.packages() function
 }
 \examples{
 \dontrun{

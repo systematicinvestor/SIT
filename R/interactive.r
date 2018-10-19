@@ -26,7 +26,7 @@
 #' Add Vertical, Horizontal, Cross line to existing plot at location of mouse click
 #' based on getGraphicsEvent {grDevices}
 #'
-#' Please note there is also an interacive plot version in
+#' Please note there is also an interactive plot version in
 #' library(playwith)
 #' playwith(plot(1:10))
 #'

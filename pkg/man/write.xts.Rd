@@ -9,10 +9,10 @@
 
   \item{filename}{file name}
 
-  \item{append}{flag to inidicate if file is overwritten or
+  \item{append}{flag to indicate if file is overwritten or
   appended, \strong{defaults to FALSE}}
 
-  \item{...}{additional paramaeters to the
+  \item{...}{additional parameters to the
   \code{\link{format}} function}
 }
 \value{

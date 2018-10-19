@@ -6,10 +6,10 @@
     price.fn = Ad)
 }
 \arguments{
-  \item{data.all}{list or enviroment that holds proxy time
+  \item{data.all}{list or environment that holds proxy time
   series}
 
-  \item{names}{names or indexs of time series,
+  \item{names}{names or indexes of time series,
   \strong{defaults to all time series}}
 
   \item{price.fn}{name of price function, \strong{defaults

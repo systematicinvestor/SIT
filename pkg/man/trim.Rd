@@ -1,6 +1,6 @@
 \name{trim}
 \alias{trim}
-\title{Remnove any leading and trailing spaces}
+\title{Remove any leading and trailing spaces}
 \usage{
   trim(s)
 }
@@ -11,8 +11,7 @@
   resulting string
 }
 \description{
-  This function will remnove any leading and trailing
-  spaces
+  This function will remove any leading and trailing spaces
 }
 \examples{
 \dontrun{

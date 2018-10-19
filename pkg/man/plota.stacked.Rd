@@ -1,6 +1,6 @@
 \name{plota.stacked}
 \alias{plota.stacked}
-\title{Create Staccked plot}
+\title{Create Stacked plot}
 \usage{
   plota.stacked(x, y, xlab = "",
     col = plota.colors(ncol(y)), type = c("l", "s"),
@@ -26,7 +26,7 @@
   nothing
 }
 \description{
-  Create Staccked plot
+  Create Stacked plot
 }
 \examples{
 \dontrun{

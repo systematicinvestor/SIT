@@ -12,7 +12,7 @@
 }
 \description{
   If frequency of observations in the given time series is
-  less than monthly, i.e. quaterly or annually, properly
+  less than monthly, i.e. quarterly or annually, properly
   align this time series to monthly
 }
 \examples{

@@ -744,7 +744,7 @@ risk.parity.portfolio <- function(
 				
 		# re-scale weights to penalize for risk		
 		x = 1 / fn(ia)[risk.index]
-			# if an asset has a negative fn this asset’s weight will be 0; 
+			# if an asset has a negative fn this assetâ€™s weight will be 0; 
 			x[x < 0] = 0
 		
 		# normalize weights to sum up to 1
@@ -800,7 +800,7 @@ risk.parity.portfolio <- function(
 	#
 	# Mathematically, Equation 9, maximum diversification, is also analogous 
 	# to maximizing the Sharpe ratio, 
-	# where each stock’s expected return is equal to its volatility.
+	# where each stockâ€™s expected return is equal to its volatility.
 	#
 	# Please see Max Sharpe ratio for implementation including linear constraints
 	#

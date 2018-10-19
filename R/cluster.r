@@ -40,7 +40,7 @@ setup.cluster <- function(expr = NULL, varlist = NULL, envir = .GlobalEnv, cores
 	load.packages('parallel')	
 	cores = min(cores, detectCores())
 		
-	# we don't want to execute defult settings	
+	# we don't want to execute default settings	
 		Sys.unsetenv("R_PROFILE_USER")	
 	cl = makeCluster(cores)	
 	

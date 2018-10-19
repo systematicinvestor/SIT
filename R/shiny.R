@@ -31,7 +31,7 @@
 #' @param header.col background color for the header row
 #' @param row.col background color for alternative rows
 #' @param negative.col text color for negative values
-#' @param ... additional parameters to the \code{\link{reactiveTable}} fucntion
+#' @param ... additional parameters to the \code{\link{reactiveTable}} function
 #'
 #' @return HTML table
 #'
