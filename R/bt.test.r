@@ -5500,7 +5500,7 @@ bt.aaa.test <- function()
 	getSymbols(tickers, src = 'yahoo', from = '1980-01-01', env = data, auto.assign = T)
 	
 	
-	# contruct another back-test environment with split-adjusted prices, do not include dividends
+	# contruct another back-test enviroment with split-adjusted prices, do not include dividends
 	# http://www.fintools.com/wp-content/uploads/2012/02/DividendAdjustedStockPrices.pdf
 	# http://www.pstat.ucsb.edu/research/papers/momentum.pdf
 	data.price <- new.env()
@@ -7894,7 +7894,11 @@ bt.cluster.portfolio.allocation.test1 <- function()
 						RP=risk.parity.portfolio(),
 						
 						C.EW = distribute.weights(equal.weight.portfolio, cluster.group),
-						C.RP=distribute.weights(risk.parity.portfolio(), cluster.group)
+						C.RP=distribute.weights(risk.parity.portfolio(), cluster.group),
+						
+						IVP = inverse.variance.portfolio,
+						C.IVP=distribute.weights(inverse.variance.portfolio, cluster.group, inverse.variance.portfolio),
+						HRP = hierarchical.risk.parity						
 			)
 	) 		
 	

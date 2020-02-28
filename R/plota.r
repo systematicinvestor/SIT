@@ -212,7 +212,7 @@ plota <- function
 	}
 		
 	# create plot frame, do not plot data
-	temp.x = attr(y, 'index')	
+	temp.x = xts::.index(y)
 	plot( temp.x, y1, xlab = xlab, ylab = ylab, main = main,
 		type = 'n', yaxt = 'n', xaxt = 'n', ylim = ylim, log = log, ... )
 		
@@ -294,7 +294,7 @@ plota2Y <- function(
 	# plot
 	par(new = TRUE)
 	xlim = par('usr')[1:2]
-	plot( attr(y1, 'index') , y1[,1], xlim = xlim, xaxs = 'i', type = type,
+	plot( xts::.index(y1) , y1[,1], xlim = xlim, xaxs = 'i', type = type,
 		yaxt = 'n', xaxt = 'n', xlab = '', ylab = '', axes = F, ... )
 		
 		# Y axis rotation
@@ -337,7 +337,7 @@ plota.lines <- function(
 {
 	if(has.Cl(y)) y1 = Cl(y) else y1 = y[,1]	
 	
-	temp.x = attr(y, 'index')
+	temp.x = xts::.index(y)
 	
 	if( type == 'l' & len(col) > 1 ) {
 		for( icol in unique(col) ) {
@@ -494,7 +494,7 @@ plota.dx <- function
 	
 	# R by default extends xrange by 1.08
 	xlim = par('usr')[1:2]
-	xportion = min(1, diff(unclass(range(attr(y1, 'index'))))*1.08 / diff(xlim) )
+	xportion = min(1, diff(unclass(range(xts::.index(y1))))*1.08 / diff(xlim) )
 	return( xportion * diff(xlim) / ( 2* nrow(y1)  ) )
 }
 
@@ -549,7 +549,7 @@ plota.x.highlight.helper <- function
 	if(par('ylog')) temp.y = 10^temp.y
 	
 	
-	temp.x = attr(y, 'index')		
+	temp.x = xts::.index(y)		
 	for( i in seq(1,len(hl_index),2) ) {		
 		rect(temp.x[hl_index[i]] - dx/2, temp.y[1],
 			temp.x[hl_index[(i + 1)]] + dx/2, temp.y[2],
@@ -648,7 +648,7 @@ plota.candle <- function
 	} else if ( dxi0 < 1.75 ) {
 		plota.ohlc.lwd(y, col = col, lwd = 1)
 	} else {
-		temp.x = attr(y, 'index')
+		temp.x = xts::.index(y)
 		
 		rect(temp.x - dx/10, Lo(y), temp.x + dx/10, Hi(y), 
 			col = plota.control$col.border, border = plota.control$col.border)
@@ -677,7 +677,7 @@ plota.ohlc <- function
 	} else if ( dxi0 < 1.75 ) {
 		plota.ohlc.lwd(y, col = col, lwd = 1)
 	} else {
-		temp.x = attr(y, 'index')
+		temp.x = xts::.index(y)
 		
 		rect(temp.x - dx/8, Lo(y), temp.x + dx/8, Hi(y), col = col, border = col)
 		segments(temp.x - dx/2, Op(y), temp.x, Op(y), col = col)	
@@ -702,7 +702,7 @@ plota.hl <- function
 	if( dxi0 < 1.75 ) {
 		plota.hl.lwd(y, col = col, lwd = 1)
 	} else {
-		temp.x = attr(y, 'index')
+		temp.x = xts::.index(y)
 		
 		rect(temp.x - dx/2, Lo(y), temp.x + dx/2, Hi(y), 
 			col = col, border = border)
@@ -720,7 +720,7 @@ plota.ohlc.lwd <- function
 )
 {
 	dx = plota.dx(y)
-	temp.x = attr(y, 'index')	
+	temp.x = xts::.index(y)	
 	
 	segments(temp.x, Lo(y), temp.x, Hi(y), lwd = lwd, lend = 2,  ...)
 	segments(temp.x - dx/2, Op(y), temp.x, Op(y), lwd = lwd, lend = 2, ...)
@@ -737,7 +737,7 @@ plota.hl.lwd <- function
 	...					# other parameters to segments
 )
 {
-	temp.x = attr(y, 'index')	
+	temp.x = xts::.index(y)	
 	
 	segments(temp.x, Lo(y), temp.x, Hi(y), lwd = lwd, lend = 2, ...)
 }
@@ -757,7 +757,7 @@ plota.volume <- function
 	# convert dx to line width
 	dxi0 = ( dx / xinch() ) * 96
 	
-	temp.x = attr(y, 'index')	
+	temp.x = xts::.index(y)	
 	
 	if( dxi0 < 1.75 ) {
 		segments(temp.x, 0, temp.x, Vo(y), col = col, lwd = 1, lend = 2)	

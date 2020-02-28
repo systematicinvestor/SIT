@@ -1,10 +1,6 @@
 ###############################################################################
 # Setup
 ###############################################################################
-library(devtools)
-library(roxygen)
-library(roxygen2)
-
 package.name = 'SIT'
 os = Sys.info()[["sysname"]]
 
@@ -44,7 +40,7 @@ write.dcf(list(
     LazyLoad = 'yes',
     Author = 'Michael Kapler <TheSystematicInvestor@gmail.com>', 
     Maintainer = 'Michael Kapler <TheSystematicInvestor@gmail.com>',
-	Depends = 'SIT.date'
+	Depends = 'SIT.date,quantmod,xts'
     ), 
     file = file.path('pkg', "DESCRIPTION")
 )
@@ -122,13 +118,20 @@ NULL
 ###############################################################################
 # Create documentaion and build package
 ###############################################################################
-roxygenize('pkg', copy.package = F, unlink.target = F, overwrite = T)
 
-pkg <- as.package('pkg')
-name = devtools:::build(pkg, 'pkg')
+pkg = 'pkg'
+devtools::document(pkg);
+devtools::spell_check(pkg);
+name = devtools::build(pkg)
 
 file.rename(name, paste(package.name, '.tar.gz', sep=''))
-file.remove(name)
+#file.remove(name)
+
+# devtools::install(pkg, quick = TRUE, dependencies = FALSE);
+
+devtools::install(pkg, quick = TRUE, dependencies = FALSE);
+
+
 
 ###############################################################################
 # Usage

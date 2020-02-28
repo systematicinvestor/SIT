@@ -501,7 +501,7 @@ get.CRB <- function(...)
       out[, 'Volume'] = 0
   #out = make.xts( out, as.Date(temp[,1], '%m/%d/%y'))
   out = make.xts( out, as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%m/%d/%y'))  
-    indexClass(out) = 'Date'  
+    xts::tclass(out) = 'Date'  
   
   return(out)
 }   
@@ -1276,7 +1276,7 @@ bundes.bank.data <- function(symbol) {
 
   #hist = make.xts(as.double(temp[,2]), as.Date(temp[,1], '%Y-%m-%d'))    
   hist = make.xts(as.double(temp[,2]), as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%Y-%m-%d'))
-    indexClass(hist) = 'Date'     
+    xts::tclass(hist) = 'Date'     
     colnames(hist)='Close'
   return( hist[!is.na(hist)] )
 }
@@ -1308,7 +1308,7 @@ fx.sauder.data <- function(start.year, end.year, base.cur, target.curs) {
 
   #hist = make.xts(as.matrix(temp[,-c(1:3)]), as.Date(temp[,2], '%Y/%m/%d'))    
   hist = make.xts(as.matrix(temp[,-c(1:3)]), as.POSIXct(temp[,2], tz = Sys.getenv('TZ'), format='%Y/%m/%d'))
-    indexClass(hist) = 'Date'
+    xts::tclass(hist) = 'Date'
     colnames(hist) = gsub(paste('.', base.cur, sep=''), '', colnames(hist))
     
   return( hist[!is.na(hist[,1]),] )
@@ -1349,7 +1349,7 @@ getSymbols.PI <- function
     temp = read.delim(filename, header=TRUE, sep=',')   
     #out = make.xts(temp[,-1], as.Date(temp[,1],'%m/%d/%Y'))
     out = make.xts(temp[,-1], as.POSIXct(temp[,1], tz = Sys.getenv('TZ'), format='%m/%d/%Y'))
-      indexClass(out) = 'Date'
+      xts::tclass(out) = 'Date'
       out$Adjusted = out$Close
       
 cat(i, 'out of', len(Symbols), 'Reading', Symbols[i], '\n', sep='\t')         
@@ -1858,7 +1858,7 @@ data.ff <- function(
   # url
   period = ifna(map[periodicity[1]], periodicity[1])
   filename.zip = paste(name[1], period, file.suffix, '.zip', sep='')
-  filename.txt = paste(name[1], period, '.txt', sep='')
+  filename.txt = paste(name[1], period, gsub('_','.',file.suffix), sep='')  
   url = paste('http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/', filename.zip, sep='')
         
   # download zip archive
@@ -1884,19 +1884,67 @@ data.ff <- function(
 
   if(len(files) == 1) {
   	filename = paste(temp.folder, '/', filename.txt, sep='')
-  	return( data.ff.internal.one.file(filename) )
+	if(file.suffix != '_CSV')	
+  	  return( data.ff.internal.one.file(filename) )
+	else
+  	  return( data.ff.internal.one.file.csv(filename) )	
   }
   
   data = env()
   library(stringr)
   names = str_trim(str_match(files,'.*/(.*)\\..*')[,2])
   for(i in 1:len(files))
-  	data[[ names[i] ]] = data.ff.internal.one.file(files[i])
+  	if(file.suffix != '_CSV')  
+  	  data[[ names[i] ]] = data.ff.internal.one.file(files[i])
+	else
+  	  data[[ names[i] ]] = data.ff.internal.one.file.csv(files[i])
   
   data  
 }  
   
 
+data.ff.internal.one.file.csv = function(filename) {  
+  out = readLines(filename)
+    index = which(nchar(out) == 0)
+  
+  data.index = grep('^[ 0-9\\.\\+-\\,]+$', out)
+    temp.index = which(diff(data.index) > 1)
+  data.index = matrix(data.index[sort(c(1, temp.index, temp.index+1, len(data.index)))], nc=2, byrow=T)
+
+  # extract sections  
+  data = list() 
+  for(i in 1:nrow(data.index)) {
+    start.index = data.index[i,1] - 2
+	name = trim(out[start.index])
+	if(nchar(name) == 0) name = 'data'
+    colnames = scan(text = out[start.index+1], what='', sep=',', quiet=T)	
+
+    # re-read data  
+    temp =  matrix(scan(filename, what = double(), sep=',', quiet=T,
+      skip = (data.index[i,1]-1),  
+      nlines = (data.index[i,2] - data.index[i,1]+1))
+      , nc=len(colnames), byrow=T)
+    
+    date.format = '%Y%m%d'  
+    date.format.add = ''
+    date.format.n = nchar(paste(temp[1,1]))
+    
+    if( date.format.n == 6 ) {
+      date.format.add = '01'    
+    } else if( date.format.n == 4 ) {
+      date.format.add = '0101'  
+    } 
+
+    find.name = function(name,data, i=0) if( is.null(data[[name]]) ) name else find.name(paste(name,i+1), data, i+1)    
+    name = find.name(name, data)
+    	
+    data[[name]] = make.xts(temp[,-1], as.Date(paste(temp[,1], date.format.add, sep=''),date.format))
+      colnames(data[[name]]) = colnames[-1]
+  }
+  data
+}
+
+  
 # internal helper function
 data.ff.internal.one.file = function(filename) {  
   out = readLines(filename)

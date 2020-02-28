@@ -1066,7 +1066,7 @@ make.xts <- function
 
     x = structure(.Data = x, 
       index = structure(index, tzone = tzone, tclass = orderBy), 
-      class = c('xts', 'zoo'), .indexCLASS = orderBy, tclass=orderBy, .indexTZ = tzone, tzone=tzone)
+      class = c('xts', 'zoo'))
       
     if (!is.null(attributes(x)$dimnames[[1]]))
         dimnames(x) <- dimnames(x)              
@@ -1126,7 +1126,7 @@ flip.xts <- function(x)
   dates = index(x)
   dates.index = nrow(x):1
   out = make.xts(coredata(x)[dates.index,], dates[dates.index])
-    indexClass(out) = indexClass(x)
+    xts::tclass(out) = xts::tclass(x)
   return( out )
 }
 
@@ -1160,6 +1160,23 @@ write.xts <- function
   write.table(x, sep=',',  row.names = format(index(x), ...), 
     col.names = NA, file = filename, append = T, quote = F)
   #write.csv(x, row.names = format(index(x)), filename) 
+}
+
+#' @export 
+write.xts.rev = function
+(
+  x,      # XTS object
+  filename, # file name
+  append = FALSE, 
+  ...
+)
+{
+    cat("Date", file = filename, append = append)
+	
+	x = as.matrix(x)[nrow(x):1,]
+	
+    write.table(x, sep = ",", row.names = rownames(x),
+        col.names = NA, file = filename, append = T, quote = F)
 }
 
 ###############################################################################
@@ -1232,7 +1249,7 @@ if(!is.data.table(x)) {
   dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
     dates.index = iif(is.null(decreasing), 1:nrow(data), order(dates, decreasing = decreasing) )
   out = make.xts(data[dates.index,,drop=F], dates[dates.index])
-    indexClass(out) = index.class
+    xts::tclass(out) = index.class
   return( out )
 }  
 
@@ -1253,12 +1270,12 @@ read.xts.old <- function
   dates = as.POSIXct(match.fun(date.fn)(out[,1]), tz = Sys.getenv('TZ'), ...)
     dates.index = order(dates, decreasing = decreasing)
   out = make.xts(out[dates.index,-1,drop=F], dates[dates.index])
-    indexClass(out) = index.class
+    xts::tclass(out) = index.class
   return( out )
 
 # Example code from getSymbols.yahoo (quantmod): as.POSIXct is used to avoid Dates conversion problems
 # fr = xts(1, as.POSIXct('2012-10-31', tz = Sys.getenv("TZ"), format='%Y-%m-%d'),  src = "yahoo", updated = Sys.time())
-# indexClass(fr) = "Date" 
+# xts::tclass(fr) = "Date" 
 }
 
 read.xts.yahoo.old <- function
@@ -1285,7 +1302,7 @@ read.xts.yahoo.old <- function
     out[,6] = temp[[7]]
     
     out = make.xts(out[dates.index,],  dates[dates.index])
-    indexClass(out) = index.class
+    xts::tclass(out) = index.class
   return( out )
 }
 
@@ -1359,10 +1376,10 @@ index.xts <- function
   x     # XTS object
 )
 {
-  temp = attr(x, 'index')
+  temp = xts::.index(x)
   class(temp) = c('POSIXct', 'POSIXt')
   
-    type = attr(x, '.indexCLASS')[1]
+    type = xts::tclass(x)[1]
     if( type == 'Date' || type == 'yearmon' || type == 'yearqtr')
     temp = as.Date(temp)
   return(temp)
@@ -1375,7 +1392,7 @@ index4xts <- function
   x     # XTS object
 )
 {
-  temp = attr(x, 'index')
+  temp = xts::.index(x)
   class(temp)='POSIXct' 
   
   return(temp)
@@ -1384,7 +1401,7 @@ index4xts <- function
 index2date.time <- function(temp) {
   class(temp)='POSIXct' 
   
-  if( attr(x, '.indexCLASS')[1] == 'Date') {  
+  if( xts::tclass(x)[1] == 'Date') {  
     as.Date(temp)
   } else {
     as.POSIXct(temp, tz = Sys.getenv('TZ'))

@@ -43,7 +43,7 @@ bt.merge <- function
 	# put all dates into one large vector
 	itemp = 1
 	for( i in 1:nsymbols ) {
-		all.dates[itemp : (itemp + ncount[i] -1)] = attr(b[[ symbolnames[i] ]], 'index')
+		all.dates[itemp : (itemp + ncount[i] -1)] = xts::.index(b[[ symbolnames[i] ]])
 		itemp = itemp + ncount[i]
 	}
 		
@@ -55,7 +55,7 @@ bt.merge <- function
 	if(!is.null(dates)) { 
 		class(unique.dates) = c('POSIXct', 'POSIXt')	
 		temp = make.xts(integer(len(unique.dates)), unique.dates) 		
-		unique.dates = attr(temp[dates], 'index')
+		unique.dates = xts::.index(temp[dates])
 	}
 		
 	# date map
@@ -990,8 +990,8 @@ bt.trade.summary <- function
 		out = list()
 		out$stats = cbind(
 			bt.trade.summary.helper(trades),
-			bt.trade.summary.helper(trades[trades[, 'weight'] >= 0, ]),
-			bt.trade.summary.helper(trades[trades[, 'weight'] <0, ])
+			bt.trade.summary.helper(trades[trades[, 'weight'] >= 0, , drop=F]),
+			bt.trade.summary.helper(trades[trades[, 'weight'] <0, , drop=F])
 		)
 		colnames(out$stats) = spl('All,Long,Short')
 		

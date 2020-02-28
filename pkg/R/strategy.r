@@ -901,6 +901,82 @@ ef.portfolio <- function(percent = 0.5)
 }	
 
 
+
+
+# The inverse-variance portfolio
+#' @export 
+inverse.variance.portfolio = function(ia, constraints) {
+	risk.index = get.risky.asset.index(ia)
+
+	x = 1 / diag(ia$cov[risk.index, risk.index])
+	w = x / sum(x)
+	
+	set.risky.asset(w, risk.index)	
+}
+
+# Hierarchical Risk Parity  by Dr. Marcos López de Prado
+# https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678
+# https://quantdare.com/hierarchical-risk-parity/
+# http://gallery.rcpp.org/articles/hierarchical-risk-parity/
+# https://quantstrattrader.wordpress.com/2017/05/22/the-marcos-lopez-de-prado-hierarchical-risk-parity-algorithm/
+
+# Compute variance per cluster
+get.cluster.var = function(mcov, index) {
+	get.ivp = function(mcov) {  
+	  ivp = 1 / diag(mcov)
+	  ivp / sum(ivp)
+	}
+
+	mcov.slice = mcov[index, index, drop=F]
+	w = get.ivp(mcov.slice)
+	cVar  = t(w) %*% as.matrix(mcov.slice) %*% w
+	cVar[1]
+}
+
+# Compute HRP alloc
+get.rec.bipart = function(mcov, index) {
+    w = rep(1, ncol(mcov))
+    index = list(index) # initialize all items in one cluster
+    while(length(index) > 0) {
+        new.index = list()
+        for(i in index) {
+            mid.index = 1:floor(length(i)/2)
+            index0 = i[mid.index]
+            index1 = i[-mid.index]
+            cVar0 = get.cluster.var(mcov, index0)
+            cVar1 = get.cluster.var(mcov, index1)
+            alpha = 1 - cVar0/(cVar0 + cVar1)
+            w[index0] = w[index0] * alpha
+            w[index1] = w[index1] * (1-alpha)
+            if(length(index0) > 1) new.index = c(new.index, list(index0))
+            if(length(index1) > 1) new.index = c(new.index, list(index1))
+			index = new.index
+        }
+    }
+    w
+}
+
+# Hierarchical Risk Parity  by Dr. Marcos López de Prado
+# https://papers.ssrn.com/sol3/papers.cfm?abstract_id=27
+#' @export 
+hierarchical.risk.parity = function(ia, constraints) {
+	risk.index = get.risky.asset.index(ia)
+
+	clust.order = hclust(dist(ia$correlation[risk.index, risk.index]), method = 'single')$order
+	
+	# Optionally use short-term risk (20 day) and oroignal correlation
+	#risk = apply(mlast(ia$hist.returns,20) , 2, sd, na.rm = T)
+	#mcov = ia$correlation * (risk %*% t(risk))	
+	
+	mcov = ia$cov
+	
+	w = get.rec.bipart(mcov[risk.index, risk.index], clust.order)
+	
+	set.risky.asset(w, risk.index)	
+}	
+
+
+
 #*****************************************************************	
 # Tracking Error minimization:
 # http://www.mathworks.com/matlabcentral/answers/59587-how-to-use-the-objective-function-minimize-te-in-quadprog
