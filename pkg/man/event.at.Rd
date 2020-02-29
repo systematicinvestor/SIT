@@ -4,8 +4,13 @@
 \alias{event.at}
 \title{Helper functions, subject to change}
 \usage{
-event.at(x, period = "month", amount = 1, period.ends = date.ends(x,
-  period), offset = 1)
+event.at(
+  x,
+  period = "month",
+  amount = 1,
+  period.ends = date.ends(x, period),
+  offset = 1
+)
 }
 \description{
 Helper functions, subject to change

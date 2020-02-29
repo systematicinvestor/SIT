@@ -2882,7 +2882,7 @@ quantumonline.info <- function
 #' http://web.tmxmoney.com/pricehistory.php?qm_page=90043&qm_symbol=HOD
 #' http://www.quotemedia.com/portal/history?qm_symbol=HOD:CA
 #'
-#' @export 
+#' @export hist.quotes.url
 ###############################################################################
 hist.quotes.url <- function
 (

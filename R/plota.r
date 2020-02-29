@@ -1176,7 +1176,7 @@ plota.recession <- function
 #' @param y matrix or vector of y values
 #' @param x optional vector of x values, \strong{defaults to 1:nr, where nr is the number of rows in y}
 #' @param pch optional vector of markers for time series, \strong{defaults to 1:nc, where nc is the number of columns in y}
-#' @param width optional location of the plot legend, \strong{defaults to 80% of the screen width}
+#' @param width optional location of the plot legend, \strong{defaults to 0.8 of the screen width}
 #'
 #' @return nothing
 #'
@@ -1190,7 +1190,7 @@ plota.recession <- function
 #' plot.txt(cbind(y,y1),x)
 #' plot.txt(cbind(y,y1),x,pch=c('+','*'))
 #' }
-#' @export 
+#' @export plot.txt
 ############################################################################### 
 plot.txt = function
 (

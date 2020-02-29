@@ -7,8 +7,14 @@
 \alias{plota.theme.gray.orange}
 \title{Plota Control Parameters & Themes}
 \usage{
-plota.theme(col.border = "black", col.up = "green", col.dn = "red",
-  col.x.highlight = "orange", col.y.highlight = "orange", alpha = NA)
+plota.theme(
+  col.border = "black",
+  col.up = "green",
+  col.dn = "red",
+  col.x.highlight = "orange",
+  col.y.highlight = "orange",
+  alpha = NA
+)
 
 plota.theme.blue.red(alpha = NA)
 

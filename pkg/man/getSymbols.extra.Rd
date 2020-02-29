@@ -4,9 +4,16 @@
 \alias{getSymbols.extra}
 \title{Helper function to extend functionality of getSymbols}
 \usage{
-getSymbols.extra(Symbols = NULL, env = parent.frame(),
-  getSymbols.fn = getSymbols, raw.data = new.env(),
-  set.symbolnames = F, auto.assign = T, try.extend = T, ...)
+getSymbols.extra(
+  Symbols = NULL,
+  env = parent.frame(),
+  getSymbols.fn = getSymbols,
+  raw.data = new.env(),
+  set.symbolnames = F,
+  auto.assign = T,
+  try.extend = T,
+  ...
+)
 }
 \description{
 Syntax to specify tickers:

@@ -574,7 +574,7 @@ asset.paths.at.period.ends <- function(
 # Generate All Possible Combinations
 # there are 2^n - 1 distinct permutations
 # Please note: first row contains all zeros
-#' @export 
+#' @export all.permutations
 ###############################################################################
 all.permutations <- function(n = 1) {
 	m = matrix(F,2^n,n)

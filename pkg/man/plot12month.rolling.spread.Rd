@@ -4,8 +4,7 @@
 \alias{plot12month.rolling.spread}
 \title{Plot 12 Month Spread for 2 symbols over common period}
 \usage{
-plot12month.rolling.spread(data.all, names = ls(data.all),
-  price.fn = Ad)
+plot12month.rolling.spread(data.all, names = ls(data.all), price.fn = Ad)
 }
 \arguments{
 \item{data.all}{list or environment that holds proxy time series}

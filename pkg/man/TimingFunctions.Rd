@@ -11,8 +11,6 @@ toc(identifier)
 }
 \arguments{
 \item{identifier}{name for this timing session}
-
-\item{identifier}{name for this timing session}
 }
 \value{
 nothing

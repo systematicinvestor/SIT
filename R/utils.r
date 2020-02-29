@@ -824,7 +824,7 @@ mat <- function
 #' matrix(1:3, nr=5, nc=3, byrow=T)
 #' rep.row(1:3, 5)
 #' }
-#' @export 
+#' @export rep.row
 ###############################################################################
 rep.row <- function
 (
@@ -850,7 +850,7 @@ rep.row <- function
 #' matrix(1:5, nr=5, nc=3, byrow=F)
 #' rep.col(1:5, 3)
 #' }
-#' @export 
+#' @export rep.col
 ###############################################################################
 rep.col <- function
 (
@@ -1076,7 +1076,7 @@ make.xts <- function
 
 # convenience function: take list of xts objects with 1 column and combine them into
 # one xts object with column names beign names in the input list
-#' @export 
+#' @export as.xts.list
 as.xts.list <- function(data) { for(n in names(data)) colnames(data[[n]])=n; do.call(cbind, data)}
 
 
@@ -1368,7 +1368,7 @@ read.xts.test <- function() {
 #' \dontrun{ 
 #' index.xts(make.xts(1:101,seq(Sys.Date()-100, Sys.Date(), 1)))
 #' }
-#' @export 
+#' @export index.xts
 ###############################################################################
 # maybe rename to bt.index.xts
 index.xts <- function
@@ -1524,7 +1524,7 @@ make.stock.xts <- function(out, column=1) {
 #' \dontrun{ 
 #' plota.matplot(scale.one(data$prices))
 #' }
-#' @export 
+#' @export scale.one
 ############################################################################### 
 # scale.one <- function(x) x / rep.row(as.numeric(x[1,]), nrow(x))  
 scale.one <- function
@@ -1994,7 +1994,7 @@ expr.symbols.test = function() {
 ###############################################################################
 
 ###############################################################################
-#' @export 
+#' @export log.fn
 ###############################################################################
 log.fn <- function(p.start=0, p.end=1) {
   p.start = p.start
@@ -2005,7 +2005,7 @@ log.fn <- function(p.start=0, p.end=1) {
 }
 
 ###############################################################################
-#' @export 
+#' @export log.fn.msg
 ###############################################################################
 log.fn.msg <- function(msg, log = log.fn()) {
   log = log
@@ -2124,7 +2124,7 @@ map2vector = function(expr, labels, default = 0) {
 ###############################################################################
 #' Reverse mapping
 #'
-#' @export 
+#' @export rev.map
 ###############################################################################
 rev.map = function(map) {
 	value = names(map)
@@ -2161,7 +2161,7 @@ read.file = function(file) readChar(file, file.info(file)$size)
 #' sb=NULL
 #' }
 #' @rdname string.buffer
-#' @export
+#' @export string.buffer
 ###############################################################################
 string.buffer = function() structure(list(file = rawConnection(raw(0L), open='w')), class = 'StringBuffer')
 
@@ -2170,7 +2170,7 @@ string.buffer = function() structure(list(file = rawConnection(raw(0L), open='w'
 add = function(x,...,sep,end.sep) UseMethod('add',x)
 
 #' @rdname string.buffer
-#' @export
+#' @export add.StringBuffer
 add.StringBuffer = function(x,...,sep=',',end.sep='\n') {
 	cat(..., file = x$file, sep = sep)	
 	if(nchar(end.sep) > 0) cat(end.sep, file = x$file)
@@ -2181,7 +2181,7 @@ add.StringBuffer = function(x,...,sep=',',end.sep='\n') {
 string = function(x) UseMethod('string',x)
 
 #' @rdname string.buffer
-#' @export
+#' @export string.StringBuffer
 string.StringBuffer = function(x) rawToChar(rawConnectionValue(x$file))
 
 #' @rdname string.buffer
@@ -2189,7 +2189,7 @@ string.StringBuffer = function(x) rawToChar(rawConnectionValue(x$file))
 close = function(x) UseMethod('close',x)
 
 #' @rdname string.buffer
-#' @export
+#' @export close.StringBuffer
 close.StringBuffer = function(x) {close(x$file); x$file = NULL}
 
 

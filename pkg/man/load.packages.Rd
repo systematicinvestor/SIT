@@ -4,8 +4,12 @@
 \alias{load.packages}
 \title{Load Packages that are available and install ones that are not available}
 \usage{
-load.packages(packages, repos = "http://cran.r-project.org",
-  dependencies = c("Depends", "Imports"), ...)
+load.packages(
+  packages,
+  repos = "http://cran.r-project.org",
+  dependencies = c("Depends", "Imports"),
+  ...
+)
 }
 \arguments{
 \item{packages}{names of the packages separated by comma}

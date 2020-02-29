@@ -1371,7 +1371,7 @@ bt.run.share.ex.allocate.test = function() {
 ###############################################################################	
 #' Round Lot
 #' a helper function for round.lot.basic
-#' @export 
+#' @export round.lot
 ###############################################################################
 round.lot = function(weight, price, capital, lot.size) {
 	weight = coredata(ifna(weight, 0))
@@ -1384,13 +1384,13 @@ round.lot = function(weight, price, capital, lot.size) {
 ###############################################################################	
 #' Round Lot Basic Base
 #' round lot to the nearest lot.size
-#' @export 
+#' @export round.lot.basic.base
 ###############################################################################
 round.lot.basic.base = function(weight, price, capital, lot.size) {
 	sign(weight) * floor(abs(weight * capital / price / lot.size)) * lot.size
 }
 
-#' @export 
+#' @export round.to
 round.to = function(x, to) {
 	sign(x) * floor(abs(x) / to) * to
 }
@@ -1398,7 +1398,7 @@ round.to = function(x, to) {
 ###############################################################################	
 #' Round Lot Basic
 #' round lot to the nearest lot.size and next try to reallocate remaining cash
-#' @export 
+#' @export round.lot.basic
 ###############################################################################
 round.lot.basic = function(weight, price, capital, lot.size) {
 	share = abs(weight * capital) / price		

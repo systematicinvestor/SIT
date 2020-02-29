@@ -5,9 +5,19 @@
 \title{minimally update portfolio to allocate cashflow
 only add new positions, such that abs(shares) only increases}
 \usage{
-bt.run.share.ex.invest(weight.new, weight.prev, weight.change.index, price,
-  share, cash, cashflow, commission, lot.size, silent = T,
-  control = default.round.lot.control())
+bt.run.share.ex.invest(
+  weight.new,
+  weight.prev,
+  weight.change.index,
+  price,
+  share,
+  cash,
+  cashflow,
+  commission,
+  lot.size,
+  silent = T,
+  control = default.round.lot.control()
+)
 }
 \description{
 minimally update portfolio to allocate cashflow

@@ -43,7 +43,7 @@
 # solveLP(cvec, bvec - Amat %*% dvec, Amat)$solution + dvec
 #
 # For portfolio weights, it is safe to assume that x.i >= -100
-#' @export 
+#' @export solve.LP.bounds
 ###############################################################################
 solve.LP.bounds <- function
 (
@@ -99,7 +99,7 @@ solve.LP.bounds <- function
 
 ###############################################################################
 # Solve QP problem, handling binary variables using Binary Branch and Bound
-#' @export 
+#' @export solve.QP.bounds
 ###############################################################################
 solve.QP.bounds <- function
 (

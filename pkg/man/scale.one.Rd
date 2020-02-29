@@ -4,8 +4,7 @@
 \alias{scale.one}
 \title{Normalize all timeseries to start at one}
 \usage{
-\method{scale}{one}(x, overlay = F, main.index = which(!is.na(x[1,
-  ]))[1])
+\method{scale}{one}(x, overlay = F, main.index = which(!is.na(x[1, ]))[1])
 }
 \arguments{
 \item{x}{\code{\link{xts}} time series}

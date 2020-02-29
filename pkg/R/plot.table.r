@@ -243,7 +243,7 @@ plot.table.helper.colorbar <- function
 #' # plot temp with colorbar, display Correlation in (top, left) cell	
 #' plot.table(temp, smain='Correlation', highlight = TRUE, colorbar = TRUE)	
 #' }
-#' @export 
+#' @export plot.table
 ###############################################################################
 plot.table <- function
 (

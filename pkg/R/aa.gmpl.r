@@ -168,7 +168,7 @@ minimize objective : ", join(symbolnames, '+'), ";
 
 ###############################################################################
 # Helper function to find Minimum Variance Portfolio
-#' @export 
+#' @export min.var.portfolio.gmpl
 ############################################################################### 
 min.var.portfolio.gmpl <- function(ia, constraints)
 {

@@ -4,9 +4,15 @@
 \alias{plot.table}
 \title{Plot Table}
 \usage{
-\method{plot}{table}(plot.matrix, smain = NULL, text.cex = 1,
-  frame.cell = T, highlight = F, colorbar = FALSE,
-  keep_all.same.cex = FALSE)
+\method{plot}{table}(
+  plot.matrix,
+  smain = NULL,
+  text.cex = 1,
+  frame.cell = T,
+  highlight = F,
+  colorbar = FALSE,
+  keep_all.same.cex = FALSE
+)
 }
 \arguments{
 \item{plot.matrix}{matrix to plot}

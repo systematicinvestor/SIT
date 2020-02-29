@@ -4,9 +4,14 @@
 \alias{getSymbols.sit}
 \title{Helper function to read historical stock prices saved by Seasonality tool}
 \usage{
-getSymbols.sit(Symbols, env = .GlobalEnv, auto.assign = TRUE,
+getSymbols.sit(
+  Symbols,
+  env = .GlobalEnv,
+  auto.assign = TRUE,
   stock.folder = "c:/temp/Seasonality/stocks",
-  stock.date.format = "\%Y-\%m-\%d", ...)
+  stock.date.format = "\%Y-\%m-\%d",
+  ...
+)
 }
 \arguments{
 \item{Symbols}{vector of symbols}

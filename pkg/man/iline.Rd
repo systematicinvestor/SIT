@@ -5,8 +5,12 @@
 \title{Add Vertical, Horizontal, Cross line to existing plot at location of mouse click
 based on getGraphicsEvent {grDevices}}
 \usage{
-iline(type = c("v", "h", "cross"), col = "red", remove.col = "white",
-  stop.key = "q")
+iline(
+  type = c("v", "h", "cross"),
+  col = "red",
+  remove.col = "white",
+  stop.key = "q"
+)
 }
 \value{
 nothing

@@ -4,8 +4,16 @@
 \alias{plota.legend}
 \title{Plot legend - shortcut to the \code{\link{legend}} function}
 \usage{
-plota.legend(labels, fill = NULL, lastobs = NULL, x = "topleft",
-  merge = F, bty = "n", yformat = plota.format, ...)
+plota.legend(
+  labels,
+  fill = NULL,
+  lastobs = NULL,
+  x = "topleft",
+  merge = F,
+  bty = "n",
+  yformat = plota.format,
+  ...
+)
 }
 \arguments{
 \item{labels}{legend labels}

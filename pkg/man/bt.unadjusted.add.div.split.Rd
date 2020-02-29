@@ -4,8 +4,11 @@
 \alias{bt.unadjusted.add.div.split}
 \title{Append dividend and split columns}
 \usage{
-bt.unadjusted.add.div.split(data.raw, yahoo.round.up.nearest.cents = F,
-  infer.div.split.from.adjusted = F)
+bt.unadjusted.add.div.split(
+  data.raw,
+  yahoo.round.up.nearest.cents = F,
+  infer.div.split.from.adjusted = F
+)
 }
 \description{
 Append dividend and split columns

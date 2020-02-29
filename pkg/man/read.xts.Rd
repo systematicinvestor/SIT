@@ -4,8 +4,16 @@
 \alias{read.xts}
 \title{Read \code{\link{xts}} object from file}
 \usage{
-read.xts(x, date.fn = paste, index.class = "Date",
-  decreasing = FALSE, sep = ",", date.column = 1, skip = 0L, ...)
+read.xts(
+  x,
+  date.fn = paste,
+  index.class = "Date",
+  decreasing = FALSE,
+  sep = ",",
+  date.column = 1,
+  skip = 0L,
+  ...
+)
 }
 \arguments{
 \item{date.fn}{function to preprocess string dates, \strong{defaults to \code{\link{paste}} - i.e. no preprocessing}}

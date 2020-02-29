@@ -177,7 +177,7 @@ compute.quantiles <- function
 
 ###############################################################################
 # Create Average factor
-#' @export 
+#' @export add.avg.factor
 ###############################################################################
 add.avg.factor <- function
 (
@@ -240,7 +240,7 @@ normalize.normal <- function
 
 ###############################################################################
 # Plot Quantiles
-#' @export 
+#' @export plot.quantiles
 ###############################################################################
 plot.quantiles <- function
 (
@@ -257,7 +257,7 @@ plot.quantiles <- function
 
 ###############################################################################
 # Plot Backtest Quantiles and spread (Q5-Q1)
-#' @export 
+#' @export plot.bt.quantiles
 ###############################################################################
 plot.bt.quantiles <- function
 (
@@ -305,7 +305,7 @@ plot.bt.quantiles <- function
 
 ###############################################################################
 # Plot Factors details
-#' @export 
+#' @export plot.factors
 ###############################################################################
 plot.factors <- function
 (

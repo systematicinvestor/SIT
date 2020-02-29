@@ -5,13 +5,25 @@
 \title{New Share Back Test functionality to properly capture portfolio changes.
 This is an event driven back test that updates portfolio at every trade event}
 \usage{
-bt.run.share.ex(b, prices = b$prices, clean.signal = T,
-  trade.summary = F, do.lag = 1, silent = F, capital = 1e+05,
-  commission = 0, weight = b$weight, dates = 1:nrow(b$prices),
-  lot.size = 0.01, control = list(round.lot =
-  default.round.lot.control()), cashflow.control = list(),
-  adjusted = T, dividend.control = list(foreign.withholding.tax = NULL,
-  invest = spl("cash,rebalance,update")), tax.control = NULL)
+bt.run.share.ex(
+  b,
+  prices = b$prices,
+  clean.signal = T,
+  trade.summary = F,
+  do.lag = 1,
+  silent = F,
+  capital = 1e+05,
+  commission = 0,
+  weight = b$weight,
+  dates = 1:nrow(b$prices),
+  lot.size = 0.01,
+  control = list(round.lot = default.round.lot.control()),
+  cashflow.control = list(),
+  adjusted = T,
+  dividend.control = list(foreign.withholding.tax = NULL, invest =
+    spl("cash,rebalance,update")),
+  tax.control = NULL
+)
 }
 \description{
 Summary:

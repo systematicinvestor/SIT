@@ -4,8 +4,13 @@
 \alias{tableColor}
 \title{Add color highlighting to the \code{\link{reactiveTable}} function}
 \usage{
-tableColor(data, header.col = "LightGray", row.col = "yellow",
-  negative.col = "red", ...)
+tableColor(
+  data,
+  header.col = "LightGray",
+  row.col = "yellow",
+  negative.col = "red",
+  ...
+)
 }
 \arguments{
 \item{data}{table data}

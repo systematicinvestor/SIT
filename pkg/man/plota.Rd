@@ -4,9 +4,21 @@
 \alias{plota}
 \title{Plot function for time series}
 \usage{
-plota(y, main = NULL, plotX = TRUE, LeftMargin = 0,
-  x.highlight = NULL, y.highlight = NULL, las = 1, type = "n",
-  xlab = "", ylab = "", ylim = NULL, log = "", ...)
+plota(
+  y,
+  main = NULL,
+  plotX = TRUE,
+  LeftMargin = 0,
+  x.highlight = NULL,
+  y.highlight = NULL,
+  las = 1,
+  type = "n",
+  xlab = "",
+  ylab = "",
+  ylim = NULL,
+  log = "",
+  ...
+)
 }
 \arguments{
 \item{y}{\code{\link{xts}} object}

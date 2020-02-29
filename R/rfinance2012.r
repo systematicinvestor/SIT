@@ -199,7 +199,7 @@ group.seasonality <- function
 
 #############################################################################
 # Time seasonally for given periods
-#' @export 
+#' @export time.seasonality
 ###############################################################################
 time.seasonality <- function
 (
@@ -282,7 +282,7 @@ time.seasonality <- function
 
 #############################################################################
 # Find and Plot Classical Techical Patterns
-#' @export 
+#' @export plot.patterns
 #############################################################################
 plot.patterns <- function
 (

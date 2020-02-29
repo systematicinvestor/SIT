@@ -4,8 +4,11 @@
 \alias{bt.apply.min.weight}
 \title{Remove small weights}
 \usage{
-bt.apply.min.weight(weight, long.min.weight = 0.1,
-  short.min.weight = long.min.weight)
+bt.apply.min.weight(
+  weight,
+  long.min.weight = 0.1,
+  short.min.weight = long.min.weight
+)
 }
 \arguments{
 \item{weight}{weight matrix}

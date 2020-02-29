@@ -4,9 +4,19 @@
 \alias{bt.run.share.ex.allocate}
 \title{Do one period re balance}
 \usage{
-bt.run.share.ex.allocate(weight.new, weight.prev, weight.change.index,
-  price, share, cash, commission, lot.size, silent = T,
-  control = default.round.lot.control(), cashflow = 0)
+bt.run.share.ex.allocate(
+  weight.new,
+  weight.prev,
+  weight.change.index,
+  price,
+  share,
+  cash,
+  commission,
+  lot.size,
+  silent = T,
+  control = default.round.lot.control(),
+  cashflow = 0
+)
 }
 \description{
 Do one period re balance

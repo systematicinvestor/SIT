@@ -4,8 +4,12 @@
 \alias{hist.quotes.url}
 \title{URL for various data providers}
 \usage{
-\method{hist}{quotes.url}(ticker = "IBM", from = "1900-01-01",
-  to = Sys.Date(), src = spl("yahoo,google,quotemedia"))
+\method{hist}{quotes.url}(
+  ticker = "IBM",
+  from = "1900-01-01",
+  to = Sys.Date(),
+  src = spl("yahoo,google,quotemedia")
+)
 }
 \description{
 [lookup ticker](http://www.quotemedia.com/portal/quote?qm_symbol=pot:ca)

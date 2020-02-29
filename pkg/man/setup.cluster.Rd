@@ -4,8 +4,7 @@
 \alias{setup.cluster}
 \title{Helper function to setup cluster}
 \usage{
-setup.cluster(expr = NULL, varlist = NULL, envir = .GlobalEnv,
-  cores = 1000)
+setup.cluster(expr = NULL, varlist = NULL, envir = .GlobalEnv, cores = 1000)
 }
 \description{
 load.packages('parallel')

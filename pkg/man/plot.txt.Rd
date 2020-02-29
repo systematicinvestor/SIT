@@ -4,8 +4,7 @@
 \alias{plot.txt}
 \title{Create Ascii(txt) plot}
 \usage{
-\method{plot}{txt}(y, x = NULL, pch = 1:ncol(y),
-  width = round(options()$width * 0.8))
+\method{plot}{txt}(y, x = NULL, pch = 1:ncol(y), width = round(options()$width * 0.8))
 }
 \arguments{
 \item{y}{matrix or vector of y values}
@@ -13,6 +12,8 @@
 \item{x}{optional vector of x values, \strong{defaults to 1:nr, where nr is the number of rows in y}}
 
 \item{pch}{optional vector of markers for time series, \strong{defaults to 1:nc, where nc is the number of columns in y}}
+
+\item{width}{optional location of the plot legend, \strong{defaults to 0.8 of the screen width}}
 }
 \value{
 nothing
