@@ -65,4 +65,12 @@
 #'    
 #' plotbt.custom.report.part2(models$equal.weight)
 #' }
+#' 
+#' 
+#' 
+#' @import graphics
+#' @import stats
+#' @import utils
+#'
+#' 
 NULL
