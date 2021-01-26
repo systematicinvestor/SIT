@@ -1222,7 +1222,7 @@ if (is.matrix(x) || (is.data.frame(x) && !is.data.table(x)) ) {
 if(!is.data.table(x)) {
   # set autostart
   out = tryCatch({ 
-	fread(filename, stringsAsFactors=F, sep=sep, autostart=2, skip=skip)
+	fread(filename, stringsAsFactors=F, sep=sep, skip=skip)
   }, error = function(ex) data.table(read.csv(filename,stringsAsFactors=F,sep=sep,skip=skip))
   )
 # alternative  
@@ -1241,11 +1241,11 @@ if(!is.data.table(x)) {
 # dates = out[,eval(first.column.expr)]
 # data = out[, eval(rest.columns.expr)]
 
-  dates = as.matrix(out[,date.column,with=FALSE])   
+  dates = out[,date.column,with=FALSE]   
   index = which(sapply(out,class) != 'character')
     index = index[ index > date.column ]  
   data =  as.matrix(out[,index,with=FALSE]+0) 
-}   
+}  
   dates = as.POSIXct(match.fun(date.fn)(dates), tz = Sys.getenv('TZ'), ...)
     dates.index = iif(is.null(decreasing), 1:nrow(data), order(dates, decreasing = decreasing) )
   out = make.xts(data[dates.index,,drop=F], dates[dates.index])
