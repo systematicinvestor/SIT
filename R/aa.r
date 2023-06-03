@@ -54,10 +54,10 @@ new.constraints <- function
 		}
 	}
 	
-	if ( is.null(lb) || is.na(lb) ) lb = rep(NA, n)
+	if ( is.null(lb) || all(is.na(lb)) ) lb = rep(NA, n)
 	if ( len(lb) != n ) lb = rep(lb[1], n)
 
-	if ( is.null(ub) || is.na(ub) ) ub = rep(NA, n)
+	if ( is.null(ub) || all(is.na(ub)) ) ub = rep(NA, n)
 	if ( len(ub) != n ) ub = rep(ub[1], n)
 		
 	
